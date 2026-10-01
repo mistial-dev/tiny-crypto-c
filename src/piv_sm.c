@@ -180,6 +180,8 @@ static TC_status finish_response(TC_PIV_SM* session, const TC_PIV_SM_peer* parse
          settings->key_bytes);
   memcpy(session->data.traffic.rmac_key, TC_SM_SYM(workspace).material + 3 * settings->key_bytes,
          settings->key_bytes);
+  memcpy(session->data.traffic.peer_digest, TC_SM_SYM(workspace).digest,
+         sizeof session->data.traffic.peer_digest);
   session->data.traffic.counter[15] = 1;
   session->state = TC_PIV_SM_READY;
 done:
@@ -187,6 +189,18 @@ done:
     TC_PIV_SM_clear(session);
   TC_secure_zero(workspace, sizeof *workspace);
   return status;
+}
+
+int TC_PIV_SM_peer_matches(const TC_PIV_SM* session, TC_bytes certificate)
+{
+  uint8_t digest[32];
+  if (!session || !certificate.data || !certificate.length ||
+      (session->state != TC_PIV_SM_READY && session->state != TC_PIV_SM_PENDING) ||
+      TC_SHA256_digest(certificate, digest) != TC_OK)
+    return 0;
+  const int matches = TC_ct_equal(digest, session->data.traffic.peer_digest, sizeof digest) == TC_OK;
+  TC_secure_zero(digest, sizeof digest);
+  return matches;
 }
 
 TC_status TC_PIV_SM_finish(TC_PIV_SM* session, const TC_PIV_SM_peer* peer,

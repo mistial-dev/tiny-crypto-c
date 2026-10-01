@@ -140,6 +140,8 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
         return result;
       if (!(usage & TC_KEY_USAGE_CERT_SIGN))
         return TC_TLV_INVALID;
+      if (usage & TC_KEY_USAGE_CRL_SIGN)
+        out->usage |= TC_X509_ANCHOR_USAGE_CRL_SIGN;
       break;
     }
     default:
@@ -170,6 +172,8 @@ TC_TLV_result tc_x509_anchor_certificate(const TC_X509_certificate* certificate,
     return TC_TLV_INVALID;
   out->trust.name = certificate->subject;
   out->trust.public_key = certificate->public_key;
+  if (certificate->version < 3)
+    out->usage |= TC_X509_ANCHOR_USAGE_CRL_SIGN;
   if (!certificate->extensions.data)
     return TC_TLV_OK;
   if (TC_DER_sequence(certificate->extensions, &contents) != TC_TLV_OK)

@@ -33,12 +33,45 @@ static int profile_fits(TC_PIV_card_profile profile, const TC_PIV_inventory* inv
   return inventory->link.application == TC_PIV_APPLICATION_PIV;
 }
 
+TC_TLV_result TC_PIV_card_chuid_profile(TC_PIV_application_id application,
+                                        TC_PIV_card_profile profile,
+                                        TC_PIV_CHUID_profile* out)
+{
+  if (!out || (profile != TC_PIV_CARD && profile != TC_TWIC_LEGACY_CARD &&
+               profile != TC_TWIC_NEXGEN_CARD))
+    return TC_TLV_ARGUMENT;
+  if (application == TC_PIV_APPLICATION_PIV)
+    *out = profile == TC_PIV_CARD ? TC_CHUID_PROFILE_PIV : TC_CHUID_PROFILE_LEGACY_KEY_MAP;
+  else if (application == TC_PIV_APPLICATION_TWIC && profile != TC_PIV_CARD)
+    *out = TC_CHUID_PROFILE_TWIC_SIGNED;
+  else
+    return TC_TLV_ARGUMENT;
+  return TC_TLV_OK;
+}
+
 static int objects_valid(const TC_PIV_object* objects, size_t count)
 {
   if (count && !objects)
     return 0;
   for (size_t i = 0; i < count; ++i)
     if (!objects[i].info)
+      return 0;
+  return 1;
+}
+
+/* A card check consumes the complete catalog snapshot produced by
+ * TC_PIV_inventory_read. Exact pointer identity also prevents callers from
+ * substituting metadata with the same container number. */
+static int inventory_complete(const TC_PIV_inventory* inventory)
+{
+  const size_t expected = TC_PIV_catalog_count(inventory->link.application,
+                                                inventory->link.profile);
+  if (!expected || inventory->count != expected || inventory->capacity < expected ||
+      !inventory->objects || (!inventory->pool && inventory->pool_used))
+    return 0;
+  for (size_t i = 0; i < expected; ++i)
+    if (inventory->objects[i].info !=
+        TC_PIV_catalog_at(inventory->link.application, inventory->link.profile, i))
       return 0;
   return 1;
 }
@@ -118,8 +151,7 @@ static int arguments_valid(const TC_PIV_card_check_request* request,
     return 0;
   const TC_PIV_inventory* inventory = request->inventory;
   int order = 1;
-  return inventory->count && inventory->count <= inventory->capacity &&
-         objects_valid(inventory->objects, inventory->count) &&
+  return inventory_complete(inventory) &&
          objects_valid(request->plain_copies, request->plain_copy_count) &&
          request->plain_copy_count <= SIZE_MAX / sizeof *request->plain_copies &&
          (request->sm_card_cvc.data || !request->sm_card_cvc.length) &&

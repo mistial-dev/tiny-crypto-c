@@ -863,9 +863,8 @@ static TC_TLV_result check_path(TC_bytes response, int crl, const TC_bytes* dele
                                        result);
 }
 
-/* TC_X509_path_check_revocation settles a member with an accepted OCSP
- * response and falls back to CRLs otherwise. A delegate without
- * id-pkix-ocsp-nocheck needs CRL evidence of its own (RFC 6960 4.2.2.2.1). */
+/* Authenticated revocation from either source wins. An unchecked delegate may
+ * report REVOKED, while GOOD requires proof that the delegate is unrevoked. */
 TC_TEST(path_fallback)
 {
   TC_X509_revocation_result result;
@@ -875,9 +874,9 @@ TC_TEST(path_fallback)
   const TC_bytes good = build_response(&spec, response_bytes);
   munit_assert_int(check_path(good, NO_CRL, NULL, &result), ==, TC_TLV_OK);
   munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
-  /* OCSP settles the member before the CRL is consulted. */
+  /* A revoking CRL overrides an accepted GOOD response. */
   munit_assert_int(check_path(good, CRL_REVOKES_TARGET, NULL, &result), ==, TC_TLV_OK);
-  munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
+  munit_assert_int(result.status, ==, TC_X509_REVOCATION_REVOKED);
 
   /* An unauthorized responder falls back to the CRL, which decides. */
   certificate_spec unauthorized = delegate_spec();
@@ -904,7 +903,8 @@ TC_TEST(path_fallback)
   spec.status = V_OCSP_CERTSTATUS_REVOKED;
   spec.reason = OCSP_REVOKED_STATUS_SUPERSEDED;
   const TC_bytes revoked = build_response(&spec, response_bytes);
-  munit_assert_int(check_path(revoked, NO_CRL, &delegate_der, &result), ==, TC_TLV_UNSUPPORTED);
+  munit_assert_int(check_path(revoked, NO_CRL, &delegate_der, &result), ==, TC_TLV_OK);
+  munit_assert_int(result.status, ==, TC_X509_REVOCATION_REVOKED);
   munit_assert_int(check_path(revoked, EMPTY_CRL, &delegate_der, &result), ==, TC_TLV_OK);
   munit_assert_int(result.status, ==, TC_X509_REVOCATION_REVOKED);
   munit_assert_uint(result.evidence.revocation.reason, ==, OCSP_REVOKED_STATUS_SUPERSEDED);

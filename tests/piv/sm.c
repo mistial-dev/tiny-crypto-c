@@ -4,6 +4,7 @@
  * sizing, response authentication and in-place decryption (SP 800-73-5
  * Part 2 sections 4.1 and 4.2). The APDU framing tests are in sm_apdu.c. */
 #include <tiny_crypto/piv_sm.h>
+#include <tiny_crypto/hash.h>
 #include "munit.h"
 #include "test_util.h"
 #include <string.h>
@@ -101,6 +102,30 @@ TC_TEST(ciphertext_size)
     munit_assert_size(length, ==, 999);
   }
   munit_assert_int(TC_PIV_SM_ciphertext_size(16, NULL), ==, TC_ERROR);
+  return MUNIT_OK;
+}
+
+TC_TEST(peer_binding)
+{
+  static const uint8_t certificate[] = {0x7f, 0x21, 0x01, 0x00};
+  uint8_t other[sizeof certificate];
+  TC_PIV_SM session = {0};
+  session.state = TC_PIV_SM_READY;
+  munit_assert_int(TC_SHA256_digest((TC_bytes){certificate, sizeof certificate},
+                                    session.data.traffic.peer_digest),
+                   ==, TC_OK);
+  munit_assert_true(
+      TC_PIV_SM_peer_matches(&session, (TC_bytes){certificate, sizeof certificate}));
+  memcpy(other, certificate, sizeof other);
+  other[sizeof other - 1] ^= 1;
+  munit_assert_false(TC_PIV_SM_peer_matches(&session, (TC_bytes){other, sizeof other}));
+  session.state = TC_PIV_SM_PENDING;
+  munit_assert_true(
+      TC_PIV_SM_peer_matches(&session, (TC_bytes){certificate, sizeof certificate}));
+  TC_PIV_SM_clear(&session);
+  munit_assert_false(
+      TC_PIV_SM_peer_matches(&session, (TC_bytes){certificate, sizeof certificate}));
+  munit_assert_false(TC_PIV_SM_peer_matches(NULL, (TC_bytes){certificate, sizeof certificate}));
   return MUNIT_OK;
 }
 
@@ -364,6 +389,7 @@ TC_TEST(in_place)
 static MunitTest tests[] = {
     {"/begin-failures", begin_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/ciphertext-size", ciphertext_size, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/peer-binding", peer_binding, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/response-failures", response_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/in-place", in_place, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};

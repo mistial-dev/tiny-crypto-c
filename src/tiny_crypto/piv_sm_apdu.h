@@ -127,6 +127,10 @@ TC_PIV_result TC_PIV_SM_key_request(TC_PIV_link* link, TC_PIV_SM* session, TC_PI
 TC_PIV_result TC_PIV_link_secure(TC_PIV_link* link, TC_PIV_SM_workspace* workspace,
                                  TC_buffer sm_scratch);
 
+/* 1 when the secured live link is bound to the exact authenticated card CVC,
+ * else 0. The comparison is constant-time over a SHA-256 binding. */
+int TC_PIV_link_sm_peer_matches(const TC_PIV_link* link, TC_bytes certificate);
+
 /* Clear the bound session, wipe the secure messaging scratch and clear the
  * secured, sm_lost and VCI state, so the next commands travel in plaintext.
  * Accepts NULL and an unsecured link. */

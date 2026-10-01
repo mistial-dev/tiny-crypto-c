@@ -242,6 +242,13 @@ TC_PIV_result TC_PIV_link_secure(TC_PIV_link* link, TC_PIV_SM_workspace* workspa
   return TC_PIV_OK;
 }
 
+int TC_PIV_link_sm_peer_matches(const TC_PIV_link* link, TC_bytes certificate)
+{
+  return link && (link->flags & TC_PIV_LINK_SECURED) && !(link->flags & TC_PIV_LINK_SM_LOST) &&
+         link->security == &tc_piv_sm_security && link->sm &&
+         TC_PIV_SM_peer_matches((const TC_PIV_SM*)link->sm, certificate);
+}
+
 void TC_PIV_link_unsecure(TC_PIV_link* link)
 {
   if (!link)

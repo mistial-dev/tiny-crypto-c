@@ -217,6 +217,13 @@ typedef struct {
   size_t plain_copy_count;
 } TC_PIV_card_check_request;
 
+/* Select the CHUID encoding rules for an application and credential profile.
+ * The PIV application on a TWIC card uses the legacy key-map form; the TWIC
+ * application uses its signed form. Invalid combinations return ARGUMENT. */
+TC_TLV_result TC_PIV_card_chuid_profile(TC_PIV_application_id application,
+                                       TC_PIV_card_profile profile,
+                                       TC_PIV_CHUID_profile* out);
+
 /* Scratch and output storage of one card check.
  * gzip          GZIP decoder scratch for compressed certificates.
  * point         EC scratch for CVC point checks, cleared after each check.

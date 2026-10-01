@@ -139,6 +139,7 @@ static TC_TLV_result cert_path_controls(TC_bytes contents, const TC_TLV_limits* 
       out->names = embedded.names;
       out->path_len = embedded.path_len;
       out->has_path_len = embedded.has_path_len;
+      out->usage = embedded.usage;
       out->certificate_extensions = embedded.certificate_extensions;
       break;
     }

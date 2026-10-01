@@ -28,6 +28,11 @@ enum {
   TC_X509_ANCHOR_REPLACED_PATH_LEN = 1u << 3
 };
 
+/* Local authorization carried with a configured anchor. Certificate-derived
+ * records set CRL_SIGN for v1/v2 certificates or for v3 keyUsage with
+ * cRLSign. TrustAnchorInfo and caller-built records opt in explicitly. */
+enum { TC_X509_ANCHOR_USAGE_CRL_SIGN = 1u << 0 };
+
 /* One trust anchor with its RFC 5937 path controls. Validation applies the
  * normalized fields names, policy_set, policy_flags and path_len. The
  * extension spans are checked for controls those fields must reflect.
@@ -49,6 +54,8 @@ typedef struct {
   /* TC_X509_PATH_REQUIRE_EXPLICIT_POLICY, _INHIBIT_MAPPING and
    * _INHIBIT_ANY_POLICY only. */
   unsigned policy_flags;
+  /* TC_X509_ANCHOR_USAGE_* bits. Unknown bits make validation fail. */
+  unsigned usage;
   /* TC_X509_ANCHOR_REPLACED_* bits. TC_X509_trust_anchor_next sets them.
    * Caller-built records set a bit only when the normalized field holds the
    * replacing value. Other bits make validation return ERROR. */

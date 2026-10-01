@@ -7,6 +7,7 @@
 #if TC_ENABLE_PIV_CARD_CHECK
 #include "internal.h"
 #include "piv_card_check_internal.h"
+#include <tiny_crypto/piv_sm_apdu.h>
 #include "credential_status_internal.h"
 #if TC_ENABLE_PIV_CVC
 #include <tiny_crypto/piv_cvc.h>
@@ -38,6 +39,10 @@ static void card_cvc_check(tc_piv_check_run* run, const TC_PIV_certificate* fiel
     return;
   }
 #if TC_ENABLE_PIV_CVC
+  if (!TC_PIV_link_sm_peer_matches(request->link, request->sm_card_cvc)) {
+    tc_piv_check_status(run, check, TC_CREDENTIAL_INVALID);
+    return;
+  }
   if (info.sm_suite != SUITE_CS2 && info.sm_suite != SUITE_CS7) {
     tc_piv_check_not_checkable(check, TC_PIV_REASON_UNSUPPORTED);
     return;

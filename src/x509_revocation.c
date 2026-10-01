@@ -366,7 +366,7 @@ static TC_TLV_result x509_crl_resolve_target(x509_crl_prepared* prepared, TC_byt
   tc_x509_crl_dependencies dependencies = {resolution->options,
                                            resolution->anchor_index,
                                            prepared->workspace,
-                                           &prepared->anchor.trust,
+                                           &prepared->anchor,
                                            prepared->writes,
                                            CRL_SCOPE_WRITES,
                                            path ? path->dependency_count : 0};
@@ -436,20 +436,21 @@ static TC_TLV_result x509_ocsp_issuer(const x509_crl_path_context* path, size_t 
   return result;
 }
 
-/* RFC 6960 4.2.2.2.1: a delegate without id-pkix-ocsp-nocheck is trusted
- * only when separate evidence shows it unrevoked. Here that evidence is the
- * CRL index. OK means the delegate is proven unrevoked. */
-static TC_TLV_result x509_ocsp_delegate_checked(const x509_crl_path_context* path,
-                                                TC_bytes delegate)
+/* Keep the delegate's three-state result. An unavailable delegate check may
+ * not authorize GOOD, but it must not discard an authenticated REVOKED answer
+ * about the target. */
+static TC_TLV_result x509_ocsp_delegate_status(const x509_crl_path_context* path,
+                                               TC_bytes delegate,
+                                               TC_X509_revocation_status* status)
 {
   TC_X509_crl_evidence evidence = {0};
-  TC_X509_revocation_status status = TC_X509_REVOCATION_UNDETERMINED;
+  if (!status)
+    return TC_TLV_ARGUMENT;
+  *status = TC_X509_REVOCATION_UNDETERMINED;
   TC_TLV_result result = x509_crl_resolve_target(path->prepared, delegate, &evidence);
   if (result == TC_TLV_OK)
-    result = tc_x509_crl_evidence_status(&evidence, &status);
-  if (result != TC_TLV_OK)
-    return result;
-  return status == TC_X509_REVOCATION_GOOD ? TC_TLV_OK : TC_TLV_UNSUPPORTED;
+    result = tc_x509_crl_evidence_status(&evidence, status);
+  return result;
 }
 
 /* Verify the member's OCSP response and convert an accepted result to CRL
@@ -480,10 +481,19 @@ static TC_TLV_result x509_ocsp_member(const x509_crl_path_context* path, size_t 
                                                &options->signer_policy->signatures};
   TC_X509_ocsp_result verified;
   result = TC_X509_ocsp_response_verify(&request, validation, work, &verified);
-  if (result == TC_TLV_OK && verified.responder_certificate.data && !verified.responder_nocheck)
-    result = x509_ocsp_delegate_checked(path, verified.responder_certificate);
   if (result != TC_TLV_OK)
     return result;
+  if (verified.responder_certificate.data && !verified.responder_nocheck) {
+    TC_X509_revocation_status delegate = TC_X509_REVOCATION_UNDETERMINED;
+    result = x509_ocsp_delegate_status(path, verified.responder_certificate, &delegate);
+    if (result == TC_TLV_LIMIT || result == TC_TLV_ARGUMENT)
+      return result;
+    if (result == TC_TLV_OK && delegate == TC_X509_REVOCATION_REVOKED)
+      return TC_TLV_UNSUPPORTED;
+    if (verified.status != TC_X509_REVOCATION_REVOKED &&
+        (result != TC_TLV_OK || delegate != TC_X509_REVOCATION_GOOD))
+      return TC_TLV_UNSUPPORTED;
+  }
   TC_X509_crl_evidence accepted = {0};
   accepted.reasons = TC_X509_CRL_ALL_REASONS;
   if (verified.status == TC_X509_REVOCATION_REVOKED) {
@@ -504,13 +514,26 @@ static TC_TLV_result x509_member_evidence(const x509_crl_path_context* path, siz
   /* The callback type passes index for OCSP response lookup. */
   (void)index;
 #else
-  /* An accepted OCSP response settles the member. Other outcomes fall back
-   * to CRLs, except exhausted limits and argument errors. */
+  /* Authenticated revocation is terminal. GOOD still consults CRLs so a
+   * revocation from either source wins independent of evaluation order. */
   if (path->ocsp && path->ocsp->options->ocsp.count &&
       path->ocsp->options->ocsp.responses[index].length) {
-    TC_TLV_result result = x509_ocsp_member(path, index, encoded, evidence);
-    if (result == TC_TLV_OK || result == TC_TLV_LIMIT || result == TC_TLV_ARGUMENT)
+    TC_X509_crl_evidence ocsp = {0};
+    TC_TLV_result result = x509_ocsp_member(path, index, encoded, &ocsp);
+    if (result == TC_TLV_LIMIT || result == TC_TLV_ARGUMENT)
       return result;
+    if (result == TC_TLV_OK) {
+      if (ocsp.revocation.found) {
+        *evidence = ocsp;
+        return TC_TLV_OK;
+      }
+      TC_X509_crl_evidence crl = {0};
+      result = x509_crl_resolve_target(path->prepared, encoded, &crl);
+      if (result == TC_TLV_LIMIT || result == TC_TLV_ARGUMENT)
+        return result;
+      *evidence = result == TC_TLV_OK && crl.revocation.found ? crl : ocsp;
+      return TC_TLV_OK;
+    }
   }
 #endif
   return x509_crl_resolve_target(path->prepared, encoded, evidence);
@@ -714,18 +737,22 @@ TC_X509_path_status tc_x509_crl_dependencies_path(const TC_X509_search_result* p
 }
 
 TC_X509_signature_result tc_x509_crl_selected_anchor_check(
-    const tc_x509_crl_selected* selected, const TC_X509_trust_anchor* anchor,
+    const tc_x509_crl_selected* selected, const TC_X509_store_anchor* anchor,
     const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
     const TC_X509_name_workspace* names, size_t* work)
 {
   if (!selected || !selected->base || !anchor || !provider || !limits || !names || !work)
     return TC_X509_SIGNATURE_ERROR;
+  if (anchor->usage & ~TC_X509_ANCHOR_USAGE_CRL_SIGN)
+    return TC_X509_SIGNATURE_ERROR;
+  if (!(anchor->usage & TC_X509_ANCHOR_USAGE_CRL_SIGN))
+    return TC_X509_SIGNATURE_INVALID;
   const TC_X509_crl* records[] = {selected->base, selected->delta};
   for (size_t i = 0; i < sizeof records / sizeof *records; ++i) {
     if (!records[i])
       continue;
     TC_X509_signature_result result =
-        tc_x509_crl_anchor_check(records[i], anchor, provider, limits, names, work);
+        tc_x509_crl_anchor_check(records[i], &anchor->trust, provider, limits, names, work);
     if (result != TC_X509_SIGNATURE_VALID)
       return result;
   }

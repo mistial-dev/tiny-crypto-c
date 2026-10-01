@@ -50,13 +50,16 @@ void tc_piv_check_chuid(tc_piv_check_run* run)
     /* SP 800-73-5 Part 1 section 3.1.2, TWIC Part 2 v5 section 4.6.3. The
      * PIV application of a TWIC card keeps the optional Authentication Key
      * Map of SP 800-73-2 (3D), which a NEXGEN card sends empty. */
+    TC_PIV_CHUID_profile chuid_profile;
+    if (TC_PIV_card_chuid_profile(run->report->application, report->profile, &chuid_profile) !=
+        TC_TLV_OK) {
+      run->result = TC_PIV_ERROR;
+      return;
+    }
     const TC_PIV_CHUID_validation_request request = {object->encoded,
                                                      TC_PIV_CHUID_CONTAINER,
                                                      report->profile,
-                                                     tc_piv_check_piv(run) ? TC_CHUID_PROFILE_PIV
-                                                     : run->twic_piv
-                                                         ? TC_CHUID_PROFILE_LEGACY_KEY_MAP
-                                                         : TC_CHUID_PROFILE_TWIC_SIGNED,
+                                                     chuid_profile,
                                                      0,
                                                      &report->card,
                                                      &report->card_expiration};
@@ -271,7 +274,7 @@ static int integrity_proven(const tc_piv_check_run* run, const TC_PIV_object* ob
   const TC_PIV_check_requirement digest = {TC_PIV_CHECK_SECURITY_DIGEST, 0,
                                            object->info->container};
   const TC_PIV_check* digested = TC_PIV_card_report_find(run->report, &digest);
-  return !digested || digested->outcome == TC_PIV_CHECK_PASSED;
+  return digested && digested->outcome == TC_PIV_CHECK_PASSED;
 }
 
 /* DISCOVERY_CONSISTENCY: a nonempty BIT group needs the OCC bit of the
@@ -295,13 +298,17 @@ void tc_piv_check_discovery(tc_piv_check_run* run)
   else if (bit_group->state != TC_PIV_OBJECT_PRESENT && bit_group->state != TC_PIV_OBJECT_ABSENT &&
            bit_group->state != TC_PIV_OBJECT_EMPTY)
     tc_piv_check_unread(run, &check, bit_group, 0);
-  else if (!integrity_proven(run, discovery) || !integrity_proven(run, bit_group))
+  else if (!integrity_proven(run, discovery) ||
+           (bit_group->state == TC_PIV_OBJECT_PRESENT && !integrity_proven(run, bit_group)))
     tc_piv_check_not_checkable(&check, TC_PIV_REASON_DEPENDENCY);
   else {
     TC_PIV_discovery policy;
     const TC_PIV_discovery_profile profile =
         tc_piv_check_piv(run) ? TC_PIV_DISCOVERY_PIV : TC_PIV_DISCOVERY_TWIC;
     TC_TLV_result status = TC_PIV_discovery_read(discovery->encoded, profile, &policy);
+    if (status == TC_TLV_OK && (policy.policy & TC_PIV_POLICY_OCC) &&
+        bit_group->state != TC_PIV_OBJECT_PRESENT)
+      status = TC_TLV_INVALID;
     if (status == TC_TLV_OK && bit_group->state == TC_PIV_OBJECT_PRESENT) {
       TC_PIV_bit_group group;
       status = TC_PIV_bit_group_read(bit_group->encoded, &group);

@@ -257,9 +257,10 @@ static void plain_reads(Inspect* inspect)
   } else {
     fputs("SM certificate signer: unavailable\n", inspect->out);
   }
-  const TC_PIV_CHUID_profile chuid_profile =
-      inspect->profile == TC_PIV_CARD ? TC_CHUID_PROFILE_PIV : TC_CHUID_PROFILE_TWIC_SIGNED;
+  TC_PIV_CHUID_profile chuid_profile;
   inspect->has_chuid =
+      TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, inspect->profile,
+                                &chuid_profile) == TC_TLV_OK &&
       plain_read(inspect, chuid_tag, COPY_CHUID) &&
       TC_PIV_CHUID_read(inspect->copies[COPY_CHUID].encoded, TC_PIV_CHUID_CONTAINER, chuid_profile,
                         &inspect->chuid) == TC_TLV_OK &&

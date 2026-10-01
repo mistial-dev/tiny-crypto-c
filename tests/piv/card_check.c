@@ -314,6 +314,11 @@ static void expect_all_passed(const TC_PIV_check_requirement* exceptions, size_t
     const TC_PIV_check* check = &report.checks[i];
     if (excepted(check, exceptions, count))
       continue;
+    /* The captured SD 33 cards omit the present BIT group from the Security
+     * Object. Its unauthenticated bytes cannot establish consistency. */
+    if (check->kind == TC_PIV_CHECK_DISCOVERY_CONSISTENCY && check->container == 0x6050 &&
+        check->outcome == TC_PIV_CHECK_NOT_CHECKABLE && check->reason == TC_PIV_REASON_DEPENDENCY)
+      continue;
     if (check->outcome != TC_PIV_CHECK_PASSED)
       munit_errorf("check %zu kind %u container %04x key %02x: outcome %u reason %u status %d", i,
                    check->kind, check->container, check->key_reference, check->outcome,
@@ -326,6 +331,9 @@ static const uint16_t card2_mapped[] = {0xdb00, 0x3000, 0x6010, 0x3001, 0x6030, 
 
 static const TC_PIV_check_requirement iris_only[] = {{TC_PIV_CHECK_BIOMETRIC, 0, 0x1015},
                                                      {TC_PIV_CHECK_SM_CVC, 0, 0x1017}};
+static const TC_PIV_check_requirement card2_exceptions[] = {
+    {TC_PIV_CHECK_BIOMETRIC, 0, 0x1015}, {TC_PIV_CHECK_SM_CVC, 0, 0x1017},
+    {TC_PIV_CHECK_DISCOVERY_CONSISTENCY, 0, 0x6050}};
 
 static void expect_card2_complete(void)
 {
@@ -349,7 +357,10 @@ static void expect_card2_complete(void)
   expect_passed(TC_PIV_CHECK_BIOMETRIC, 0x6030);
   expect(TC_PIV_CHECK_BIOMETRIC, 0x1015, TC_PIV_CHECK_NOT_CHECKABLE, TC_PIV_REASON_UNSUPPORTED);
   expect_passed(TC_PIV_CHECK_PRINTED_EXPIRATION, 0x3001);
-  expect_passed(TC_PIV_CHECK_DISCOVERY_CONSISTENCY, 0x6050);
+  /* The card's Security Object hashes Discovery but omits the present BIT
+   * group, so consistency cannot rely on the BIT bytes. */
+  expect(TC_PIV_CHECK_DISCOVERY_CONSISTENCY, 0x6050, TC_PIV_CHECK_NOT_CHECKABLE,
+         TC_PIV_REASON_DEPENDENCY);
   expect_passed(TC_PIV_CHECK_SM_SIGNER, 0x1017);
   expect_passed(TC_PIV_CHECK_REVOCATION, 0x1017);
   for (size_t i = 0; i < TC_PIV_CARD_CERTIFICATES; ++i)
@@ -359,7 +370,7 @@ static void expect_card2_complete(void)
   munit_assert_uint8(report.has_security, ==, 1);
   munit_assert_int(report.profile, ==, TC_PIV_CARD);
   munit_assert_int(report.application, ==, TC_PIV_APPLICATION_PIV);
-  expect_all_passed(iris_only, 2);
+  expect_all_passed(card2_exceptions, 3);
 }
 
 /* ---- Key proofs ---- */
@@ -720,8 +731,8 @@ TC_TEST(card2_failures)
   expect(TC_PIV_CHECK_KEY_PROOF, 0, TC_PIV_CHECK_NOT_CHECKABLE, TC_PIV_REASON_DEPENDENCY);
   TC_PIV_inventory_clear(&inventory);
 
-  /* A nonempty BIT group without the OCC policy bit fails the Discovery
-   * consistency (Part 1 section 3.3.6). */
+  /* A nonempty BIT group omitted from the Security Object cannot be used to
+   * decide Discovery consistency. */
   static const uint8_t bit_group[] = {0x7f, 0x61, 0x08, 0x02, 0x01, 0x01,
                                       0x7f, 0x60, 0x02, 0x01, 0x02};
   link_open(TC_PIV_CONTACT);
@@ -730,7 +741,8 @@ TC_TEST(card2_failures)
       ==, 1);
   card2_contact_inventory();
   munit_assert_int(check_run(&request), ==, TC_PIV_OK);
-  expect(TC_PIV_CHECK_DISCOVERY_CONSISTENCY, 0x6050, TC_PIV_CHECK_FAILED, TC_PIV_REASON_NONE);
+  expect(TC_PIV_CHECK_DISCOVERY_CONSISTENCY, 0x6050, TC_PIV_CHECK_NOT_CHECKABLE,
+         TC_PIV_REASON_DEPENDENCY);
   TC_PIV_inventory_clear(&inventory);
 
   /* Without an authenticated Security Object the Discovery Object and the
@@ -892,6 +904,28 @@ TC_TEST(work_limit)
  * unchanged. */
 TC_TEST(arguments)
 {
+  TC_PIV_CHUID_profile chuid_profile = TC_CHUID_PROFILE_PIV;
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_PIV_CARD,
+                                             &chuid_profile),
+                   ==, TC_TLV_OK);
+  munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_PIV);
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_TWIC_LEGACY_CARD,
+                                             &chuid_profile),
+                   ==, TC_TLV_OK);
+  munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_LEGACY_KEY_MAP);
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_TWIC_NEXGEN_CARD,
+                                             &chuid_profile),
+                   ==, TC_TLV_OK);
+  munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_LEGACY_KEY_MAP);
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_TWIC, TC_TWIC_NEXGEN_CARD,
+                                             &chuid_profile),
+                   ==, TC_TLV_OK);
+  munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_TWIC_SIGNED);
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_TWIC, TC_PIV_CARD,
+                                             &chuid_profile),
+                   ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_PIV_CARD, NULL), ==,
+                   TC_TLV_ARGUMENT);
   load("sd33_card2");
   card2_trust(EVIDENCE_ALL, TC_VALIDATION_REVOCATION_REQUIRED);
   link_open(TC_PIV_CONTACT);
@@ -928,6 +962,24 @@ TC_TEST(arguments)
   request = check_request();
   twic = inventory;
   twic.count = 0;
+  request.inventory = &twic;
+  munit_assert_int(TC_PIV_card_check(&request, &workspace, &work, &report), ==, TC_PIV_ARGUMENT);
+  twic = inventory;
+  --twic.count;
+  request.inventory = &twic;
+  munit_assert_int(TC_PIV_card_check(&request, &workspace, &work, &report), ==, TC_PIV_ARGUMENT);
+  TC_PIV_object altered[CATALOG];
+  memcpy(altered, inventory.objects, sizeof altered);
+  TC_PIV_object swapped = altered[0];
+  altered[0] = altered[1];
+  altered[1] = swapped;
+  twic = inventory;
+  twic.objects = altered;
+  request.inventory = &twic;
+  munit_assert_int(TC_PIV_card_check(&request, &workspace, &work, &report), ==, TC_PIV_ARGUMENT);
+  memcpy(altered, inventory.objects, sizeof altered);
+  TC_PIV_object_info forged = *altered[0].info;
+  altered[0].info = &forged;
   request.inventory = &twic;
   munit_assert_int(TC_PIV_card_check(&request, &workspace, &work, &report), ==, TC_PIV_ARGUMENT);
   /* The report inside the inventory pool. */

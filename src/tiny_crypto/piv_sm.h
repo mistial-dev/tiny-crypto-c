@@ -46,7 +46,7 @@ typedef struct {
     struct {
       uint8_t mac_key[TC_PIV_SM_KEY_BYTES], enc_key[TC_PIV_SM_KEY_BYTES],
           rmac_key[TC_PIV_SM_KEY_BYTES];
-      uint8_t counter[16], command_mcv[16], response_mcv[16];
+      uint8_t counter[16], command_mcv[16], response_mcv[16], peer_digest[32];
     } traffic;
   } data;
   uint8_t suite, state;
@@ -148,6 +148,10 @@ TC_status TC_PIV_SM_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite, const uint8
  * invalid peer key and KDF failure. */
 TC_status TC_PIV_SM_finish(TC_PIV_SM* session, const TC_PIV_SM_peer* peer,
                            TC_bytes authenticated_key, TC_PIV_SM_workspace* workspace);
+
+/* 1 when READY or PENDING and certificate is the exact CVC bound into the
+ * authenticated key-establishment transcript, else 0. */
+int TC_PIV_SM_peer_matches(const TC_PIV_SM* session, TC_bytes certificate);
 
 /* Store the padded ciphertext size for plaintext_length. Padding always adds
  * 1 to 16 bytes, so a multiple of 16 grows by a full block. Empty plaintext

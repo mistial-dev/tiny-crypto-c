@@ -261,7 +261,7 @@ typedef struct {
   const TC_X509_path_options* options;
   size_t anchor_index;
   const tc_x509_crl_resolution_workspace* workspace;
-  const TC_X509_trust_anchor* anchor;
+  const TC_X509_store_anchor* anchor;
   const TC_bytes* writes;
   size_t write_count;
   size_t count;
@@ -308,7 +308,7 @@ TC_TLV_result tc_x509_crl_dependency_find_indexed(TC_X509_revocation_node* nodes
 
 /* Both effective records must verify with the anchor to bypass signer paths. */
 TC_X509_signature_result tc_x509_crl_selected_anchor_check(
-    const tc_x509_crl_selected* selected, const TC_X509_trust_anchor* anchor,
+    const tc_x509_crl_selected* selected, const TC_X509_store_anchor* anchor,
     const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
     const TC_X509_name_workspace* names, size_t* work);
 

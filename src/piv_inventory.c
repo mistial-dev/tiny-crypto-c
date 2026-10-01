@@ -205,7 +205,7 @@ TC_PIV_result TC_PIV_inventory_read(TC_PIV_link* link, const TC_PIV_inventory_pl
                             TC_PIV_OBJECT_SKIPPED,
                             0};
     const size_t left = pool.capacity - used;
-    const TC_buffer region = {pool.data + used, left < cap ? left : cap};
+    const TC_buffer region = {pool.data ? pool.data + used : NULL, left < cap ? left : cap};
     int sent = 0;
     if (!work_charge(work, 1))
       return inventory_abort(inventory, pool.data, touched, TC_PIV_LIMIT);
@@ -225,7 +225,7 @@ TC_PIV_result TC_PIV_inventory_read(TC_PIV_link* link, const TC_PIV_inventory_pl
     inventory->objects[i] = object;
   }
   /* SW bytes, padding and MACs after the last object. */
-  TC_secure_zero(pool.data + used, touched - used);
+  TC_secure_zero(pool.data ? pool.data + used : NULL, touched - used);
   inventory->count = count;
   inventory->pool = pool.data;
   inventory->pool_used = used;

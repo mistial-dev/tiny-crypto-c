@@ -92,7 +92,7 @@ Checks (40):
   PASSED        biometric               6030
   NOT_CHECKABLE biometric               1015 unsupported
   PASSED        printed expiration      3001
-  PASSED        discovery consistency   6050
+  NOT_CHECKABLE discovery consistency   6050 dependency
   PASSED        SM signer               1017
   PASSED        revocation              1017
   PASSED        SM CVC                  1017
@@ -100,5 +100,5 @@ Checks (40):
   PASSED        copy match              3000
   PASSED        key proof               0101 key 9a
   PASSED        key proof               0500 key 9e
-Summary: 39 passed, 0 failed, 1 not checkable
+Summary: 38 passed, 0 failed, 2 not checkable
 Result: accepted
