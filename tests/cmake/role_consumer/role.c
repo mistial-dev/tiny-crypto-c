@@ -125,6 +125,10 @@ static MunitResult rsa_signature(const MunitParameter params[], void* context)
   const TC_signature_algorithm algorithm = {pss ? TC_SIGNATURE_RSA_PSS : TC_SIGNATURE_RSA_V15,
                                             TC_HASH_SHA256, TC_HASH_SHA256, TC_SHA256_DIGESTLEN};
   for (size_t i = 0; i < sizeof rsa_vectors / sizeof *rsa_vectors; ++i) {
+#if !TC_RSA_ENABLE_1024
+    if (rsa_vectors[i].bits == 1024)
+      continue;
+#endif
     TC_X509_public_key key;
     size_t spki_length = tc_test_hex(rsa_vectors[i].spki, spki, sizeof spki);
     size_t signature_length =

@@ -113,11 +113,11 @@ TC_RSA_result TC_RSA_raw_private(const TC_RSA_public_key* key, TC_bytes private_
   const size_t length = key->modulus.length;
   if (!private_exponent.length || private_exponent.length > length || input.length != length)
     return TC_RSA_INVALID;
-  /* The operation and one blinding attempt fit the budget before any RNG
-   * request. */
-  const uint32_t cost =
-      tc_rsa_private_base_cost(length, key->exponent.length, 0) + tc_rsa_blinding_cost(length);
-  if (output.capacity < length ||
+  /* Preflight every allowed blinding attempt before private arithmetic. */
+  const uint32_t cost = TC_RSA_private_work(
+      &(TC_RSA_private_key){*key, private_exponent, {NULL, 0}, {NULL, 0}, NULL},
+      execution->random_attempts);
+  if (!cost || output.capacity < length ||
       workspace->capacity < TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(length * 8) ||
       execution->work.remaining < cost)
     return TC_RSA_LIMIT;
@@ -258,13 +258,14 @@ static TC_RSA_result tc_rsa_sign_limits(const tc_rsa_sign_call* call,
                                         const tc_rsa_private_view* view, size_t encode_cost)
 {
   const size_t length = view->public_key->modulus.length;
-  const uint32_t private_cost =
-      tc_rsa_private_base_cost(length, view->public_key->exponent.length, view->crt) +
-      tc_rsa_blinding_cost(length);
+  const TC_RSA_crt crt = {view->dp, view->dq, view->q_inverse};
+  const TC_RSA_private_key key = {*view->public_key, view->d, view->p, view->q,
+                                  view->crt ? &crt : NULL};
+  const uint32_t private_cost = TC_RSA_private_work(&key, call->execution->random_attempts);
   const uint32_t remaining = call->execution->work.remaining;
   if (call->signature.capacity < length ||
       call->workspace->capacity < TC_RSA_SIGN_WORKSPACE_WORDS(length * 8) ||
-      !call->execution->random_attempts || remaining < private_cost ||
+      !private_cost || remaining < private_cost ||
       remaining - private_cost < encode_cost)
     return TC_RSA_LIMIT;
   return TC_RSA_OK;

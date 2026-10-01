@@ -32,10 +32,10 @@ int main()
   if (TC_CMS_signed_attributes_read({nullptr, 0}, &cms_policy, &cms_limits,
                                     TC_TLV_frames{frames, 8}, &work, &attributes) != TC_TLV_MORE)
     return 1;
-  TC_RSA_word rsa_words[TC_RSA_VERIFY_WORKSPACE_WORDS(1024)];
+  TC_RSA_word rsa_words[TC_RSA_VERIFY_WORKSPACE_WORDS(2048)];
   auto rsa_workspace = tiny_crypto::rsa_workspace_for(rsa_words);
   tiny_crypto::rsa_public_key rsa_key = {};
-  uint8_t ciphertext[128] = {};
+  uint8_t ciphertext[256] = {};
   tiny_crypto::rsa_oaep_options oaep = {TC_HASH_SHA256, TC_HASH_SHA256, {nullptr, 0}};
   tiny_crypto::rsa_execution execution = {{nullptr, nullptr}, 0, {0}};
   if (tiny_crypto::rsa_encrypt_oaep(rsa_key, oaep, {nullptr, 0}, rsa_workspace,
@@ -45,7 +45,7 @@ int main()
   TC_work_budget rsa_work = {0};
   const tiny_crypto::rsa_pss_options pss = {TC_HASH_SHA256, TC_HASH_SHA256, 32};
   const uint8_t digest[32] = {}, salt[32] = {};
-  uint8_t representative[128];
+  uint8_t representative[256];
   rsa_work.remaining = UINT32_MAX;
   if (tiny_crypto::rsa_encode_pss_digest(pss, {digest, sizeof digest}, {salt, sizeof salt},
                                          representative, rsa_work) != TC_RSA_OK)
@@ -61,7 +61,7 @@ int main()
   if (tiny_crypto::rsa_verify_v15_digest(rsa_key, v15, {nullptr, 0}, {nullptr, 0}, rsa_workspace,
                                          rsa_work) != TC_RSA_ARGUMENT)
     return 1;
-  uint8_t raw_output[128];
+  uint8_t raw_output[256];
   rsa_work.remaining = UINT32_MAX;
   if (tiny_crypto::rsa_raw_public(rsa_key, {nullptr, 0}, rsa_workspace, raw_output, rsa_work) !=
       TC_RSA_ARGUMENT)
@@ -83,7 +83,7 @@ int main()
   tiny_crypto::AES_dynamic_CMAC cmac;
   uint8_t cmac_tag[16];
   if (cmac.init({aes_key, sizeof aes_key}) != TC_OK || cmac.update(original) != TC_OK ||
-      cmac.final(cmac_tag) != TC_OK)
+      cmac.finish(cmac_tag) != TC_OK)
     return 1;
   uint8_t hmac_tag[TC_HMAC_MIN_TAG_LEN];
   if (tiny_crypto::HMAC_SHA256::mac({aes_key, sizeof aes_key}, {original, sizeof original},

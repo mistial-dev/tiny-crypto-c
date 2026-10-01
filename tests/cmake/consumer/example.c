@@ -108,7 +108,7 @@ int main(void)
       return 1;
   }
   {
-    uint8_t digest[32] = {0}, encoded[128];
+    uint8_t digest[32] = {0}, encoded[256];
     const TC_bytes input = {digest, sizeof digest};
     const TC_buffer output = {encoded, sizeof encoded};
     const TC_RSA_v15_options options = {TC_HASH_SHA256};
@@ -328,7 +328,7 @@ int main(void)
     example_twic_ccl_import_clear(&import_state);
   }
   {
-    enum { KEY_BITS = 1024, KEY_BYTES = KEY_BITS / 8 };
+    enum { KEY_BITS = 2048, KEY_BYTES = KEY_BITS / 8 };
     uint8_t modulus[KEY_BYTES], exponent[] = {3}, ciphertext[KEY_BYTES];
     TC_RSA_word scratch[TC_RSA_ENCRYPT_WORKSPACE_WORDS(KEY_BITS)];
     const TC_RSA_public_key key = {{modulus, sizeof modulus}, {exponent, sizeof exponent}};

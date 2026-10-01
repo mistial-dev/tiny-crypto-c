@@ -76,7 +76,8 @@ static inline int tc_rsa_factor_has_half_bits(TC_bytes factor, size_t modulus_by
   size_t first = 0;
   while (first < factor.length && factor.data[first] == 0)
     ++first;
-  return factor.length - first == modulus_bytes / 2 && (factor.data[first] & 0x80u) != 0;
+  return first < factor.length && factor.length - first == modulus_bytes / 2 &&
+         (factor.data[first] & 0x80u) != 0;
 }
 
 /* FIPS 186-5 A.1.1 1(b): e odd with 2^16 < e < 2^256. Leading zero octets

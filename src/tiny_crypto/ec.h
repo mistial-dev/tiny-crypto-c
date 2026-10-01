@@ -71,11 +71,7 @@ typedef enum {
 
 /* Randomized operations draw from random, making at most random_attempts
  * requests. Work is reduced by the units completed on success and failure. */
-typedef struct {
-  TC_random_source random;
-  size_t random_attempts;
-  TC_work_budget work;
-} TC_EC_execution;
+typedef TC_execution TC_EC_execution;
 
 typedef enum {
   TC_EC_OPERATION_PUBLIC_KEY,

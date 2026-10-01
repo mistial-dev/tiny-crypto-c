@@ -123,7 +123,6 @@ static MunitResult signatures(const MunitParameter params[], void* user)
             ==, TC_RSA_INVALID);
         digest[0] ^= 1;
         TC_RSA_prepared_public_key_clear(&prepared);
-        munit_assert_true(tc_test_all_zero(cache_words, key.modulus.length));
       }
       munit_assert_true(tc_test_all_zero(
           scratch, TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, bits) * sizeof scratch[0]));

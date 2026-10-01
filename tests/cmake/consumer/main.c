@@ -7,8 +7,8 @@ int main(void)
       !TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, 3072))
     return 1;
   {
-    static TC_RSA_word words[TC_RSA_KEYGEN_WORKSPACE_WORDS(1024)];
-    static uint8_t modulus[128], exponent[3], d[128], p[64], q[64];
+    static TC_RSA_word words[TC_RSA_KEYGEN_WORKSPACE_WORDS(2048)];
+    static uint8_t modulus[256], exponent[3], d[256], p[128], q[128];
     TC_RSA_workspace workspace = {words, sizeof words / sizeof *words};
     TC_RSA_keygen_output output = {{modulus, sizeof modulus},
                                    {exponent, sizeof exponent},
@@ -16,7 +16,7 @@ int main(void)
                                    {p, sizeof p},
                                    {q, sizeof q}};
     TC_RSA_keygen_state state = {0};
-    if (TC_RSA_keygen_init(&state, 1024, &output, (TC_RSA_keygen_limits){1, 1}, &workspace) !=
+    if (TC_RSA_keygen_init(&state, 2048, &output, (TC_RSA_keygen_limits){1, 1}, &workspace) !=
         TC_RSA_OK)
       return 1;
     TC_RSA_keygen_clear(&state);
@@ -24,7 +24,7 @@ int main(void)
       TC_RSA_private_key key = {0};
       TC_RSA_crt crt = {0};
       TC_RSA_crt_output crt_output = {0};
-      uint8_t signature[128];
+      uint8_t signature[256];
       size_t plaintext_length = 0;
       TC_work_budget work = {UINT32_MAX};
       TC_RSA_execution execution = {{NULL, NULL}, 1, {UINT32_MAX}};

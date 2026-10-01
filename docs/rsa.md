@@ -75,7 +75,9 @@ For repeated verification with one key, initialize a caller-owned
 a cache of one modulus width of limbs, a temporary workspace of two modulus
 widths, and a budget of `16 * modulus_bytes + 1`. It wipes temporary storage
 on success. Keep the borrowed modulus, exponent, and cache storage alive and
-unchanged until `TC_RSA_prepared_public_key_clear`, which wipes the cache.
+unchanged until `TC_RSA_prepared_public_key_clear`. Clear wipes only the setup;
+the caller still owns the cache, which contains public data derived from the
+modulus.
 Use `TC_RSA_verify_v15_prepared` or `TC_RSA_verify_pss_prepared` with a separate
 verification workspace. `TC_RSA_prepared_public_work(&setup)` replaces
 `TC_RSA_public_work` in the verification budget because the cached `R^2`
@@ -137,9 +139,9 @@ or the cost exceeds `UINT32_MAX`:
 `TC_RSA_private_work` reads only `key->public_key` and whether `key->crt` is
 set, and selects the CRT cost when it is. Each rejected blinding factor costs
 one more attempt, so budget with the same `A` as `execution.random_attempts`.
-Operations check their cost with one attempt before any arithmetic or RNG
-request. A smaller budget returns `TC_RSA_LIMIT` and leaves outputs, work and
-the RNG untouched. Add costs with overflow checks. The
+Operations preflight the cost of all `A` allowed attempts before any arithmetic
+or RNG request. A smaller budget returns `TC_RSA_LIMIT` and leaves outputs,
+work and the RNG untouched. Add costs with overflow checks. The
 [signing](../examples/rsa_sign.c) and [encryption](../examples/rsa_encrypt.c)
 examples show the pattern.
 

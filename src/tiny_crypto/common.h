@@ -56,6 +56,13 @@ typedef struct {
   uint32_t remaining;
 } TC_work_budget;
 
+/* Shared execution resources for randomized public-key operations. */
+typedef struct {
+  TC_random_source random;
+  size_t random_attempts;
+  TC_work_budget work;
+} TC_execution;
+
 /* Setup and resource-management results. */
 typedef enum {
   TC_RESULT_OK,

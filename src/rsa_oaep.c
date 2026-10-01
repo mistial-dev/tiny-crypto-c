@@ -123,14 +123,12 @@ TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oa
   const size_t required = TC_RSA_DECRYPT_WORKSPACE_WORDS(length * 8);
   const size_t arithmetic_words = TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(length * 8);
   const size_t max_message = length - 2 * info.digest_length - 2;
-  const uint32_t private_cost =
-      tc_rsa_private_base_cost(length, key->public_key.exponent.length, view.crt) +
-      tc_rsa_blinding_cost(length);
+  const uint32_t private_cost = TC_RSA_private_work(key, execution->random_attempts);
   uint32_t* work = &execution->work.remaining;
   /* RFC 8017 section 7.1.2, note after step 4: an opponent must not learn
    * which decryption error occurred. Plaintext capacity and the whole budget
    * are checked before decryption, so LIMIT depends only on public sizes. */
-  if (plaintext.capacity < max_message || !execution->random_attempts ||
+  if (plaintext.capacity < max_message || !private_cost ||
       workspace->capacity < required || *work < private_cost || *work - private_cost < decode_cost)
     return TC_RSA_LIMIT;
   TC_hash_context hash_workspace;

@@ -74,12 +74,19 @@ TC_TEST(arguments)
                                               &prepared_work),
                    ==, TC_RSA_INVALID);
   munit_assert_uint(prepared_work.remaining, ==, work.remaining + 16 * sizeof modulus);
+  TC_RSA_word saved_cache[sizeof cache_words / sizeof *cache_words];
+  memcpy(saved_cache, cache_words, sizeof saved_cache);
   TC_RSA_prepared_public_key_clear(&prepared);
-  for (size_t i = 0; i < sizeof cache_words; ++i)
-    munit_assert_uint(((uint8_t*)cache_words)[i], ==, 0);
+  munit_assert_memory_equal(sizeof saved_cache, cache_words, saved_cache);
   munit_assert_int(TC_RSA_verify_v15_prepared(&prepared, &options, hashed, signed_bytes, &workspace,
                                               &prepared_work),
                    ==, TC_RSA_ARGUMENT);
+  /* Clearing an uninitialized setup must not follow attacker-controlled
+   * pointers. */
+  memset(&prepared, 0xa5, sizeof prepared);
+  TC_RSA_prepared_public_key_clear(&prepared);
+  const TC_RSA_prepared_public_key zero_prepared = {0};
+  munit_assert_memory_equal(sizeof prepared, &prepared, &zero_prepared);
   return MUNIT_OK;
 }
 

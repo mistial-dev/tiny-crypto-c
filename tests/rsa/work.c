@@ -344,9 +344,8 @@ static TC_status reject_once_random(void* context, uint8_t* output, size_t lengt
   return two_random(context, output, length);
 }
 
-/* TC_RSA_private_work(key, A) covers A blinding attempts. A budget one unit
- * short of the second attempt fails after the first request with LIMIT, and
- * the signature and workspace stay unpublished. */
+/* TC_RSA_private_work(key, A) covers every allowed blinding attempt. A budget
+ * one unit short fails before the first request or private operation. */
 TC_TEST(rejected_blinding)
 {
   const test_key* fixture = key_fixture();
@@ -366,7 +365,7 @@ TC_TEST(rejected_blinding)
                                               &workspace, (TC_buffer){signature, BYTES},
                                               &execution),
                        ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
-      munit_assert_uint(calls, ==, short_work ? 1 : 2);
+      munit_assert_uint(calls, ==, short_work ? 0 : 2);
       if (short_work) {
         munit_assert_true(all_bytes(signature, sizeof signature, 0xa5));
         munit_assert_true(all_bytes((const uint8_t*)scratch, sizeof scratch, 0));
@@ -403,7 +402,7 @@ TC_TEST(private_work)
     munit_assert_uint32(TC_RSA_private_work(&key, 4), ==, base + 4 * per_attempt);
     munit_assert_uint32(TC_RSA_private_work(&key, 0), ==, 0);
     munit_assert_uint32(TC_RSA_private_work(&key, SIZE_MAX), ==, 0);
-    const uint32_t private_cost = TC_RSA_private_work(&key, 1);
+    const uint32_t private_cost = TC_RSA_private_work(&key, 4);
 
     const TC_RSA_v15_options v15 = {TC_HASH_SHA256};
     const TC_RSA_pss_options pss = {TC_HASH_SHA256, TC_HASH_SHA256, SHA256_BYTES};
@@ -421,7 +420,8 @@ TC_TEST(private_work)
                    : TC_RSA_sign_v15_digest(&key, &v15, (TC_bytes){digest, sizeof digest},
                                             &workspace, (TC_buffer){signature, BYTES}, &execution);
         munit_assert_int(result, ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
-        munit_assert_uint32(execution.work.remaining, ==, short_work ? costs[scheme] - 1 : 0);
+        munit_assert_uint32(execution.work.remaining,
+                            ==, short_work ? costs[scheme] - 1 : 3 * per_attempt);
         munit_assert_uint(calls, ==, short_work ? 0 : 1 + scheme);
         if (short_work)
           munit_assert_memory_equal(sizeof signature, signature, saved);
@@ -446,7 +446,8 @@ TC_TEST(private_work)
                                            (TC_buffer){plaintext, sizeof plaintext}, &length,
                                            &execution),
                        ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
-      munit_assert_uint32(execution.work.remaining, ==, short_work ? decrypt_cost - 1 : 0);
+      munit_assert_uint32(execution.work.remaining,
+                          ==, short_work ? decrypt_cost - 1 : 3 * per_attempt);
       munit_assert_uint(calls, ==, short_work ? 0 : 1);
       munit_assert_size(length, ==, short_work ? SIZE_MAX : sizeof message);
       if (!short_work)
@@ -636,6 +637,14 @@ TC_TEST(argument_order)
                                           &no_random),
                    ==, TC_RSA_ARGUMENT);
   TC_RSA_private_key unchecked = fixture->key;
+  uint8_t zero_factor[BYTES / 2] = {0};
+  TC_RSA_private_key all_zero_factor = fixture->key;
+  all_zero_factor.p = (TC_bytes){zero_factor, sizeof zero_factor};
+  TC_RSA_execution validation = {{two_random, &calls}, TC_RSA_VALIDATION_ROUNDS,
+                                 {UINT32_MAX}};
+  munit_assert_int(TC_RSA_validate_private_key(&all_zero_factor, TC_RSA_EXPONENT_FIPS, &workspace,
+                                               &validation),
+                   ==, TC_RSA_INVALID);
   munit_assert_int(TC_RSA_sign_pss_digest(&fixture->key, &pss, (TC_bytes){digest, sizeof digest},
                                           &workspace, (TC_buffer){output, sizeof output},
                                           &no_random),

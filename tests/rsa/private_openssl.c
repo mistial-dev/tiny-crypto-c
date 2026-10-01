@@ -707,7 +707,6 @@ static MunitResult signing(const MunitParameter params[], void* user)
         signature[width - 1] ^= 1;
         TC_RSA_prepared_public_key_clear(&prepared);
         munit_assert_true(tc_test_all_zero(&prepared, sizeof prepared));
-        munit_assert_true(tc_test_all_zero(cache_words, width));
       }
     } else {
       for (size_t i = 0; i < sizeof signature; ++i)

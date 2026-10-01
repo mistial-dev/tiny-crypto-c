@@ -329,8 +329,28 @@
 #ifndef TC_RSA_SMALL
 #define TC_RSA_SMALL TC_PROFILE_VALUE(0, 1, 0, 0)
 #endif
-#if (TC_ENABLE_RSA != 0 && TC_ENABLE_RSA != 1) || (TC_RSA_SMALL != 0 && TC_RSA_SMALL != 1)
+#ifndef TC_RSA_ENABLE_1024
+#define TC_RSA_ENABLE_1024 TC_PROFILE_VALUE(0, 0, 0, 0)
+#endif
+#ifndef TC_RSA_ENABLE_2048
+#define TC_RSA_ENABLE_2048 TC_PROFILE_VALUE(1, 1, 1, 1)
+#endif
+#ifndef TC_RSA_ENABLE_3072
+#define TC_RSA_ENABLE_3072 TC_PROFILE_VALUE(1, 1, 1, 1)
+#endif
+#ifndef TC_RSA_ENABLE_4096
+#define TC_RSA_ENABLE_4096 TC_PROFILE_VALUE(1, 1, 1, 1)
+#endif
+#if (TC_ENABLE_RSA != 0 && TC_ENABLE_RSA != 1) || (TC_RSA_SMALL != 0 && TC_RSA_SMALL != 1) ||     \
+    (TC_RSA_ENABLE_1024 != 0 && TC_RSA_ENABLE_1024 != 1) ||                                     \
+    (TC_RSA_ENABLE_2048 != 0 && TC_RSA_ENABLE_2048 != 1) ||                                     \
+    (TC_RSA_ENABLE_3072 != 0 && TC_RSA_ENABLE_3072 != 1) ||                                     \
+    (TC_RSA_ENABLE_4096 != 0 && TC_RSA_ENABLE_4096 != 1)
 #error "RSA options must be 0 or 1"
+#endif
+#if TC_ENABLE_RSA && !(TC_RSA_ENABLE_1024 || TC_RSA_ENABLE_2048 || TC_RSA_ENABLE_3072 ||          \
+                       TC_RSA_ENABLE_4096)
+#error "RSA requires at least one enabled modulus size"
 #endif
 
 #ifndef TC_ENABLE_EC

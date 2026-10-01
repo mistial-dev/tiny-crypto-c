@@ -81,9 +81,8 @@ void TC_RSA_prepared_public_key_clear(TC_RSA_prepared_public_key* setup)
 {
   if (!setup)
     return;
-  if (setup->marker == TC_RSA_PUBLIC_SETUP_MARKER && setup->r2.words &&
-      setup->key.modulus.length <= TC_RSA_MAX_MODULUS_BYTES)
-    TC_secure_zero(setup->r2.words, setup->key.modulus.length);
+  /* R^2 is derived entirely from the public modulus and is owned by the
+   * caller.  Do not follow fields in a setup that may be uninitialized. */
   TC_secure_zero(setup, sizeof *setup);
 }
 

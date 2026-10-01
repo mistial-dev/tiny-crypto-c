@@ -64,7 +64,9 @@ static inline TC_status tc_rsa_v15_check(const uint8_t* encoded, size_t length,
 
 static inline int tc_rsa_supported_modulus_size(size_t length)
 {
-  return length == 128 || length == 256 || length == 384 || length == TC_RSA_MAX_MODULUS_BYTES;
+  return (TC_RSA_ENABLE_1024 && length == 128) || (TC_RSA_ENABLE_2048 && length == 256) ||
+         (TC_RSA_ENABLE_3072 && length == 384) ||
+         (TC_RSA_ENABLE_4096 && length == TC_RSA_MAX_MODULUS_BYTES);
 }
 
 static inline int tc_rsa_supported_bits(size_t bits)

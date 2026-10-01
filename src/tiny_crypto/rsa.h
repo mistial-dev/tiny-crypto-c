@@ -4,7 +4,8 @@
  * OAEP, raw operations, key validation, CRT derivation and stepwise key
  * generation.
  * Standards: RFC 8017, FIPS 186-5 appendices A.1 and C.
- * Configuration: TC_ENABLE_RSA and TC_RSA_SMALL.
+ * Configuration: TC_ENABLE_RSA, TC_RSA_ENABLE_1024/2048/3072/4096 and
+ * TC_RSA_SMALL. RSA-1024 is a legacy size and is disabled by default.
  * Limitations: two-prime keys of 1024, 2048, 3072 or 4096 bits.
  * Contracts: docs/api.md, including its TC_work_budget units.
  * Guide: docs/rsa.md. */
@@ -19,8 +20,8 @@ typedef uint32_t TC_RSA_word;
 #define TC_RSA_WORD_BITS 32
 #endif
 
-/* Supported moduli are 1024, 2048, 3072 and 4096 bits. Size caller storage
- * that holds a modulus-length value, such as an encoded message or a
+/* Individually enabled moduli are 1024, 2048, 3072 and 4096 bits. Size caller
+ * storage that holds a modulus-length value, such as an encoded message or a
  * signature, from TC_RSA_MAX_MODULUS_BYTES. */
 #define TC_RSA_MAX_MODULUS_BITS 4096u
 #define TC_RSA_MAX_MODULUS_BYTES (TC_RSA_MAX_MODULUS_BITS / 8u)
@@ -88,12 +89,7 @@ typedef struct {
   uint32_t candidate_attempts;
   uint32_t random_requests;
 } TC_RSA_keygen_limits;
-typedef struct {
-  TC_random_source random;
-  size_t random_attempts;
-  /* Reduced by work completed on success and failure. */
-  TC_work_budget work;
-} TC_RSA_execution;
+typedef TC_execution TC_RSA_execution;
 typedef struct {
   TC_hash_algorithm hash;
 } TC_RSA_v15_options;
@@ -197,8 +193,8 @@ size_t TC_RSA_workspace_words(TC_RSA_operation operation, size_t bits);
 TC_RSA_result TC_RSA_prepare_public_key(TC_RSA_prepared_public_key* setup,
                                         const TC_RSA_public_key* key, const TC_RSA_workspace* cache,
                                         const TC_RSA_workspace* workspace, TC_work_budget* work);
-/* Wipe the cached R^2 of an initialized setup and the setup itself. Accepts
- * NULL and an uninitialized setup, which is wiped alone. Charges no work. */
+/* Wipe the setup. The caller-owned R^2 cache contains only public data and is
+ * left untouched. Accepts NULL and an uninitialized setup. Charges no work. */
 void TC_RSA_prepared_public_key_clear(TC_RSA_prepared_public_key* setup);
 
 /* Generate a two-prime RSA key with e = 65537 and d = e^-1 mod LCM(p-1, q-1)
@@ -298,8 +294,8 @@ int TC_RSA_modulus_supported(size_t bits);
  *                               + 1 when salt_length is nonzero
  *   TC_RSA_decrypt_oaep         TC_RSA_private_work + TC_RSA_oaep_work
  *
- * Each operation checks its cost, with one blinding attempt for private
- * keys, before arithmetic or any RNG request. A smaller budget returns
+ * Each private-key operation checks its cost for every allowed blinding
+ * attempt before arithmetic or any RNG request. A smaller budget returns
  * TC_RSA_LIMIT and leaves outputs, work and the RNG untouched. A rejected
  * blinding factor costs one more attempt, so budget TC_RSA_private_work with
  * execution.random_attempts to cover every attempt. Verification consumes
