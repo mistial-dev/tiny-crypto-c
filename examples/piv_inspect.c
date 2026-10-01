@@ -64,6 +64,7 @@ static struct {
   uint8_t lds[LDS_BYTES];
   TC_PIV_key_proof_workspace proof;
   TC_PIV_card_report report;
+  TC_PIV_card_report twic_report;
 } storage;
 
 /* State that one step hands to the next. */
@@ -80,6 +81,9 @@ typedef struct {
   size_t copy_count;
   TC_bytes card_cvc;
   int has_signer, has_chuid, has_discovery, pin_verified;
+  /* A NEXGEN TWIC application whose checks the result requires, and their
+   * outcome. */
+  int twic_required, twic_accepted;
   int step_failed; /* a supplied PIN or pairing code was refused */
 } Inspect;
 
@@ -124,8 +128,45 @@ static TC_PIV_result inventory_read(Inspect* inspect)
   return TC_PIV_OK;
 }
 
-/* Select the TWIC application and inventory it plain under its catalog. A
- * TWIC card makes the checks of the PIV application use its TWIC profile. */
+static TC_PIV_result check(Inspect* inspect, TC_PIV_card_report* report);
+static int crls_prepare(const Inspect* inspect, const TC_PIV_inventory* inventory);
+
+/* On a NEXGEN TWIC application: the CHUID, the 9E path and revocation and the
+ * 9E key proof of the TWIC application (TWIC Part 2 v5 4.6, 5.3, 7.5). */
+static const TC_PIV_check_requirement twic_nexgen[] = {{TC_PIV_CHECK_CERTIFICATE_PATH, 0x9e, 0},
+                                                       {TC_PIV_CHECK_REVOCATION, 0, 0x0500},
+                                                       {TC_PIV_CHECK_KEY_PROOF, 0x9e, 0},
+                                                       {TC_PIV_CHECK_CHUID, 0, 0}};
+
+/* Check the TWIC inventory and print its report. A Legacy TWIC application
+ * holds no card authentication certificate, so its report is informational. */
+static int twic_check(Inspect* inspect)
+{
+  FILE* out = inspect->out;
+  if (!crls_prepare(inspect, &storage.inventory))
+    return 0;
+  const TC_PIV_result checked = check(inspect, &storage.twic_report);
+  if (checked != TC_PIV_OK) {
+    fprintf(out, "TWIC card check: %s\n", example_piv_result_text(checked));
+    return 0;
+  }
+  fputs("TWIC application checks:\n", out);
+  example_piv_print_certificates(out, &storage.twic_report);
+  example_piv_print_report(out, &storage.twic_report);
+  inspect->twic_required = inspect->profile == TC_TWIC_NEXGEN_CARD;
+  int failed = 0;
+  for (size_t i = 0; i < storage.twic_report.count; ++i)
+    failed |= storage.twic_report.checks[i].outcome == TC_PIV_CHECK_FAILED;
+  inspect->twic_accepted =
+      !failed && (!inspect->twic_required ||
+                  TC_PIV_card_report_accepts(&storage.twic_report, twic_nexgen,
+                                             sizeof twic_nexgen / sizeof *twic_nexgen));
+  return 1;
+}
+
+/* Select the TWIC application, inventory it plain under its catalog and
+ * check it. A TWIC card makes the checks of the PIV application use its TWIC
+ * profile. */
 static int twic_inspect(Inspect* inspect)
 {
   TC_PIV_application twic;
@@ -143,9 +184,10 @@ static int twic_inspect(Inspect* inspect)
   }
   example_piv_print_application(inspect->out, "TWIC", &twic);
   inspect->profile = twic.profile;
-  const int read = inventory_read(inspect) != TC_PIV_ERROR;
+  const TC_PIV_result read = inventory_read(inspect);
+  const int checked = read == TC_PIV_OK ? twic_check(inspect) : read != TC_PIV_ERROR;
   TC_PIV_inventory_clear(&storage.inventory);
-  return read;
+  return checked;
 }
 
 /* GET DATA tag into copy, as a catalog object. */
@@ -370,7 +412,7 @@ static TC_PIV_result check(Inspect* inspect, TC_PIV_card_report* report)
  * every requirement of the tables that apply PASSED. */
 static int accepted(const Inspect* inspect, const TC_PIV_card_report* report)
 {
-  if (inspect->step_failed)
+  if (inspect->step_failed || (inspect->twic_required && !inspect->twic_accepted))
     return 0;
   for (size_t i = 0; i < report->count; ++i)
     if (report->checks[i].outcome == TC_PIV_CHECK_FAILED)

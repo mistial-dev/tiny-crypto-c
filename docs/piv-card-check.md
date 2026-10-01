@@ -124,7 +124,10 @@ A mapped container that is absent, denied or empty fails its digest, since the
 signed map proves the object exists. The Discovery Object digest covers the
 value of `7E`, and every other digest the value of the `53` container. Iris
 records and the TWIC Privacy Key encrypted objects of the TWIC application are
-`NOT_CHECKABLE` with reason `UNSUPPORTED`. `SM_CVC` passes only on a link that
+`NOT_CHECKABLE` with reason `UNSUPPORTED`. The TWIC application digest of
+`3001` covers the plaintext printed information (TWIC Part 2 v5 section 4.6.5
+note 1), which the card stores TPK encrypted, so it is `NOT_CHECKABLE` with
+reason `UNSUPPORTED` as well. `SM_CVC` passes only on a link that
 reports secured with no lost session, with the curve of its suite. Key
 confirmation took place when the session was established, so the check
 re-verifies the CVC chain under the signer it validated itself.
@@ -264,8 +267,8 @@ int check_card(const TC_PIV_link* link, const TC_PIV_inventory* inventory,
 prints the report. `example_piv_inspect_run` takes the interface, the length
 format, the PIN and pairing code, the trust anchors, CRLs and OCSP responses,
 the revocation policy, the evaluation time and a random source. It selects the
-TWIC application and inventories it plain when present, then on the PIV
-application:
+TWIC application, inventories it plain and runs `TC_PIV_card_check` on it when
+present, then on the PIV application:
 
 1. reads `5FC122` and the CHUID plain and validates the secure messaging signer,
 1. establishes secure messaging with `TC_PIV_SM_key_request`,
@@ -297,6 +300,10 @@ PIN and pairing code supplied, and these requirements pass:
 | contact or VCI         | `SECURITY_SIGNATURE`                                               |
 | secure messaging suite | `SM_SIGNER`, `SM_CVC`, `COPY_MATCH`                                |
 | PIN verified           | `9A` key proof, every `SECURITY_DIGEST`, `BIOMETRIC` 6010 and 6030 |
+
+On a NEXGEN TWIC card the TWIC application report must also have no `FAILED`
+entry and pass the `9E` path, `REVOCATION` of `0500`, the `9E` key proof and the
+CHUID (TWIC Part 2 v5 sections 4.6 and 5.3).
 
 A card whose application template offers a secure messaging suite must complete
 key establishment, so a refused or failed establishment rejects the card.
