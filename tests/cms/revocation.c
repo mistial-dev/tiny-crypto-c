@@ -467,6 +467,8 @@ static void* revocation_setup(const MunitParameter params[], void* user)
                    TC_TLV_OK);
   f->anchors[0].trust = (TC_X509_trust_anchor){f->signer.subject, f->other_public};
   f->anchors[1].trust = (TC_X509_trust_anchor){f->signer.subject, f->signer.public_key};
+  f->anchors[0].usage = TC_X509_ANCHOR_USAGE_CRL_SIGN;
+  f->anchors[1].usage = TC_X509_ANCHOR_USAGE_CRL_SIGN;
   f->source = (TC_X509_store_source){f->anchors, 0, 2, NULL, crl_trust_anchor};
   f->options.at = (TC_X509_time){2026, 1, 1, 0, 0, 0};
   f->options.parsing = f->limits;

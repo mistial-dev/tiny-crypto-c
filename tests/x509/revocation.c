@@ -943,7 +943,7 @@ TC_TEST(dependency_context)
   const TC_bytes certificate = {encoded, sizeof encoded};
   const TC_X509_path_options options = {0};
   const TC_X509_path_workspace validation = {0};
-  const TC_X509_trust_anchor anchor = {0};
+  const TC_X509_store_anchor anchor = {0};
   TC_X509_revocation_node nodes[1] = {0};
   tc_x509_crl_resolution_workspace workspace = {0};
   workspace.validation = &validation;
