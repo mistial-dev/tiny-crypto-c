@@ -35,7 +35,9 @@ TC_TEST(vectors)
     memset(output, 0x5a, sizeof output);
     TC_GZIP_result result = TC_GZIP_decode((TC_bytes){input, input_length}, &workspace, &work,
                                            (TC_buffer){output, expected_length}, &length);
-    munit_assert_int(result, ==, header[0]);
+    const TC_GZIP_result expected_result = header[0] == 0 ? TC_GZIP_OK : TC_GZIP_INVALID;
+    munit_assert_uint(header[0], <=, 1);
+    munit_assert_int(result, ==, expected_result);
     if (result == TC_GZIP_OK) {
       munit_assert_size(length, ==, expected_length);
       munit_assert_memory_equal(length, output, expected);

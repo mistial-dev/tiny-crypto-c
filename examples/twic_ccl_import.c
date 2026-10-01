@@ -57,7 +57,8 @@ TC_TWIC_CCL_result example_twic_ccl_import_finish(ExampleTwicCclImport* state,
     return fail(state, result);
   if (TC_MD5_final(&state->checksum, digest) != TC_OK)
     return fail(state, TC_TWIC_CCL_ARGUMENT);
-  if (TC_ct_equal(digest, state->expected, sizeof digest) != TC_OK)
+  if (TC_ct_equal((TC_bytes){digest, sizeof digest},
+                  (TC_bytes){state->expected, sizeof state->expected}) != TC_OK)
     return fail(state, TC_TWIC_CCL_CHECKSUM_MISMATCH);
   if (staged->count != state->reader.records)
     return fail(state, TC_TWIC_CCL_INVALID);

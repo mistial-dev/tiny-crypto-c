@@ -596,9 +596,9 @@ int main(void)
     struct TC_DES_ctx ctx;
     int failed;
 
-    failed = TC_DES_init(&ctx, key, sizeof key) != TC_OK ||
-             TC_DES_set_iv(&ctx, iv) != TC_OK ||
-             TC_DES_CTR_crypt(&ctx, data, sizeof data) != TC_OK;
+    failed = TC_DES_init(&ctx, (TC_bytes){key, sizeof key}) != TC_OK ||
+             TC_DES_set_iv(&ctx, (TC_bytes){iv, sizeof iv}) != TC_OK ||
+             TC_DES_CTR_crypt(&ctx, (TC_buffer){data, sizeof data}) != TC_OK;
     TC_DES_ctx_clear(&ctx);
     return failed;
 }
@@ -643,10 +643,10 @@ int main(void)
     const uint8_t message[] = "Now is the time for all ";
     uint8_t tag[TC_DES_BLOCKLEN];
 
-    if (TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
-                           TC_DES_ISO9797_PAD2, key, sizeof key,
-                           message, sizeof message - 1,
-                           tag, sizeof tag) != TC_OK)
+    if (TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2,
+                           (TC_bytes){key, sizeof key},
+                           (TC_bytes){message, sizeof message - 1},
+                           (TC_buffer){tag, sizeof tag}) != TC_OK)
         return 1;
 
     /* Use tag with the message in the application protocol. */

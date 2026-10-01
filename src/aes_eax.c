@@ -95,7 +95,8 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, TC_bytes nonce, TC_bytes a
       goto done;
     for (i = 0; i < TC_AES_BLOCKLEN; ++i)
       st.full_tag[i] = (uint8_t)(st.nonce_mac[i] ^ st.header_mac[i] ^ st.message_mac[i]);
-    status = TC_ct_equal(st.full_tag, expected_tag, tag_len);
+    status = TC_ct_equal((TC_bytes){st.full_tag, tag_len},
+                         (TC_bytes){expected_tag, tag_len});
     if (status == TC_OK) {
       /* EAX verifies before CTR decryption, so the caller's buffer receives
        * only authenticated plaintext. */
@@ -220,7 +221,8 @@ static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, TC_bytes cleartext, 
      * small comparison buffer after its full-block value has been consumed. */
     for (i = 0; i < TC_AES_EAX_PRIME_TAG_LEN; ++i)
       st.message_mac[i] = st.full_tag[TC_AES_BLOCKLEN - 1u - i];
-    status = TC_ct_equal(st.message_mac, expected_tag, TC_AES_EAX_PRIME_TAG_LEN);
+    status = TC_ct_equal((TC_bytes){st.message_mac, TC_AES_EAX_PRIME_TAG_LEN},
+                         (TC_bytes){expected_tag, TC_AES_EAX_PRIME_TAG_LEN});
     if (status == TC_OK) {
       status = tc_aes_eax_ctr_xor(&st.aes, st.nonce_mac, input, output, input_len, 1);
     }

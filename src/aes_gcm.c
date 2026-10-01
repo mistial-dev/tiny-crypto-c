@@ -374,7 +374,7 @@ static TC_status tc_aes_gcm_decrypt_impl(TC_bytes key, TC_bytes iv, TC_bytes aad
   }
   /* Tags are secret until checked. The comparison runs in constant time. */
   if (status == TC_OK)
-    status = TC_ct_equal(expected, tag.data, ctx.tag_len);
+    status = TC_ct_equal((TC_bytes){expected, ctx.tag_len}, tag);
   if (status == TC_OK && length != 0) {
     if (plaintext.data != ciphertext.data)
       memcpy(plaintext.data, ciphertext.data, length);

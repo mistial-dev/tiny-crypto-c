@@ -36,11 +36,7 @@ typedef ::TC_credential_status credential_status;
  * the common length and its timing is independent of content. */
 TC_CPP_NODISCARD inline TC_status ct_equal(bytes a, bytes b) noexcept
 {
-  if ((a.length != 0 && a.data == nullptr) || (b.length != 0 && b.data == nullptr))
-    return TC_ERROR;
-  const size_t common = a.length < b.length ? a.length : b.length;
-  const TC_status status = ::TC_ct_equal(a.data, b.data, common);
-  return status == TC_OK && a.length != b.length ? TC_MISMATCH : status;
+  return ::TC_ct_equal(a, b);
 }
 
 } // namespace tiny_crypto

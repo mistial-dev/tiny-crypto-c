@@ -150,7 +150,7 @@ static TC_status tc_aes_kw_check(const uint8_t a[TC_AES_KW_SEMIBLOCK])
 {
   uint8_t icv1[TC_AES_KW_SEMIBLOCK];
   memset(icv1, 0xa6, sizeof icv1);
-  return TC_ct_equal(a, icv1, sizeof icv1);
+  return TC_ct_equal((TC_bytes){a, sizeof icv1}, (TC_bytes){icv1, sizeof icv1});
 }
 
 /* length is a multiple of alignment in [min, max]. Passing max as a

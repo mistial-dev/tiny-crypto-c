@@ -254,7 +254,7 @@ TC_TLV_result TC_LDS_hash_check(const TC_LDS_security_object* object, unsigned n
   const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
   result = tc_pki_hash_parts(parts, count, object->hash, limits, &tree, &scratch, digest);
   if (result == TC_TLV_OK) {
-    const TC_status comparison = TC_ct_equal(expected.data, digest, expected.length);
+    const TC_status comparison = TC_ct_equal(expected, (TC_bytes){digest, expected.length});
     if (comparison == TC_ERROR)
       result = TC_TLV_ARGUMENT;
     else

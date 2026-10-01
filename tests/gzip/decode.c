@@ -7,12 +7,11 @@
 
 TC_TEST(result_order)
 {
-  /* GZIP shares the RSA and EC result order. */
-  munit_assert_int(TC_GZIP_OK, ==, 0);
-  munit_assert_int(TC_GZIP_INVALID, ==, 1);
-  munit_assert_int(TC_GZIP_LIMIT, ==, 2);
-  munit_assert_int(TC_GZIP_ARGUMENT, ==, 3);
-  munit_assert_int(TC_GZIP_UNSUPPORTED, ==, 4);
+  munit_assert_int(TC_GZIP_OK, ==, TC_RESULT_OK);
+  munit_assert_int(TC_GZIP_INVALID, ==, TC_RESULT_INVALID);
+  munit_assert_int(TC_GZIP_LIMIT, ==, TC_RESULT_LIMIT);
+  munit_assert_int(TC_GZIP_ARGUMENT, ==, TC_RESULT_ARGUMENT);
+  munit_assert_int(TC_GZIP_UNSUPPORTED, ==, TC_RESULT_UNSUPPORTED);
   return MUNIT_OK;
 }
 

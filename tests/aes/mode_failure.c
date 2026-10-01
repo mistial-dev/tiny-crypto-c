@@ -43,7 +43,7 @@ TC_status tc_test_cipher(state_t* state, const uint8_t* key)
   return tc_test_cipher_rounds(state, key, TC_AES_FIXED_ROUNDS);
 }
 
-typedef TC_status (*mode_fn)(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t length);
+typedef TC_status (*mode_fn)(struct TC_AES_ctx* ctx, TC_buffer buffer);
 
 static void check_fixed_mode(mode_fn mode, size_t length)
 {
@@ -57,16 +57,16 @@ static void check_fixed_mode(mode_fn mode, size_t length)
   memset(buffer, 0x11, sizeof buffer);
   calls = 0;
   fail_at = 0;
-  munit_assert_int(mode(&ctx, buffer, length), ==, TC_OK);
+  munit_assert_int(mode(&ctx, (TC_buffer){buffer, length}), ==, TC_OK);
   munit_assert_uint(calls, >, 1);
   munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){iv, TC_AES_BLOCKLEN}), ==, TC_OK);
   calls = 0;
   fail_at = 2;
-  munit_assert_int(mode(&ctx, buffer, length), ==, TC_ERROR);
+  munit_assert_int(mode(&ctx, (TC_buffer){buffer, length}), ==, TC_ERROR);
   munit_assert_true(tc_test_all_zero(buffer, length));
   munit_assert_true(tc_test_all_zero(&ctx, sizeof ctx));
   fail_at = 0;
-  munit_assert_int(mode(&ctx, buffer, length), ==, TC_ERROR);
+  munit_assert_int(mode(&ctx, (TC_buffer){buffer, length}), ==, TC_ERROR);
 }
 
 TC_TEST(fixed_modes)

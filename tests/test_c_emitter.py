@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Mistial Dev
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Regression tests for generated C byte-array formatting."""
 
 import sys

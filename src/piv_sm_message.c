@@ -226,7 +226,7 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_requ
                      request->authenticated_count, TC_SM_SYM(workspace).digest);
   if (status != TC_OK)
     goto done;
-  status = TC_ct_equal(TC_SM_SYM(workspace).digest, request->tag.data, 8);
+  status = TC_ct_equal((TC_bytes){TC_SM_SYM(workspace).digest, 8}, request->tag);
   if (status != TC_OK)
     goto done;
   status = TC_ERROR;

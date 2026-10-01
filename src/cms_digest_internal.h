@@ -37,7 +37,7 @@ tc_cms_content_digest_compare(const TC_CMS_signed_attributes* attributes, TC_byt
     return TC_TLV_LIMIT;
   *matched = tc_pki_equal(expected_type, attributes->content_type) &&
              attributes->message_digest.length == digest.length &&
-             TC_ct_equal(digest.data, attributes->message_digest.data, digest.length) == TC_OK;
+             TC_ct_equal(digest, attributes->message_digest) == TC_OK;
   return TC_TLV_OK;
 }
 #endif

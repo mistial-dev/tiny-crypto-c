@@ -182,7 +182,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_by
   for (i = 0; i < TC_AES_BLOCKLEN; ++i)
     st.work[i] = (uint8_t)(st.mac[i] ^ st.s0[i]);
   if (decrypt) {
-    status = TC_ct_equal(st.work, expected_tag, tag_len);
+    status = TC_ct_equal((TC_bytes){st.work, tag_len}, (TC_bytes){expected_tag, tag_len});
     if (status == TC_OK) {
       /* CBC-MAC needs plaintext. The first pass keeps each block private. The
        * second CTR pass writes the caller's buffer after authentication. */

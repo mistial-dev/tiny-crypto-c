@@ -132,11 +132,11 @@ typedef enum {
  * or elsewhere remain. */
 void TC_secure_zero(void* memory, size_t length);
 
-/* Constant-time comparison of length bytes. length is public, and the scan
- * always covers every byte. a and b may overlap.
+/* Constant-time comparison of two spans. Lengths are public, and the scan
+ * always covers every byte in the shorter span. a and b may overlap.
  * Returns TC_OK when the bytes are equal, TC_MISMATCH when any byte differs
- * and TC_ERROR when length is nonzero and a or b is NULL. */
-TC_status TC_ct_equal(const uint8_t* a, const uint8_t* b, size_t length);
+ * or the lengths differ, and TC_ERROR for an invalid span. */
+TC_status TC_ct_equal(TC_bytes a, TC_bytes b);
 
 #ifdef __cplusplus
 }

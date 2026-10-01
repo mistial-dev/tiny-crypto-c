@@ -19,9 +19,7 @@ static TC_status siv_encrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_byte
   const TC_bytes ad[] = {aad, nonce};
   if (tag.capacity != TC_AES_SIV_V_LEN)
     return TC_ERROR;
-  return TC_AES_SIV_encrypt((TC_bytes){key, TC_AES_SIV_KEYLEN}, ad, siv_ad_count,
-                            (TC_buffer){input, TC_AES_BLOCKLEN},
-                            (TC_buffer){tag.data, TC_AES_SIV_V_LEN}, output);
+  return TC_AES_SIV_encrypt(key, ad, siv_ad_count, input, tag, output);
 }
 
 static TC_status siv_decrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
@@ -30,8 +28,7 @@ static TC_status siv_decrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_byte
   const TC_bytes ad[] = {aad, nonce};
   if (tag.length != TC_AES_SIV_V_LEN)
     return TC_ERROR;
-  return TC_AES_SIV_decrypt((TC_bytes){key, TC_AES_SIV_KEYLEN}, ad, siv_ad_count,
-                            (TC_bytes){tag.data, TC_AES_SIV_V_LEN}, input, output);
+  return TC_AES_SIV_decrypt(key, ad, siv_ad_count, tag, input, output);
 }
 
 /* Wycheproof CCM groups include 4- and 6-byte tags. Tags below TC_MIN_TAG_LEN

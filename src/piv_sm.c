@@ -170,7 +170,7 @@ static TC_status finish_response(TC_PIV_SM* session, const TC_PIV_SM_peer* parse
   }
   if (status != TC_OK)
     goto done;
-  status = TC_ct_equal(TC_SM_SYM(workspace).block, parsed->cryptogram.data, 16);
+  status = TC_ct_equal((TC_bytes){TC_SM_SYM(workspace).block, 16}, parsed->cryptogram);
   if (status != TC_OK)
     goto done;
   TC_secure_zero(&session->data, sizeof session->data);
@@ -199,7 +199,9 @@ int TC_PIV_SM_peer_matches(const TC_PIV_SM* session, TC_bytes certificate)
       TC_SHA256_digest(certificate, digest) != TC_OK)
     return 0;
   const int matches =
-      TC_ct_equal(digest, session->data.traffic.peer_digest, sizeof digest) == TC_OK;
+      TC_ct_equal((TC_bytes){digest, sizeof digest},
+                  (TC_bytes){session->data.traffic.peer_digest,
+                             sizeof session->data.traffic.peer_digest}) == TC_OK;
   TC_secure_zero(digest, sizeof digest);
   return matches;
 }

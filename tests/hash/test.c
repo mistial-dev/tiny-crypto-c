@@ -246,8 +246,8 @@ TC_TEST(test_secure_zero)
   TC_secure_zero(buf, 0); /* zero length is a no-op */
 
   munit_assert_int(TC_OK, ==, 0);
-  munit_assert_int(TC_ERROR, ==, -1);
-  munit_assert_int(TC_MISMATCH, ==, 1);
+  munit_assert_int(TC_ERROR, ==, TC_RESULT_ERROR);
+  munit_assert_int(TC_MISMATCH, ==, TC_RESULT_INVALID);
 
   return MUNIT_OK;
 }
@@ -258,18 +258,23 @@ TC_TEST(test_ct_eq)
   uint8_t b[5];
 
   memcpy(b, a, sizeof(a));
-  munit_assert_int(TC_ct_equal(a, b, sizeof(a)), ==, TC_OK);
-  munit_assert_int(TC_ct_equal(NULL, NULL, 0), ==, TC_OK);
-  munit_assert_int(TC_ct_equal(a, b, 0), ==, TC_OK);
+  munit_assert_int(TC_ct_equal((TC_bytes){a, sizeof a}, (TC_bytes){b, sizeof b}), ==, TC_OK);
+  munit_assert_int(TC_ct_equal((TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}), ==, TC_OK);
+  munit_assert_int(TC_ct_equal((TC_bytes){a, 0}, (TC_bytes){b, 0}), ==, TC_OK);
 
   b[0] ^= 0x01U;
-  munit_assert_int(TC_ct_equal(a, b, sizeof(a)), ==, TC_MISMATCH);
+  munit_assert_int(TC_ct_equal((TC_bytes){a, sizeof a}, (TC_bytes){b, sizeof b}), ==,
+                   TC_MISMATCH);
   b[0] ^= 0x01U;
   b[sizeof(b) - 1] ^= 0x80U;
-  munit_assert_int(TC_ct_equal(a, b, sizeof(a)), ==, TC_MISMATCH);
+  munit_assert_int(TC_ct_equal((TC_bytes){a, sizeof a}, (TC_bytes){b, sizeof b}), ==,
+                   TC_MISMATCH);
 
-  munit_assert_int(TC_ct_equal(NULL, b, 1), ==, TC_ERROR);
-  munit_assert_int(TC_ct_equal(a, NULL, 1), ==, TC_ERROR);
+  munit_assert_int(TC_ct_equal((TC_bytes){a, sizeof a}, (TC_bytes){b, sizeof b - 1}), ==,
+                   TC_MISMATCH);
+
+  munit_assert_int(TC_ct_equal((TC_bytes){NULL, 1}, (TC_bytes){b, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_ct_equal((TC_bytes){a, 1}, (TC_bytes){NULL, 1}), ==, TC_ERROR);
 
   return MUNIT_OK;
 }
