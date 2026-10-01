@@ -10,11 +10,10 @@ Update all calls as one source change; the library does not provide duplicate
 
 ## Byte ranges and results
 
-Pass immutable byte ranges as `TC_bytes` and writable ranges as `TC_buffer`
-where the function declares a span. One-shot authenticated encryption, key
-wrap, hash and KDF interfaces use spans, as do protocol parsers and writers.
-In-place block-mode and some streaming cipher/MAC functions retain pointer and
-length parameters. Public operation statuses now share `TC_result`. Existing names,
+Pass immutable byte ranges as `TC_bytes` and writable ranges as `TC_buffer`.
+Ordinary public byte APIs use spans. `TC_secure_zero` retains a raw pointer and
+length because it wipes arbitrary objects, and callback adapters retain their
+required callback signatures. Public operation statuses now share `TC_result`. Existing names,
 such as `TC_status`, `TC_RSA_result` and `TC_TLV_result`, are aliases, and their
 value names remain available. Code may use the module names at call sites or a
 single `TC_result` handler across modules.

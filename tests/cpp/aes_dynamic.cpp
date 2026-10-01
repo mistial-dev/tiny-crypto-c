@@ -6,8 +6,8 @@
 
 TEST_CASE("Dynamic AES wrappers and lifecycle")
 {
-  tiny_crypto::AES_dynamic cipher;
-  tiny_crypto::AES_dynamic_CMAC mac;
+  tiny_crypto::AESDynamic cipher;
+  tiny_crypto::AESDynamicCMAC mac;
   uint8_t key[32] = {}, block[16] = {}, original[16] = {}, iv[16] = {};
   CHECK(cipher.encrypt(block) == TC_ERROR);
   CHECK(mac.finish(block) == TC_ERROR);

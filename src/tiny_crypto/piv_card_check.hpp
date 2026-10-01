@@ -74,8 +74,8 @@ piv_card_certificate_validate(const piv_card_certificate_request& request,
 #if TC_ENABLE_PIV_KEY_PROOF
 typedef ::TC_PIV_card_proof_request piv_card_proof_request;
 
-/* TC_PIV_card_prove_keys on a piv_link. */
-TC_CPP_NODISCARD inline piv_result piv_card_prove_keys(piv_link& link,
+/* TC_PIV_card_prove_keys on a PIVLink. */
+TC_CPP_NODISCARD inline piv_result piv_card_prove_keys(PIVLink& link,
                                                        const piv_card_proof_request& request,
                                                        TC_PIV_key_proof_workspace& workspace,
                                                        TC_work_budget& work,

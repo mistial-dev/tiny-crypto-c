@@ -158,16 +158,16 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
   gcm.clear();
 #endif
 #if TC_AES_ENABLE_CMAC
-  tiny_crypto::AES_CMAC aes_cmac;
+  tiny_crypto::AESCMAC aes_cmac;
   failures += aes_cmac.init(block) != TC_OK;
   failures += aes_cmac.update(block) != TC_OK;
   failures += aes_cmac.finish(block) != TC_OK;
   failures += tiny_crypto::aes_cmac_verify(in, in, in) != TC_OK;
 #endif
 #if TC_AES_ENABLE_DYNAMIC
-  tiny_crypto::AES_dynamic dynamic;
+  tiny_crypto::AESDynamic dynamic;
   failures += dynamic.init(block) != TC_OK;
-  tiny_crypto::AES_dynamic_CMAC dynamic_cmac;
+  tiny_crypto::AESDynamicCMAC dynamic_cmac;
   failures += dynamic_cmac.init(block) != TC_OK;
   failures += dynamic_cmac.update(block) != TC_OK;
 #endif
@@ -192,14 +192,14 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
   failures += des.encrypt_cfb1(des_block, 8) != TC_OK;
 #endif
 #if TC_DES_ENABLE_CMAC
-  tiny_crypto::DES_CMAC des_cmac;
+  tiny_crypto::DESCMAC des_cmac;
   failures += des_cmac.init(des_block) != TC_OK;
   failures += des_cmac.update(des_block) != TC_OK;
   failures += des_cmac.finish(des_block) != TC_OK;
   failures += tiny_crypto::des_cmac_verify(in, in, in) != TC_OK;
 #endif
 #if TC_DES_ENABLE_ISO9797
-  tiny_crypto::DES_ISO9797 iso9797;
+  tiny_crypto::DESISO9797 iso9797;
   failures += iso9797.init(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, block) != TC_OK;
   failures += iso9797.update(des_block) != TC_OK;
   failures += iso9797.finish(des_block) != TC_OK;
@@ -228,7 +228,7 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
   (void)gzip;
 #endif
 #if TC_ENABLE_DRBG
-  tiny_crypto::drbg generator;
+  tiny_crypto::DRBG generator;
   failures += generator.generate(tiny_crypto::buffer{block, sizeof block}) != TC_DRBG_ARGUMENT;
 #endif
 #if TC_ENABLE_RSA
@@ -240,7 +240,7 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
   failures += tiny_crypto::rsa_workspace_words(TC_RSA_OPERATION_RAW_PUBLIC, 1024) == 0;
 #endif
 #if TC_ENABLE_PIV_SM
-  tiny_crypto::piv_sm session;
+  tiny_crypto::PIVSM session;
   tiny_crypto::piv_sm_workspace sm_workspace{};
   const tiny_crypto::piv_sm_unprotect_request sm_response{};
   size_t sm_length = 0;
@@ -303,7 +303,7 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
     uint8_t encoded[TC_APDU_HEADER_BYTES];
     size_t written = 0;
     tiny_crypto::apdu_response response = {};
-    tiny_crypto::apdu_channel channel;
+    tiny_crypto::APDUChannel channel;
     if (tiny_crypto::apdu_command_encode(command, TC_APDU_SHORT, encoded, written) != TC_APDU_OK ||
         tiny_crypto::apdu_response_read({answer, sizeof answer}, response) != TC_APDU_OK ||
         tiny_crypto::apdu_status_classify(response.sw) != TC_APDU_SW_SUCCESS ||
@@ -313,7 +313,7 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
 #endif
 #if TC_ENABLE_PIV_COMMAND
   {
-    tiny_crypto::piv_link link;
+    tiny_crypto::PIVLink link;
     if (link.status() != 0 || link.info().application != TC_PIV_APPLICATION_NONE ||
         tiny_crypto::piv_status_classify(0x6a82, TC_PIV_COMMAND_GET_DATA, TC_PIV_APPLICATION_PIV) !=
             TC_PIV_SW_NOT_FOUND)
@@ -323,8 +323,8 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
 #if TC_ENABLE_PIV_SM_APDU
   {
     // The session outlives the link that borrows it.
-    tiny_crypto::piv_sm link_session;
-    tiny_crypto::piv_link link;
+    tiny_crypto::PIVSM link_session;
+    tiny_crypto::PIVLink link;
     tiny_crypto::piv_sm_workspace link_workspace{};
     if (link_session.native() == nullptr ||
         tiny_crypto::piv_link_secure(link, link_workspace, tiny_crypto::buffer{data, length}) !=
@@ -335,7 +335,7 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
 #endif
 #if TC_ENABLE_PIV_VCI
   {
-    tiny_crypto::piv_link link;
+    tiny_crypto::PIVLink link;
     tiny_crypto::piv_discovery discovery{};
     tiny_crypto::piv_vci_mode mode = TC_PIV_VCI_PAIRED;
     if (tiny_crypto::piv_discovery_get(link, TC_PIV_DISCOVERY_PIV,
@@ -348,9 +348,9 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
 #endif
 #if TC_ENABLE_PIV_CATALOG
   {
-    tiny_crypto::piv_link link;
+    tiny_crypto::PIVLink link;
     tiny_crypto::piv_object objects[TC_PIV_CATALOG_PIV_OBJECTS];
-    tiny_crypto::piv_inventory inventory(objects);
+    tiny_crypto::PIVInventory inventory(objects);
     size_t work = 0;
     if (inventory.read(link, nullptr, tiny_crypto::buffer{data, length}, work) != TC_PIV_ARGUMENT ||
         tiny_crypto::piv_catalog_count(TC_PIV_APPLICATION_PIV, TC_PIV_CARD) !=
@@ -360,7 +360,7 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
 #endif
 #if TC_ENABLE_PIV_KEY_PROOF
   {
-    tiny_crypto::piv_link link;
+    tiny_crypto::PIVLink link;
     const tiny_crypto::piv_key_proof_request request{};
     const TC_X509_signature_provider provider{};
     static tiny_crypto::piv_key_proof_workspace proof_workspace;

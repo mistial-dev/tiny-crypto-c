@@ -259,7 +259,7 @@ int check_card(const TC_PIV_link* link, const TC_PIV_inventory* inventory,
 `<tiny_crypto/piv_card_check.hpp>` wraps the functions as
 `tiny_crypto::piv_card_check`, `piv_card_report_find`,
 `piv_card_report_accepts`, `piv_card_certificate_validate` and
-`piv_card_prove_keys`, which takes a `piv_link`.
+`piv_card_prove_keys`, which takes a `PIVLink`.
 
 ## Inspect a card
 

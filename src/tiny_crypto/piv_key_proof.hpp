@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-/* Key proofs on a piv_link for piv_key_proof.h.
+/* Key proofs on a PIVLink for piv_key_proof.h.
  * Contracts, statuses and lifetimes follow the C header. Conventions:
  * docs/cpp.md. Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_PIV_KEY_PROOF_HPP_
@@ -33,7 +33,7 @@ TC_CPP_NODISCARD inline piv_result piv_key_parameters_select(const TC_X509_certi
 
 /* TC_PIV_key_prove. */
 TC_CPP_NODISCARD inline piv_result
-piv_key_prove(piv_link& link, const piv_key_proof_request& request, TC_random_source random,
+piv_key_prove(PIVLink& link, const piv_key_proof_request& request, TC_random_source random,
               const TC_X509_signature_provider& provider, piv_key_proof_workspace& workspace,
               TC_work_budget& work) noexcept
 {

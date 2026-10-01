@@ -378,10 +378,10 @@ TEST_CASE("DES-CMAC one-shot and verify wrappers")
 TEST_CASE("DES-CMAC streaming class")
 {
   using tiny_crypto::bytes;
-  static_assert(tiny_crypto::DES_CMAC::tag_size == TC_DES_CMAC_TAG_MAX, "full tag size");
+  static_assert(tiny_crypto::DESCMAC::tag_size == TC_DES_CMAC_TAG_MAX, "full tag size");
   uint8_t tag[TC_DES_CMAC_TAG_MAX];
 
-  tiny_crypto::DES_CMAC unkeyed;
+  tiny_crypto::DESCMAC unkeyed;
   CHECK(unkeyed.update({des_cmac_message, 1}) == TC_ERROR);
   CHECK(unkeyed.finish(tag) == TC_ERROR);
 
@@ -403,7 +403,7 @@ TEST_CASE("DES-CMAC streaming class")
   for (const auto& c : cases) {
     CAPTURE(c.key_length);
     for (size_t split = 0; split <= des_cmac_message_length; ++split) {
-      tiny_crypto::DES_CMAC mac;
+      tiny_crypto::DESCMAC mac;
       REQUIRE(mac.init({c.key, c.key_length}) == TC_OK);
       CHECK(mac.update({des_cmac_message, split}) == TC_OK);
       CHECK(mac.update({des_cmac_message + split, des_cmac_message_length - split}) == TC_OK);
@@ -416,7 +416,7 @@ TEST_CASE("DES-CMAC streaming class")
   }
 
   /* A failed re-init leaves the object unkeyed. */
-  tiny_crypto::DES_CMAC mac;
+  tiny_crypto::DESCMAC mac;
   REQUIRE(mac.init(des_test_key) == TC_OK);
   CHECK(mac.init({des_test_key, 7}) == TC_ERROR);
   CHECK(mac.update({des_cmac_message, 1}) == TC_ERROR);
@@ -552,10 +552,10 @@ TEST_CASE("ISO 9797-1 one-shot wrappers match Annex B")
 
 TEST_CASE("ISO 9797-1 streaming class")
 {
-  static_assert(tiny_crypto::DES_ISO9797::tag_size == TC_DES_BLOCKLEN, "full tag size");
+  static_assert(tiny_crypto::DESISO9797::tag_size == TC_DES_BLOCKLEN, "full tag size");
   uint8_t tag[TC_DES_BLOCKLEN];
 
-  tiny_crypto::DES_ISO9797 unkeyed;
+  tiny_crypto::DESISO9797 unkeyed;
   CHECK(unkeyed.update({iso9797_message1, 1}) == TC_ERROR);
   CHECK(unkeyed.finish(tag) == TC_ERROR);
 
@@ -563,7 +563,7 @@ TEST_CASE("ISO 9797-1 streaming class")
     CAPTURE(c.algorithm);
     CAPTURE(c.padding);
     for (size_t split = 0; split <= c.message.length; ++split) {
-      tiny_crypto::DES_ISO9797 mac;
+      tiny_crypto::DESISO9797 mac;
       REQUIRE(mac.init(c.algorithm, c.padding, c.key) == TC_OK);
       CHECK(mac.update({c.message.data, split}) == TC_OK);
       CHECK(mac.update({c.message.data + split, c.message.length - split}) == TC_OK);
@@ -575,7 +575,7 @@ TEST_CASE("ISO 9797-1 streaming class")
     }
   }
 
-  tiny_crypto::DES_ISO9797 mac;
+  tiny_crypto::DESISO9797 mac;
   /* Array keys deduce their length. */
   REQUIRE(mac.init(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key2) == TC_OK);
   CHECK(mac.update({iso9797_message1, 24}) == TC_OK);

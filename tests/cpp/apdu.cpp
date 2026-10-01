@@ -58,7 +58,7 @@ TEST_CASE("APDU channel owns and clears its state")
   const tiny_crypto::apdu_transport transport = {answer, &calls};
   const tiny_crypto::apdu_channel_options options = {TC_APDU_SHORT, 0, 2, 0, 0};
   {
-    tiny_crypto::apdu_channel channel;
+    tiny_crypto::APDUChannel channel;
     REQUIRE(channel.init(transport, options, {scratch, sizeof scratch}) == TC_APDU_OK);
     CHECK(channel.exchanges_left() == 2);
     REQUIRE(channel.restrict(32, 16, TC_APDU_GET_RESPONSE_PLAIN_CLA) == TC_APDU_OK);

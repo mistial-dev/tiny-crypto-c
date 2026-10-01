@@ -62,19 +62,19 @@ TC_CPP_NODISCARD inline apdu_status_class apdu_status_classify(uint16_t sw) noex
 
 /* A bounded APDU exchange channel. The transport context and scratch buffer
  * must outlive the object. Destruction wipes the scratch and channel state. */
-class apdu_channel {
+class APDUChannel {
   ::TC_APDU_channel channel_{};
 
 public:
-  apdu_channel() noexcept = default;
-  ~apdu_channel() noexcept
+  APDUChannel() noexcept = default;
+  ~APDUChannel() noexcept
   {
     clear();
   }
-  apdu_channel(const apdu_channel&) = delete;
-  apdu_channel& operator=(const apdu_channel&) = delete;
-  apdu_channel(apdu_channel&&) = delete;
-  apdu_channel& operator=(apdu_channel&&) = delete;
+  APDUChannel(const APDUChannel&) = delete;
+  APDUChannel& operator=(const APDUChannel&) = delete;
+  APDUChannel(APDUChannel&&) = delete;
+  APDUChannel& operator=(APDUChannel&&) = delete;
 
   TC_CPP_NODISCARD apdu_result init(apdu_transport transport, const apdu_channel_options& options,
                                     buffer scratch) noexcept

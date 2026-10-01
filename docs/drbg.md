@@ -117,7 +117,7 @@ fields are private.
 
 ## Random sources for other APIs
 
-`TC_DRBG_random_source(&drbg)` returns a `TC_random_source` for RSA key
+`TC_DRBG_random_source(&DRBG)` returns a `TC_random_source` for RSA key
 generation, EC key generation and signing, key challenges and PIV secure
 messaging. `TC_DRBG_random` splits large requests into maximum-size calls. It
 rejects a NULL or uninstantiated DRBG and output that overlaps the DRBG before
@@ -127,7 +127,7 @@ in use.
 
 ## C++
 
-Include `<tiny_crypto/drbg.hpp>` and use `tiny_crypto::drbg`. Its
+Include `<tiny_crypto/drbg.hpp>` and use `tiny_crypto::DRBG`. Its
 `instantiate`, `reseed` and `generate` members forward to the C API and return
 its `TC_DRBG_result`. `random_source()` returns the `TC_random_source` of
 `TC_DRBG_random_source`, and the object must outlive it. The destructor

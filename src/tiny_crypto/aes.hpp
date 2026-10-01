@@ -275,17 +275,17 @@ TC_CPP_NODISCARD inline TC_status aes_cmac_verify_short_tag(bytes key, bytes mes
  * return TC_ERROR until the next successful init. Compare a received tag with
  * aes_cmac_verify or tiny_crypto::ct_equal. The destructor clears the
  * context. */
-class AES_CMAC {
+class AESCMAC {
 public:
   static const size_t tag_size = TC_AES_CMAC_TAG_MAX;
 
-  AES_CMAC() noexcept = default;
-  ~AES_CMAC() noexcept
+  AESCMAC() noexcept = default;
+  ~AESCMAC() noexcept
   {
     TC_AES_CMAC_ctx_clear(&ctx_);
   }
-  AES_CMAC(const AES_CMAC&) = delete;
-  AES_CMAC& operator=(const AES_CMAC&) = delete;
+  AESCMAC(const AESCMAC&) = delete;
+  AESCMAC& operator=(const AESCMAC&) = delete;
 
   TC_CPP_NODISCARD TC_status init(bytes key) noexcept
   {

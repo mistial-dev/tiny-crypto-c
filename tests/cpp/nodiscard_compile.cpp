@@ -157,7 +157,7 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   ccm_encrypt(in, in, in, in, out, out);           /* DISCARDED */
   ccm_encrypt_short_tag(in, in, in, in, out, out); /* DISCARDED */
   eax_encrypt_short_tag(in, in, in, in, out, out); /* DISCARDED */
-  AES_CMAC aes_mac;
+  AESCMAC aes_mac;
   aes_mac.init(in);      /* DISCARDED */
   aes_mac.update(in);    /* DISCARDED */
   aes_mac.finish(block); /* DISCARDED */
@@ -174,7 +174,7 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   des_cmac_verify(in, in, in);           /* DISCARDED */
   des_cmac_short_tag(in, in, out);       /* DISCARDED */
   des_cmac_verify_short_tag(in, in, in); /* DISCARDED */
-  DES_CMAC des_mac;
+  DESCMAC des_mac;
   des_mac.init(in);          /* DISCARDED */
   des_mac.update(in);        /* DISCARDED */
   des_mac.finish(des_block); /* DISCARDED */
@@ -184,7 +184,7 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   des_iso9797_verify(alg3, pad2, in, in, in);           /* DISCARDED */
   des_iso9797_mac_short_tag(alg3, pad2, in, in, out);   /* DISCARDED */
   des_iso9797_verify_short_tag(alg3, pad2, in, in, in); /* DISCARDED */
-  DES_ISO9797 iso9797;
+  DESISO9797 iso9797;
   iso9797.init(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD1, in); /* DISCARDED */
   iso9797.update(in);                                         /* DISCARDED */
   iso9797.finish(des_block);                                  /* DISCARDED */
@@ -205,10 +205,10 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   kmac.finish(out);                 /* DISCARDED */
   KMAC256::digest(in, in, in, out); /* DISCARDED */
 
-  AES_dynamic dynamic;
+  AESDynamic dynamic;
   dynamic.init(in);       /* DISCARDED */
   dynamic.encrypt(block); /* DISCARDED */
-  AES_dynamic_CMAC dynamic_cmac;
+  AESDynamicCMAC dynamic_cmac;
   dynamic_cmac.init(in);      /* DISCARDED */
   dynamic_cmac.update(in);    /* DISCARDED */
   dynamic_cmac.finish(block); /* DISCARDED */
@@ -219,10 +219,10 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   aes_kwp_unwrap(in, in, out, kw_length); /* DISCARDED */
 
   /* Generator and secure messaging results. */
-  drbg generator;
+  DRBG generator;
   generator.generate(out);       /* DISCARDED */
   generator.generate(out, true); /* DISCARDED */
-  piv_sm session;
+  PIVSM session;
   piv_sm_workspace sm_workspace = {};
   const piv_sm_unprotect_request sm_response = {};
   size_t sm_length = 0;
@@ -247,13 +247,13 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   apdu_command_encode(command, TC_APDU_SHORT, out, apdu_size); /* DISCARDED */
   apdu_response_read(in, response);                            /* DISCARDED */
   apdu_status_classify(0x9000);                                /* DISCARDED */
-  apdu_channel channel;
+  APDUChannel channel;
   channel.init(apdu_transport{}, apdu_channel_options{}, out); /* DISCARDED */
   channel.restrict(0, 0, 0);                                   /* DISCARDED */
   channel.transceive(command, out, response);                  /* DISCARDED */
   channel.exchanges_left();                                    /* DISCARDED */
   channel.native();                                            /* DISCARDED */
-  piv_link link;
+  PIVLink link;
   piv_application application = {};
   piv_data_object object = {};
   piv_reference_status reference = {};
@@ -280,7 +280,7 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   piv_discovery_get(link, TC_PIV_DISCOVERY_PIV, out, discovery); /* DISCARDED */
   piv_vci_establish(link, discovery, in, mode);                  /* DISCARDED */
   piv_object objects[1];
-  piv_inventory inventory(objects);
+  PIVInventory inventory(objects);
   size_t inventory_work = 0;
   inventory.read(link, nullptr, out, inventory_work);        /* DISCARDED */
   inventory.find(0x3000);                                    /* DISCARDED */

@@ -45,10 +45,10 @@ TEST_CASE("PIV secure messaging on a link")
   const uint8_t host_id[8] = {};
   const tiny_crypto::piv_link_options options = {{TC_APDU_SHORT, 0, 16, 0, 0}, TC_PIV_CONTACT, 0};
   // Declare the session first: the link borrows it and is destroyed first.
-  tiny_crypto::piv_sm session;
+  tiny_crypto::PIVSM session;
   tiny_crypto::piv_sm_workspace workspace{};
   {
-    tiny_crypto::piv_link link;
+    tiny_crypto::PIVLink link;
     REQUIRE(link.init(tc_sm_card_transport(&card), options, {scratch, sizeof scratch}) ==
             TC_PIV_OK);
     tiny_crypto::piv_application application{};

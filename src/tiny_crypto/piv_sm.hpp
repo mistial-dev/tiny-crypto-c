@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-/* The piv_sm session class for piv_sm.h and piv_sm_authenticate.h.
+/* The PIVSM session class for piv_sm.h and piv_sm_authenticate.h.
  * Contracts, statuses and lifetimes follow the C header. Conventions:
  * docs/cpp.md. Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_PIV_SM_HPP_
@@ -30,20 +30,20 @@ typedef ::TC_PIV_SM_authentication_workspace piv_sm_authentication_workspace;
 #endif
 
 // Moving or copying a session could reuse its message counter.
-class piv_sm {
+class PIVSM {
   ::TC_PIV_SM session_;
 
 public:
-  piv_sm() noexcept : session_{}
+  PIVSM() noexcept : session_{}
   {}
-  ~piv_sm() noexcept
+  ~PIVSM() noexcept
   {
     clear();
   }
-  piv_sm(const piv_sm&) = delete;
-  piv_sm& operator=(const piv_sm&) = delete;
-  piv_sm(piv_sm&&) = delete;
-  piv_sm& operator=(piv_sm&&) = delete;
+  PIVSM(const PIVSM&) = delete;
+  PIVSM& operator=(const PIVSM&) = delete;
+  PIVSM(PIVSM&&) = delete;
+  PIVSM& operator=(PIVSM&&) = delete;
 
   void clear() noexcept
   {

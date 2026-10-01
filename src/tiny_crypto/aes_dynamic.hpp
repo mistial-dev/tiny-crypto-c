@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-/* AES_dynamic and AES_dynamic_CMAC classes for aes_dynamic.h.
+/* AESDynamic and AESDynamicCMAC classes for aes_dynamic.h.
  * Contracts, statuses and lifetimes follow the C header. Conventions:
  * docs/cpp.md. Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_AES_DYNAMIC_HPP_
@@ -19,18 +19,18 @@ namespace tiny_crypto {
 /* AES with a key length chosen at init: 16, 24 or 32 bytes. The key is a
  * borrowed span disjoint from the object. A failed init leaves the object
  * unkeyed. The destructor clears the key schedule. */
-class AES_dynamic {
+class AESDynamic {
   TC_AES_dynamic_key ctx_;
 
 public:
-  AES_dynamic() noexcept : ctx_{}
+  AESDynamic() noexcept : ctx_{}
   {}
-  ~AES_dynamic() noexcept
+  ~AESDynamic() noexcept
   {
     clear();
   }
-  AES_dynamic(const AES_dynamic&) = delete;
-  AES_dynamic& operator=(const AES_dynamic&) = delete;
+  AESDynamic(const AESDynamic&) = delete;
+  AESDynamic& operator=(const AESDynamic&) = delete;
   TC_CPP_NODISCARD TC_status init(bytes key) noexcept
   {
     return ::TC_AES_dynamic_key_init(&ctx_, TC_bytes{key.data, key.length});
@@ -74,18 +74,18 @@ public:
 /* Streaming AES-CMAC with a key length chosen at init. finish writes the full
  * 16-byte tag and consumes the key. A failed init, finish and clear leave the
  * object unkeyed. The destructor clears the context. */
-class AES_dynamic_CMAC {
+class AESDynamicCMAC {
   TC_AES_dynamic_CMAC ctx_;
 
 public:
-  AES_dynamic_CMAC() noexcept : ctx_{}
+  AESDynamicCMAC() noexcept : ctx_{}
   {}
-  ~AES_dynamic_CMAC() noexcept
+  ~AESDynamicCMAC() noexcept
   {
     clear();
   }
-  AES_dynamic_CMAC(const AES_dynamic_CMAC&) = delete;
-  AES_dynamic_CMAC& operator=(const AES_dynamic_CMAC&) = delete;
+  AESDynamicCMAC(const AESDynamicCMAC&) = delete;
+  AESDynamicCMAC& operator=(const AESDynamicCMAC&) = delete;
   TC_CPP_NODISCARD TC_status init(bytes key) noexcept
   {
     return ::TC_AES_dynamic_CMAC_init(&ctx_, TC_bytes{key.data, key.length});

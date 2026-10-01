@@ -367,16 +367,16 @@ TEST_CASE("AES CMAC known answer and verify wrappers")
 
 TEST_CASE("AES CMAC streaming class")
 {
-  static_assert(tiny_crypto::AES_CMAC::tag_size == TC_AES_CMAC_TAG_MAX, "full tag size");
+  static_assert(tiny_crypto::AESCMAC::tag_size == TC_AES_CMAC_TAG_MAX, "full tag size");
   uint8_t tag[TC_AES_CMAC_TAG_MAX];
 
-  tiny_crypto::AES_CMAC unkeyed;
+  tiny_crypto::AESCMAC unkeyed;
   CHECK(unkeyed.update({nist_plaintext, 1}) == TC_ERROR);
   CHECK(unkeyed.finish(tag) == TC_ERROR);
 
   for (size_t split = 0; split <= cmac_40_length; ++split) {
     CAPTURE(split);
-    tiny_crypto::AES_CMAC mac;
+    tiny_crypto::AESCMAC mac;
     REQUIRE(mac.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
     CHECK(mac.update({nist_plaintext, split}) == TC_OK);
     CHECK(mac.update({nist_plaintext + split, cmac_40_length - split}) == TC_OK);
@@ -388,7 +388,7 @@ TEST_CASE("AES CMAC streaming class")
   }
 
   /* A wrong key length on re-init leaves the object unkeyed. */
-  tiny_crypto::AES_CMAC mac;
+  tiny_crypto::AESCMAC mac;
   REQUIRE(mac.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
   CHECK(mac.init({kat_key, TC_AES_KEYLEN - 1}) == TC_ERROR);
   CHECK(mac.update({nist_plaintext, 1}) == TC_ERROR);

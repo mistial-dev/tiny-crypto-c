@@ -392,7 +392,7 @@ TC_PIV_result prove_card_authentication(TC_PIV_link* link, const TC_X509_certifi
 ```
 
 `tiny_crypto::piv_key_prove` in `<tiny_crypto/piv_key_proof.hpp>` takes a
-`piv_link`.
+`PIVLink`.
 
 ## Example
 
@@ -430,9 +430,9 @@ TC_PIV_result read_chuid(TC_APDU_transport transport, TC_PIV_interface interface
 }
 ```
 
-The C++11 class `tiny_crypto::piv_link` in `<tiny_crypto/piv_command.hpp>` owns a
+The C++11 class `tiny_crypto::PIVLink` in `<tiny_crypto/piv_command.hpp>` owns a
 link and clears it on destruction. `piv_application_read` and
-`piv_status_classify` wrap the free functions. `tiny_crypto::piv_inventory` in
+`piv_status_classify` wrap the free functions. `tiny_crypto::PIVInventory` in
 `<tiny_crypto/piv_catalog.hpp>` clears its inventory on destruction.
 
 ## Limits

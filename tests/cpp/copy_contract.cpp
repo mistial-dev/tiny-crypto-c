@@ -19,35 +19,35 @@
   static_assert(!std::is_copy_constructible<type>::value, #type " must not copy-construct");       \
   static_assert(!std::is_copy_assignable<type>::value, #type " must not copy-assign")
 
-/* drbg, piv_sm, piv_link and piv_inventory also delete both move operations. */
+/* DRBG, PIVSM, PIVLink and PIVInventory also delete both move operations. */
 #define TC_ASSERT_NOT_MOVABLE(type)                                                                \
   static_assert(!std::is_move_constructible<type>::value, #type " must not move-construct");       \
   static_assert(!std::is_move_assignable<type>::value, #type " must not move-assign")
 
 TC_ASSERT_NOT_COPYABLE(tiny_crypto::AES);
 TC_ASSERT_NOT_COPYABLE(tiny_crypto::GCM);
-TC_ASSERT_NOT_COPYABLE(tiny_crypto::AES_CMAC);
-TC_ASSERT_NOT_COPYABLE(tiny_crypto::AES_dynamic);
-TC_ASSERT_NOT_COPYABLE(tiny_crypto::AES_dynamic_CMAC);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::AESCMAC);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::AESDynamic);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::AESDynamicCMAC);
 TC_ASSERT_NOT_COPYABLE(tiny_crypto::DES);
-TC_ASSERT_NOT_COPYABLE(tiny_crypto::DES_CMAC);
-TC_ASSERT_NOT_COPYABLE(tiny_crypto::DES_ISO9797);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::DESCMAC);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::DESISO9797);
 /* Each hash and HMAC typedef instantiates basic_hash or basic_hmac. */
 TC_ASSERT_NOT_COPYABLE(tiny_crypto::MD5);
 TC_ASSERT_NOT_COPYABLE(tiny_crypto::SHA256);
 TC_ASSERT_NOT_COPYABLE(tiny_crypto::HMAC_SHA256);
 TC_ASSERT_NOT_COPYABLE(tiny_crypto::KMAC256);
 TC_ASSERT_NOT_COPYABLE(tiny_crypto::GZIPDecoder);
-TC_ASSERT_NOT_COPYABLE(tiny_crypto::drbg);
-TC_ASSERT_NOT_MOVABLE(tiny_crypto::drbg);
-TC_ASSERT_NOT_COPYABLE(tiny_crypto::piv_sm);
-TC_ASSERT_NOT_MOVABLE(tiny_crypto::piv_sm);
-TC_ASSERT_NOT_COPYABLE(tiny_crypto::piv_link);
-TC_ASSERT_NOT_MOVABLE(tiny_crypto::piv_link);
-TC_ASSERT_NOT_COPYABLE(tiny_crypto::apdu_channel);
-TC_ASSERT_NOT_MOVABLE(tiny_crypto::apdu_channel);
-TC_ASSERT_NOT_COPYABLE(tiny_crypto::piv_inventory);
-TC_ASSERT_NOT_MOVABLE(tiny_crypto::piv_inventory);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::DRBG);
+TC_ASSERT_NOT_MOVABLE(tiny_crypto::DRBG);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::PIVSM);
+TC_ASSERT_NOT_MOVABLE(tiny_crypto::PIVSM);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::PIVLink);
+TC_ASSERT_NOT_MOVABLE(tiny_crypto::PIVLink);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::APDUChannel);
+TC_ASSERT_NOT_MOVABLE(tiny_crypto::APDUChannel);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::PIVInventory);
+TC_ASSERT_NOT_MOVABLE(tiny_crypto::PIVInventory);
 
 /* TLVReader holds a cursor over borrowed input, and a copy is a saved
  * position. tests/cpp/tlv.cpp checks that a copy continues independently. */

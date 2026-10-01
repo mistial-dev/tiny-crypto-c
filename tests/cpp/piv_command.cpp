@@ -43,7 +43,7 @@ TEST_CASE("PIV link session")
   uint8_t response[64];
   const tiny_crypto::piv_link_options options = {{TC_APDU_SHORT, 0, 8, 0, 0}, TC_PIV_CONTACT, 0};
   {
-    tiny_crypto::piv_link link;
+    tiny_crypto::PIVLink link;
     REQUIRE(link.init({answer, &state}, options, {scratch, sizeof scratch}) == TC_PIV_OK);
     tiny_crypto::piv_application application = {};
     REQUIRE(link.select(TC_PIV_APPLICATION_PIV, 0, {response, sizeof response}, application) ==

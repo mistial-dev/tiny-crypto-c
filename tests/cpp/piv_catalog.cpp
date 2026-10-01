@@ -54,13 +54,13 @@ TEST_CASE("PIV inventory lifecycle")
   static uint8_t pool[1024];
   tiny_crypto::piv_object objects[TC_PIV_CATALOG_PIV_OBJECTS];
   const tiny_crypto::piv_link_options options = {{TC_APDU_SHORT, 0, 64, 0, 0}, TC_PIV_CONTACT, 0};
-  tiny_crypto::piv_link link;
+  tiny_crypto::PIVLink link;
   REQUIRE(link.init({answer, &calls}, options, {scratch, sizeof scratch}) == TC_PIV_OK);
   tiny_crypto::piv_application application = {};
   REQUIRE(link.select(TC_PIV_APPLICATION_PIV, 0, {response, sizeof response}, application) ==
           TC_PIV_OK);
   {
-    tiny_crypto::piv_inventory inventory(objects);
+    tiny_crypto::PIVInventory inventory(objects);
     size_t work = 10000;
     REQUIRE(inventory.read(link, nullptr, {pool, sizeof pool}, work) == TC_PIV_OK);
     CHECK(inventory.size() == TC_PIV_CATALOG_PIV_OBJECTS);

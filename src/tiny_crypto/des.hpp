@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-/* DES, DES_CMAC and DES_ISO9797 classes and the one-shot MAC functions for des.h.
+/* DES, DESCMAC and DESISO9797 classes and the one-shot MAC functions for des.h.
  * Contracts, statuses and lifetimes follow the C header. Conventions:
  * docs/cpp.md. Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_DES_HPP_
@@ -227,17 +227,17 @@ TC_CPP_NODISCARD inline TC_status des_cmac_verify_short_tag(bytes key, bytes mes
  * then return TC_ERROR until the next successful init. Compare a received tag
  * with des_cmac_verify or tiny_crypto::ct_equal. The destructor clears the
  * context. */
-class DES_CMAC {
+class DESCMAC {
 public:
   static const size_t tag_size = TC_DES_CMAC_TAG_MAX;
 
-  DES_CMAC() noexcept = default;
-  ~DES_CMAC() noexcept
+  DESCMAC() noexcept = default;
+  ~DESCMAC() noexcept
   {
     TC_DES_CMAC_ctx_clear(&ctx_);
   }
-  DES_CMAC(const DES_CMAC&) = delete;
-  DES_CMAC& operator=(const DES_CMAC&) = delete;
+  DESCMAC(const DESCMAC&) = delete;
+  DESCMAC& operator=(const DESCMAC&) = delete;
 
   TC_CPP_NODISCARD TC_status init(bytes key) noexcept
   {
@@ -273,7 +273,8 @@ private:
 #endif
 
 #if TC_DES_ENABLE_ISO9797
-/* One-shot ISO/IEC 9797-1 MAC algorithm 1 or 3 over a 16- or 24-byte key.
+/* One-shot ISO/IEC 9797-1 MAC algorithm 1 or 3. Standard ALG3 takes a
+ * 16-byte key; ALG3_3KEY_EXTENSION explicitly selects the 24-byte form.
  * des_iso9797_mac writes the full TC_DES_BLOCKLEN-byte MAC and verify
  * compares a full MAC. The _short_tag forms take the leading 4..7 bytes.
  * Verify returns TC_OK, TC_MISMATCH for a wrong MAC, or TC_ERROR for an
@@ -313,17 +314,17 @@ TC_CPP_NODISCARD inline TC_status des_iso9797_verify_short_tag(TC_DES_ISO9797_al
  * arguments keeps the state.
  * Compare a received MAC with des_iso9797_verify or tiny_crypto::ct_equal.
  * The destructor clears the context. */
-class DES_ISO9797 {
+class DESISO9797 {
 public:
   static const size_t tag_size = TC_DES_BLOCKLEN;
 
-  DES_ISO9797() noexcept = default;
-  ~DES_ISO9797() noexcept
+  DESISO9797() noexcept = default;
+  ~DESISO9797() noexcept
   {
     TC_DES_ISO9797_ctx_clear(&ctx_);
   }
-  DES_ISO9797(const DES_ISO9797&) = delete;
-  DES_ISO9797& operator=(const DES_ISO9797&) = delete;
+  DESISO9797(const DESISO9797&) = delete;
+  DESISO9797& operator=(const DESISO9797&) = delete;
 
   TC_CPP_NODISCARD TC_status init(TC_DES_ISO9797_algorithm algorithm,
                                   TC_DES_ISO9797_padding padding, bytes key) noexcept

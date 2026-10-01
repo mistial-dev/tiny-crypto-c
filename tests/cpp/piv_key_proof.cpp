@@ -43,7 +43,7 @@ bool card_certificate(TC_X509_certificate& out)
 }
 } // namespace
 
-TEST_CASE("PIV key proof on a piv_link")
+TEST_CASE("PIV key proof on a PIVLink")
 {
   char path[512];
   std::snprintf(path, sizeof path, "%s/sd33_card4.txt", TC_CARD_FIXTURE_DIR);
@@ -68,7 +68,7 @@ TEST_CASE("PIV key proof on a piv_link")
   const TC_X509_native_workspace native = {&ec, nullptr, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   const TC_X509_signature_provider provider = TC_X509_native_provider(&native);
   const tiny_crypto::piv_link_options options = {{TC_APDU_SHORT, 0, 16, 0, 0}, TC_PIV_CONTACT, 0};
-  tiny_crypto::piv_link link;
+  tiny_crypto::PIVLink link;
   tiny_crypto::piv_application application;
   REQUIRE(link.init(tc_card_simulator_transport(&card), options, {scratch, sizeof scratch}) ==
           TC_PIV_OK);

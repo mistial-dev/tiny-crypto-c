@@ -80,7 +80,7 @@ int main()
       return 1;
   if (aes.init({aes_key, sizeof aes_key - 1}) != TC_ERROR || aes.xcrypt_ctr(block) != TC_ERROR)
     return 1;
-  tiny_crypto::AES_dynamic_CMAC cmac;
+  tiny_crypto::AESDynamicCMAC cmac;
   uint8_t cmac_tag[16];
   if (cmac.init({aes_key, sizeof aes_key}) != TC_OK || cmac.update(original) != TC_OK ||
       cmac.finish(cmac_tag) != TC_OK)
@@ -96,7 +96,7 @@ int main()
   uint8_t point[65];
   uint8_t derived[32];
   tiny_crypto::ec_workspace workspace;
-  tiny_crypto::piv_sm session;
+  tiny_crypto::PIVSM session;
   scalar[31] = 1;
   TC_work_budget ec_work = {UINT32_MAX};
   if (tiny_crypto::ec_public_key(TC_EC_P256, {scalar, sizeof scalar}, point, workspace, ec_work) !=

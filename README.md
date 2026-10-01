@@ -607,7 +607,7 @@ until `TC_PIV_link_unsecure`. `TINY_CRYPTO_ENABLE_PIV_VCI` adds
 `<tiny_crypto/piv_vci.h>`: `TC_PIV_discovery_get` reads the Discovery Object
 over the secured link, and `TC_PIV_vci_establish` opens the virtual contact
 interface with the pairing code, or without it when the card's policy allows.
-The C++11 `tiny_crypto::piv_sm` wrapper clears its session on destruction and cannot be
+The C++11 `tiny_crypto::PIVSM` wrapper clears its session on destruction and cannot be
 copied or moved. See [PIV secure messaging](docs/piv-sm.md) for build options,
 span layouts, state transitions and every result.
 

@@ -57,7 +57,7 @@ and [`kbkdf.cpp`](../examples/kbkdf.cpp) build and run on the host as
   `buffer` spans or fixed-size C arrays whose size is part of the type. Array
   overloads deduce the span length.
 - In-place block-mode calls (`encrypt_cbc`, `xcrypt_ctr` and the others),
-  `AES_dynamic` CBC and `GCM::encrypt_update` take a `buffer`. Array overloads
+  `AESDynamic` CBC and `GCM::encrypt_update` take a `buffer`. Array overloads
   deduce the capacity. `encrypt_ecb` and `decrypt_ecb` transform one fixed-size
   block in place.
 - Wrappers add length checks before the C call. A wrong key or IV length, or a
@@ -74,8 +74,8 @@ are public. Timing depends on the shorter length and is independent of content.
 Cipher, hash, MAC, DRBG, GZIP, APDU, PIV SM and PIV link classes own their C state.
 They delete their copy operations, so key material and generator state are
 never duplicated. `TLVReader` holds only a cursor over borrowed input, so it
-may be copied, and a copy acts as a saved position. `drbg`, `piv_sm` and
-`piv_link` also delete their move operations. Destruction clears the context.
+may be copied, and a copy acts as a saved position. `DRBG`, `PIVSM` and
+`PIVLink` also delete their move operations. Destruction clears the context.
 Stateful classes use `init`, `update`, `finish` and `clear` where those stages
 apply. More specific operations keep a descriptive verb, such as
 `encrypt_finish`, `decode`, `transceive` and `unprotect`.
@@ -84,12 +84,12 @@ apply. More specific operations keep a descriptive verb, such as
 | ------------------ | -------------------------------------------------- | ----------------------------------------------------------------- |
 | `AES`              | `TC_AES_KEYLEN` bytes, optional 16-byte IV         | none                                                              |
 | `GCM`              | `TC_AES_KEYLEN` bytes and an IV                    | `encrypt_finish` writes `tag_length()` bytes and consumes the key |
-| `AES_CMAC`         | `TC_AES_KEYLEN` bytes                              | writes a 16-byte tag and consumes the key                         |
-| `AES_dynamic`      | 16, 24 or 32 bytes                                 | none                                                              |
-| `AES_dynamic_CMAC` | 16, 24 or 32 bytes                                 | writes a 16-byte tag and consumes the key                         |
+| `AESCMAC`          | `TC_AES_KEYLEN` bytes                              | writes a 16-byte tag and consumes the key                         |
+| `AESDynamic`       | 16, 24 or 32 bytes                                 | none                                                              |
+| `AESDynamicCMAC`   | 16, 24 or 32 bytes                                 | writes a 16-byte tag and consumes the key                         |
 | `DES`              | 8 bytes, or 16 or 24 with TDEA, optional 8-byte IV | none                                                              |
-| `DES_CMAC`         | 8, 16 or 24 bytes                                  | writes an 8-byte tag and consumes the key                         |
-| `DES_ISO9797`      | algorithm, padding and 16 or 24 bytes              | writes the 8-byte MAC and consumes the key                        |
+| `DESCMAC`          | 8, 16 or 24 bytes                                  | writes an 8-byte tag and consumes the key                         |
+| `DESISO9797`       | standard ALG3: 16; three-key extension: 24 bytes   | writes the 8-byte MAC and consumes the key                        |
 | `HMAC_SHA*`        | any length                                         | writes `tag_size` bytes and consumes the key                      |
 | `KMAC256`          | any length, optional customization                 | writes `out.capacity` bytes and consumes the key                  |
 | `SHA*`, `MD5`      | none                                               | writes the digest and starts the next message                     |
@@ -102,49 +102,49 @@ at construction, and `reset` discards a partial message. Compare a received
 tag with a `*_verify` wrapper or `tiny_crypto::ct_equal`, which run in
 constant time.
 
-`drbg` uninstantiates on destruction. `random_source()` returns a
-`TC_random_source` for the C APIs, and the `drbg` object must outlive it.
+`DRBG` uninstantiates on destruction. `random_source()` returns a
+`TC_random_source` for the C APIs, and the `DRBG` object must outlive it.
 `TLVReader::init` and `init_child` leave the reader unusable on failure, and
 `next` on an unusable reader returns `TC_TLV_ARGUMENT`. `GZIPDecoder` owns
 reusable decoding scratch, and input and output stay caller-owned. The
-`piv_sm` session is cleared on destruction.
+`PIVSM` session is cleared on destruction.
 
-`piv_link` follows init, commands and clear. `init`, `select`, `get_data`,
+`PIVLink` follows init, commands and clear. `init`, `select`, `get_data`,
 `verify_status` and `pin_verify` forward to the C functions, `status` and
 `info` report the link state, and `native` returns the `TC_PIV_link` for the C
 layers built on it. The destructor calls `TC_PIV_link_clear`, which wipes the
 borrowed command scratch, so the scratch buffer and the transport context
 outlive the object.
 
-`apdu_channel` owns a `TC_APDU_channel`. `init`, `restrict` and `transceive`
+`APDUChannel` owns a `TC_APDU_channel`. `init`, `restrict` and `transceive`
 forward to the bounded C channel, and `exchanges_left` reports its remaining
 budget. The transport context and scratch buffer outlive the wrapper. Its
 destructor clears the channel and wipes the borrowed scratch.
 
 `piv_sm_key_request`, `piv_link_secure` and `piv_link_unsecure` in
-`piv_sm_apdu.hpp` take a `piv_link` and a `piv_sm` by reference. A secured
+`piv_sm_apdu.hpp` take a `PIVLink` and a `PIVSM` by reference. A secured
 link borrows the session, the workspace and the secure messaging scratch.
-Declare the `piv_sm` before the `piv_link`, so the link is destroyed first and
-clears the bound session while it exists. `piv_sm::native` returns the
+Declare the `PIVSM` before the `PIVLink`, so the link is destroyed first and
+clears the bound session while it exists. `PIVSM::native` returns the
 `TC_PIV_SM`. `piv_discovery_get` and `piv_vci_establish` in `piv_vci.hpp` take
-the `piv_link` by reference and follow the same lifetime.
+the `PIVLink` by reference and follow the same lifetime.
 
-`piv_inventory` in `piv_catalog.hpp` wraps a `TC_PIV_inventory` over a caller
-object array. `read` takes the `piv_link`, an optional plan, the pool and the
+`PIVInventory` in `piv_catalog.hpp` wraps a `TC_PIV_inventory` over a caller
+object array. `read` takes the `PIVLink`, an optional plan, the pool and the
 work counter. `find`, `size` and `operator[]` return the entries, which borrow
 the pool. The destructor calls `TC_PIV_inventory_clear`, which wipes the pool
 bytes the objects use and the object array, so both outlive the object.
 Copying and moving are deleted. `piv_catalog_count`, `piv_catalog_at` and
 `piv_catalog_find` wrap the catalog lookups.
 
-`piv_key_prove` in `piv_key_proof.hpp` takes the `piv_link`, the request, the
+`piv_key_prove` in `piv_key_proof.hpp` takes the `PIVLink`, the request, the
 provider, the workspace and the work budget by reference.
 `piv_key_parameters_select` wraps the key policy.
 
 `piv_card_check` in `piv_card_check.hpp` takes the request, the workspace, the
 work counter and the report by reference. The report borrows the inventory
 pool and the workspace buffers. `piv_card_report_accepts` takes a requirement
-array, and `piv_card_prove_keys` takes the `piv_link`.
+array, and `piv_card_prove_keys` takes the `PIVLink`.
 
 ## GCM streaming
 
@@ -211,7 +211,7 @@ the C API from C++ code. `der.h` is used through higher-level C APIs, while
 bool retail_mac_valid(const uint8_t (&key)[16], tiny_crypto::bytes message,
                       const uint8_t (&received)[TC_DES_BLOCKLEN])
 {
-  tiny_crypto::DES_ISO9797 mac;
+  tiny_crypto::DESISO9797 mac;
   uint8_t computed[TC_DES_BLOCKLEN];
   if (mac.init(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key) != TC_OK ||
       mac.update(message) != TC_OK || mac.finish(computed) != TC_OK)

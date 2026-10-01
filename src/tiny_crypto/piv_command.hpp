@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-/* The piv_link card session class for piv_command.h.
+/* The PIVLink card session class for piv_command.h.
  * Contracts, statuses and lifetimes follow the C header. Conventions:
  * docs/cpp.md. Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_PIV_COMMAND_HPP_
@@ -48,20 +48,20 @@ TC_CPP_NODISCARD inline piv_status piv_status_classify(uint16_t sw, piv_command 
 // A card session. The destructor calls TC_PIV_link_clear, which wipes the
 // borrowed command scratch, so the scratch and the transport context must
 // outlive the object. Copying or moving would duplicate the channel state.
-class piv_link {
+class PIVLink {
   ::TC_PIV_link link_;
 
 public:
-  piv_link() noexcept : link_{}
+  PIVLink() noexcept : link_{}
   {}
-  ~piv_link() noexcept
+  ~PIVLink() noexcept
   {
     clear();
   }
-  piv_link(const piv_link&) = delete;
-  piv_link& operator=(const piv_link&) = delete;
-  piv_link(piv_link&&) = delete;
-  piv_link& operator=(piv_link&&) = delete;
+  PIVLink(const PIVLink&) = delete;
+  PIVLink& operator=(const PIVLink&) = delete;
+  PIVLink(PIVLink&&) = delete;
+  PIVLink& operator=(PIVLink&&) = delete;
 
   TC_CPP_NODISCARD piv_result init(apdu_transport transport, const piv_link_options& options,
                                    buffer command_scratch) noexcept

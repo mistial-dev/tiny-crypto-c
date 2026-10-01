@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
-/* C++ wrapper for the SP 800-90A DRBGs. The drbg object owns one TC_DRBG and
+/* C++ wrapper for the SP 800-90A DRBGs. The DRBG object owns one TC_DRBG and
  * uninstantiates it on destruction. Results are the C TC_DRBG_result values.
  * Contracts, statuses and lifetimes follow drbg.h. Conventions: docs/cpp.md.
  * Library-wide contracts: docs/api.md. */
@@ -20,20 +20,20 @@ namespace tiny_crypto {
 typedef ::TC_DRBG_config drbg_config;
 
 // Copying or moving would duplicate the generator state and repeat output.
-class drbg {
+class DRBG {
   ::TC_DRBG state_;
 
 public:
-  drbg() noexcept : state_{}
+  DRBG() noexcept : state_{}
   {}
-  ~drbg() noexcept
+  ~DRBG() noexcept
   {
     uninstantiate();
   }
-  drbg(const drbg&) = delete;
-  drbg& operator=(const drbg&) = delete;
-  drbg(drbg&&) = delete;
-  drbg& operator=(drbg&&) = delete;
+  DRBG(const DRBG&) = delete;
+  DRBG& operator=(const DRBG&) = delete;
+  DRBG(DRBG&&) = delete;
+  DRBG& operator=(DRBG&&) = delete;
 
   TC_CPP_NODISCARD TC_DRBG_result instantiate(const drbg_config& config, TC_random_source entropy,
                                               bytes nonce, bytes personalization) noexcept

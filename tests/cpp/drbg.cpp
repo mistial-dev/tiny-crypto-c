@@ -49,7 +49,7 @@ TEST_CASE("HMAC_DRBG SHA-256 CAVP answer and lifecycle")
   tiny_crypto::drbg_config config = {};
   config.mechanism = TC_DRBG_HMAC;
   config.hash = TC_HASH_SHA256;
-  tiny_crypto::drbg generator;
+  tiny_crypto::DRBG generator;
   CHECK(generator.generate(tiny_crypto::buffer{out, sizeof(out)}) == TC_DRBG_ARGUMENT);
   REQUIRE(generator.instantiate(config, TC_random_source{fill, &source},
                                 tiny_crypto::bytes{nonce, sizeof(nonce)},

@@ -443,18 +443,18 @@ establishment.
 
 ## C++
 
-`tiny_crypto::piv_sm` in `<tiny_crypto/piv_sm.hpp>` wraps one session. It clears
+`tiny_crypto::PIVSM` in `<tiny_crypto/piv_sm.hpp>` wraps one session. It clears
 the session on destruction and cannot be copied or moved. Its member functions
 match the C calls and take the same request types through references. Workspace
 stays outside the object so it can be shared with other operations. `native()`
 returns the `TC_PIV_SM` for the C layers.
 
 `<tiny_crypto/piv_sm_apdu.hpp>` adds `piv_sm_key_request`, `piv_link_secure`
-and `piv_link_unsecure` over a `piv_link` and a `piv_sm`. The link holds a
-pointer to the session while it is bound, so declare the `piv_sm` before the
-`piv_link`. The link is then destroyed first, and its destructor clears the
+and `piv_link_unsecure` over a `PIVLink` and a `PIVSM`. The link holds a
+pointer to the session while it is bound, so declare the `PIVSM` before the
+`PIVLink`. The link is then destroyed first, and its destructor clears the
 bound session while the session still exists. `<tiny_crypto/piv_vci.hpp>`
-adds `piv_discovery_get` and `piv_vci_establish` over a `piv_link`.
+adds `piv_discovery_get` and `piv_vci_establish` over a `PIVLink`.
 
 ## Resource use
 

@@ -54,9 +54,9 @@ TEST_CASE("PIV virtual contact interface on a link")
   const tiny_crypto::piv_link_options options = {
       {TC_APDU_SHORT, 0, 16, 0, 0}, TC_PIV_CONTACTLESS, 0};
   // Declare the session first: the link borrows it and is destroyed first.
-  tiny_crypto::piv_sm session;
+  tiny_crypto::PIVSM session;
   tiny_crypto::piv_sm_workspace workspace{};
-  tiny_crypto::piv_link link;
+  tiny_crypto::PIVLink link;
   REQUIRE(link.init(tc_sm_card_transport(&card), options, {scratch, sizeof scratch}) == TC_PIV_OK);
   tiny_crypto::piv_application application{};
   REQUIRE(link.select(TC_PIV_APPLICATION_PIV, 0, {response, sizeof response}, application) ==

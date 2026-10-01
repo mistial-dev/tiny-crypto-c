@@ -19,7 +19,7 @@ static TC_status scalar_one(void*, uint8_t* output, size_t length)
 TEST_CASE("PIV SM authenticated exchange")
 {
   for (const auto& fixture : sm_fixtures) {
-    tiny_crypto::piv_sm session;
+    tiny_crypto::PIVSM session;
     tiny_crypto::piv_sm_workspace workspace{};
     uint8_t host[8] = {}, output[256];
     tiny_crypto::piv_sm_handshake handshake{};
@@ -74,7 +74,7 @@ TEST_CASE("PIV SM session lifecycle")
 {
   const TC_PIV_SM_suite suites[] = {TC_PIV_SM_CS2, TC_PIV_SM_CS7};
   for (auto suite : suites) {
-    tiny_crypto::piv_sm session;
+    tiny_crypto::PIVSM session;
     tiny_crypto::piv_sm_workspace workspace{};
     uint8_t host[8] = {}, output[118] = {};
     tiny_crypto::piv_sm_handshake handshake{};
