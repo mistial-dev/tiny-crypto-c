@@ -10,15 +10,18 @@ permissions:
 
 jobs:
   full:
-    name: Full ${{ matrix.compiler }}
+    name: Full ${{ matrix.suite }} (${{ matrix.compiler }})
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - {compiler: gcc, cc: gcc, cxx: g++}
-          - {compiler: clang, cc: clang, cxx: clang++}
+          - {suite: release, compiler: gcc, cc: gcc, cxx: g++, target: test-full, openssl: 'ON', timeout: 90}
+          - {suite: release, compiler: clang, cc: clang, cxx: clang++, target: test-full, openssl: 'ON', timeout: 90}
+          - {suite: sanitizers, compiler: gcc, cc: gcc, cxx: g++, target: test-sanitize-full, openssl: 'ON', timeout: 150}
+          - {suite: sanitizers, compiler: clang, cc: clang, cxx: clang++, target: test-sanitize-full, openssl: 'ON', timeout: 150}
+          - {suite: memory sanitizer, compiler: clang, cc: clang, cxx: clang++, target: test-msan-full, openssl: 'OFF', timeout: 150}
     env:
       CTEST_PARALLEL_LEVEL: 4
       CC: ${{ matrix.cc }}
@@ -36,17 +39,8 @@ jobs:
           for number in 3454 4518; do
             curl --fail --location --retry 3 "https://www.rfc-editor.org/rfc/rfc$number.txt" -o "$RUNNER_TEMP/unicode/rfc$number.txt"
           done
-      - name: Full release suite
+      - name: Run full ${{ matrix.suite }} suite
         run: >-
-          make test-full TINY_CRYPTO_TEST_OPENSSL=ON
-          TINY_CRYPTO_TEST_UNICODE_DIR="$RUNNER_TEMP/unicode"
-      - name: Full sanitizer suite
-        run: >-
-          make test-sanitize-full
-          TINY_CRYPTO_TEST_OPENSSL=ON
-          TINY_CRYPTO_TEST_UNICODE_DIR="$RUNNER_TEMP/unicode"
-      - name: Full memory sanitizer suite
-        if: matrix.compiler == 'clang'
-        run: >-
-          make test-msan-full
+          make "${{ matrix.target }}"
+          TINY_CRYPTO_TEST_OPENSSL="${{ matrix.openssl }}"
           TINY_CRYPTO_TEST_UNICODE_DIR="$RUNNER_TEMP/unicode"
