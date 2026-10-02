@@ -39,11 +39,11 @@ def generate_vectors():
     # Single DES ECB Test Vectors (NIST SP 800-20)
     des_key1 = bytes.fromhex("0123456789ABCDEF")
     des_pt1  = bytes.fromhex("4E6F772069732074") # 'Now is t'
-    
+
     # 2-Key 3DES ECB Test Vectors
     tdes_key2 = bytes.fromhex("0123456789ABCDEF23456789ABCDEF01")
     tdes_pt2  = bytes.fromhex("6BC1BEE22E409F96E93D7E117393172A") # 16 bytes
-    
+
     # 3-Key 3DES ECB Test Vectors
     tdes_key3 = bytes.fromhex("0123456789ABCDEF23456789ABCDEF01456789ABCDEF0123")
     tdes_pt3  = bytes.fromhex("4E6F77206973207468652074696D6520") # 16 bytes

@@ -40,11 +40,11 @@ authorization type AT (eID), generated 2016 by the same tool:
 
 All 13 signatures verify. `public_keys/*.x509.cv` are the 7F49 public-key
 templates (with domain parameters) for the CVCAs and the two terminal sector
-keys; `descriptions/*.bin` are the CertificateDescription structures whose
-SHA-256 the terminal certificates reference; `CVCertificates.xml` is the
-generator configuration that produced them; `GOV_TERMINAL_CERT.hex` is an
+keys. `descriptions/*.bin` are the CertificateDescription structures whose
+SHA-256 the terminal certificates reference. `CVCertificates.xml` is the
+generator configuration that produced them. `GOV_TERMINAL_CERT.hex` is an
 additional terminal certificate issued by `DEDVtIDGVNK00005`, from the
-testbed's unit tests, as hex text (its issuer is not in the set). Private keys were not copied.
+testbed's unit tests, as hex text (its issuer is outside the set). Private keys were excluded.
 
 The testbed's X.509 side (CSCA, document signers, master list, black lists,
 TLS test certificates) is in `../x509/eid_testbeds/`.
@@ -58,8 +58,8 @@ BouncyCertGenerator with reference date 2026-09-01, then derives the
 `malformed/` set and `manifest.json`. That tool is not vendored: it has no
 licence file, targets Java 8 / BouncyCastle 1.57 / JAXB, and needs one source
 patch for the NIST curves (`(ECCurve.Fp)` cast in `CVPubKeyHolder.java` to
-`ECCurve.AbstractFp`, and `getQ()` to `getField().getCharacteristic()`);
-build notes are in the script's docstring. Rerunning makes new keys.
+`ECCurve.AbstractFp`, and `getQ()` to `getField().getCharacteristic()`).
+Build notes are in the script's docstring. Rerunning makes new keys.
 
 `config.xml` is the configuration used. Each chain is CVCA (self-signed, with
 domain parameters, every authorization bit) -> DV_DOMESTIC -> TERMINAL (90-day
@@ -79,15 +79,15 @@ validity), named `<TAG>_cvca`, `<TAG>_dv`, `<TAG>_terminal`:
 | `RE3`, `R512` | RSA e=3 (2048), RSA-512 | |
 
 `public_keys/` holds the exported 7F49 templates for every CVCA and the
-sector key; `descriptions/BP256_terminal.bin` is the CertificateDescription.
+sector key. `descriptions/BP256_terminal.bin` is the CertificateDescription.
 
-**Encoding defect worth knowing about.** BouncyCertGenerator emits ECDSA `r`,
+**Encoding defect.** BouncyCertGenerator emits ECDSA `r`,
 `s` and point coordinates as minimal big-endian integers, so whenever a value
 has a leading zero octet the field is one byte shorter than TR-03110 D.3.3
 requires. `secp160r1` (161-bit order) always hits it; other curves hit it at
 random. The frozen run has 5 such certificates (`P160_*`, `P521_cvca`,
-`P521_dv`); they are kept as non-conforming samples, their manifest `expect`
-is `parse-only`, and the `reason` says why. The testbed's own certificates do
+`P521_dv`). They are kept as non-conforming samples, their manifest `expect`
+is `parse-only`, and the `reason` explains the defect. The testbed's own certificates do
 not have the defect.
 
 `manifest.json` fields: `file`, `kind` (`cvc`, `cvc-public-key`,

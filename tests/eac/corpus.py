@@ -136,7 +136,7 @@ def main():
     for path in keys:
         key = fields(fields(path.read_bytes())[0x7f49][0])
         oid = key[6][0]
-        # The generator's RSA exports carry RI-DH identifiers, not TA-RSA.
+        # The generator's RSA exports carry RI-DH identifiers where TA-RSA is expected.
         expected = oid[7:9] == bytes([5, 2])
         if expected:
             width = len(key[0x81][0])

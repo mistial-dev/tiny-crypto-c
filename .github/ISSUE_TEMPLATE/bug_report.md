@@ -1,12 +1,9 @@
----
-name: Bug report
-about: Report a technical defect in tiny-crypto-c
-title: ''
-labels: bug
-assignees: ''
----
+______________________________________________________________________
+
+## name: Bug report about: Report a technical defect in tiny-crypto-c title: '' labels: bug assignees: ''
 
 <!-- SPDX-FileCopyrightText: Mistial Dev -->
+
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
 ## Problem description
@@ -16,8 +13,8 @@ Clear description of the incorrect behaviour.
 ## Reproduction steps
 
 1.
-2.
-3.
+1.
+1.
 
 ## Expected behaviour
 
@@ -40,7 +37,7 @@ What happens instead.
 - Relevant hex dumps (message, key, expected and actual digest or tag)
 - Algorithm and mode, including streaming vs one-shot API
 
----
+______________________________________________________________________
 
 **Policy:** This project follows the [Bounded Contribution Policy](../../CODE_OF_CONDUCT.md).
 Please keep the report focused on technical facts and reproduction.

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Mistial Dev
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Original RFC 5280 encoding fixtures; signatures are placeholders."""
+"""Original RFC 5280 encoding fixtures. Signatures are placeholders."""
 import argparse
 from pathlib import Path
 import subprocess
@@ -24,6 +24,15 @@ class Schema(unittest.TestCase):
         self.assertEqual(result["key_bits"], "12")
         self.assertEqual(result["key_oid"], "2a864886f70d010101")
         self.assertEqual(result["signature_oid"], "2a864886f70d01010b")
+
+    def test_rsa_signature_parameters(self):
+        # RFC 4055 section 5: readers accept absent or NULL parameters.
+        oid = tlv(6, bytes.fromhex("2a864886f70d01010b"))
+        for parameters, expected in ((b"", "0"), (tlv(5, b""), "0"), (tlv(5, b"\x00"), "-1"),
+                                     (tlv(2, b"\x00"), "-1"), (seq(), "-1")):
+            with self.subTest(parameters=parameters.hex()):
+                algorithm = seq(oid, parameters) if parameters else seq(oid)
+                self.assertEqual(self.read(certificate(signature_algorithm=algorithm))["result"], expected)
 
     def test_pss_parameters(self):
         oid = tlv(6, bytes.fromhex("2a864886f70d01010a"))

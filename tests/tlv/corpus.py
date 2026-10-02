@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Mistial Dev
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Check corpus framing, not certificate trust or PIV authentication."""
+"""Check TLV framing of the external object corpus."""
 import argparse
 import base64
 import hashlib

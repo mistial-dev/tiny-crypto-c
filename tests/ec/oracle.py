@@ -5,7 +5,10 @@ import argparse
 import hashlib
 from pathlib import Path
 import subprocess
-import zipfile
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from tools.cavp_rsp import records
 
 
 def check(readers, bits, scalar, public, peer, shared, label):
@@ -16,31 +19,19 @@ def check(readers, bits, scalar, public, peer, shared, label):
             raise AssertionError(f"{label}, {reader}:\n{result.stdout}\n{result.stderr}")
 
 
-def cavp(archive, readers):
-    # NIST's component-testing page, ECCCDH Primitive Test Vectors (2012).
-    # https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/component-testing
-    expected = "5fff092551f2d72e89a3d9362711878708f9a14b502f0dfae819649105b0ea39"
-    if hashlib.sha256(archive.read_bytes()).hexdigest() != expected:
-        raise AssertionError("Unexpected ECCCDH archive digest")
-    with zipfile.ZipFile(archive) as bundle:
-        lines = bundle.read("KAS_ECC_CDH_PrimitiveTest.txt").decode("ascii").splitlines()
-    curve, record = None, {}
+def cavp(directory, readers):
+    # NIST ECCCDH Primitive Test Vectors. The source is recorded in
+    # tests/vectors/nist_ecccdh/README.md.
+    text = (directory / "KAS_ECC_CDH_PrimitiveTest.txt").read_text(encoding="ascii")
     counts = {"P-256": 0, "P-384": 0}
-    for line in lines:
-        line = line.strip()
-        if line.startswith("["):
-            curve = line[1:-1]
-            record = {}
-        elif curve in counts and "=" in line:
-            key, value = (part.strip() for part in line.split("=", 1))
-            record[key] = value
-            if key == "ZIUT":
-                check(readers, curve[2:], record["dIUT"],
-                      "04" + record["QIUTx"] + record["QIUTy"],
-                      "04" + record["QCAVSx"] + record["QCAVSy"],
-                      record["ZIUT"], f"{curve} COUNT={record['COUNT']}")
-                counts[curve] += 1
-                record = {}
+    for curve, record in records(text):
+        if curve not in counts or "ZIUT" not in record:
+            continue
+        check(readers, curve[2:], record["dIUT"],
+              "04" + record["QIUTx"] + record["QIUTy"],
+              "04" + record["QCAVSx"] + record["QCAVSy"],
+              record["ZIUT"], f"{curve} COUNT={record['COUNT']}")
+        counts[curve] += 1
     if counts != {"P-256": 25, "P-384": 25}:
         raise AssertionError(f"Incomplete ECCCDH corpus: {counts}")
     print(f"Checked 50 NIST ECCCDH answers using {len(readers)} builds")
@@ -50,12 +41,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reader", action="append", required=True)
     parser.add_argument("--cases", type=int, default=16)
-    parser.add_argument("--cavp-archive", type=Path)
+    parser.add_argument("--cavp-dir", type=Path)
     args = parser.parse_args()
     if args.cases < 1:
         parser.error("--cases must be positive")
-    if args.cavp_archive:
-        cavp(args.cavp_archive, args.reader)
+    if args.cavp_dir:
+        cavp(args.cavp_dir, args.reader)
         return
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat

@@ -14,9 +14,12 @@ static inline TC_TLV_result read_candidate(void* context, size_t index, size_t* 
 {
   candidate_source* source = context;
   ++source->calls;
-  if (source->increase_work) ++*work;
-  if (source->status != TC_TLV_OK) return source->status;
-  if (index >= source->count) return TC_TLV_ARGUMENT;
+  if (source->increase_work)
+    ++*work;
+  if (source->status != TC_TLV_OK)
+    return source->status;
+  if (index >= source->count)
+    return TC_TLV_ARGUMENT;
   *out = source->records[index];
   return TC_TLV_OK;
 }

@@ -3,21 +3,17 @@
 #ifndef TC_TEST_MAC_VECTORS_H
 #define TC_TEST_MAC_VECTORS_H
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include <stdio.h>
 #include <string.h>
 
-typedef TC_status (*tc_test_mac_fn)(const uint8_t*, size_t, const uint8_t*, size_t,
-                                     uint8_t*, size_t);
+typedef TC_status (*tc_test_mac_fn)(const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*,
+                                    size_t);
 
 static size_t tc_test_mac_hex(const char* text, uint8_t* output, size_t capacity)
 {
-  size_t length;
-  if (strcmp(text, "-") == 0) return 0;
-  length = tc_test_decode_hex(text, output, capacity);
-  munit_assert_size(strlen(text) % 2, ==, 0);
-  munit_assert_size(length, ==, strlen(text) / 2);
-  return length;
+  /* "-" marks an empty value. */
+  return strcmp(text, "-") == 0 ? 0 : tc_test_hex(text, output, capacity);
 }
 
 static MunitResult tc_test_mac_vectors(const char* path, tc_test_mac_fn digest)
@@ -27,11 +23,12 @@ static MunitResult tc_test_mac_vectors(const char* path, tc_test_mac_fn digest)
   uint8_t key[1024], msg[8192], tag[1024], output[1024];
   unsigned id, count = 0;
   int fields;
-  if (!path) return MUNIT_SKIP;
+  if (!path)
+    return MUNIT_SKIP;
   file = fopen(path, "r");
   munit_assert_not_null(file);
-  while ((fields = fscanf(file, "%u %2048s %16384s %2048s %15s",
-                           &id, key_hex, msg_hex, tag_hex, verdict)) == 5) {
+  while ((fields = fscanf(file, "%u %2048s %16384s %2048s %15s", &id, key_hex, msg_hex, tag_hex,
+                          verdict)) == 5) {
     size_t key_length = tc_test_mac_hex(key_hex, key, sizeof key);
     size_t msg_length = tc_test_mac_hex(msg_hex, msg, sizeof msg);
     size_t tag_length = tc_test_mac_hex(tag_hex, tag, sizeof tag);
@@ -41,7 +38,8 @@ static MunitResult tc_test_mac_vectors(const char* path, tc_test_mac_fn digest)
     if (strcmp(verdict, "invalid-key") == 0) {
       size_t i;
       munit_assert_int(status, ==, TC_ERROR);
-      for (i = 0; i < sizeof output; ++i) munit_assert_uint(output[i], ==, 0xa5);
+      for (i = 0; i < sizeof output; ++i)
+        munit_assert_uint(output[i], ==, 0xa5);
     } else {
       munit_assert_true(strcmp(verdict, "valid") == 0 || strcmp(verdict, "invalid") == 0);
       munit_assert_size(tag_length, >, 0);

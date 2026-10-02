@@ -32,7 +32,9 @@ def main():
         if not contents.endswith(b"\xfe\0"):
             raise AssertionError(f"Unexpected FE encoding: {path}")
         certificate = fields[0x70]
-        for value, profiles in ((contents, ((0, 0), (2, 0), (1, 1))),
+        # The TWIC profile also reads the PIV form ending in FE (TWIC Part 2
+        # v5 4.7.1).
+        for value, profiles in ((contents, ((0, 0), (2, 0), (1, 0))),
                                 (contents[:-2], ((1, 0), (0, 1), (2, 1))),
                                 (contents + b"\x72\0", ((0, 1), (1, 1), (2, 1)))):
             encoded = wrap(value)

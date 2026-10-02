@@ -17,6 +17,7 @@ import sys
 import tempfile
 
 from benchmark_cases import FEATURES, RP2350_FEATURES, SKETCH, definitions, features_for_board
+import feature_registry
 
 ROOT = Path(__file__).resolve().parents[1]
 SDK_REVISION = "079c6f39023649b154152db30f1d781e884879bc"
@@ -47,8 +48,6 @@ def validate_host(directory, name, body, flags):
     command += ["-std=c99", "-O1", "-g", "-fsanitize=address,undefined",
                 "-fno-omit-frame-pointer", "-I" + str(ROOT / "src")]
     command += ["-D" + k + "=" + v for k, v in definitions(flags).items()]
-    if definitions(flags).get("TC_ENABLE_PIV_SM") == "1":
-        command += ["-I" + str(ROOT / "examples"), ROOT / "examples/piv_sm_wire.c"]
     command += [source, *sorted((ROOT / "src").glob("*.c")), "-o", executable]
     run(command)
     run([executable])
@@ -167,15 +166,8 @@ def pico_environment():
 def measure_pico(directory, body, flags, toolchain, env):
     source = directory / "fixture.c"
     source.write_text(host_source(body), encoding="utf-8")
-    # Read the option names from CMake rather than maintaining a second list.
-    mapping = {macro: option for option, macro in re.findall(
-        r'"(TINY_CRYPTO_\w+);(TC_\w+)"', (ROOT / "CMakeLists.txt").read_text())}
-    options = []
-    for macro, value in definitions(flags).items():
-        if macro == "TC_AES_GCM_GHASH_MODE":
-            options.append("-DTINY_CRYPTO_AES_GHASH=" + ["auto", "bitwise", "wide", "fast-table", "hardware"][int(value)])
-        else:
-            options.append("-D" + mapping[macro] + "=" + ("ON" if value == "1" else "OFF"))
+    options = [feature_registry.cmake_definition(macro, value)
+               for macro, value in definitions(flags).items()]
     build = directory / "build"
     run(["cmake", "-S", ROOT / "benchmarks/pico", "-B", build,
          "-DCMAKE_BUILD_TYPE=Release", "-DTC_MEASUREMENT_SOURCE=" + str(source),
@@ -307,10 +299,10 @@ def render(report):
              "linker. Measure peak runtime use in your application.", "",
              "The Pico 2 builds use one Cortex-M33 core and run code from flash,",
              "with the RTOS and USB/UART output disabled. The report measures memory",
-             "use; run host throughput tests with `make benchmark`.", "",
+             "use. Run host throughput tests with `make benchmark`.", "",
              "## Updating the numbers", "",
              "Run `make benchmark-report` to rebuild this page, or",
-             "`make benchmark-report-check` to check that it's up to date.",
+             "`make benchmark-report-check` to check that it is up to date.",
              "Both validate fixtures on the host and cross-compile for each board.",
              "Boards can remain disconnected.", "",
              "Install PlatformIO 6.1.19 and Arm GCC 12.3.Rel1. Set",
@@ -329,14 +321,14 @@ def render(report):
                   f"Physical flash: {cap['flash']:,} bytes. SRAM: {cap['ram']:,} bytes.",
                   f"Application flash limit: {cap['application_flash']:,} bytes.", ""]
         if board == "uno":
-            lines += ["The bootloader takes another 512 bytes, not included in the table.", ""]
+            lines += ["The bootloader takes another 512 bytes outside the table figures.", ""]
         storage = data["tlv"]
         for field in ("reader", "stream", "frame", "element", "largest_stack_frame"):
             if type(storage[field]) is not int or storage[field] <= 0:
                 raise ValueError("Invalid TLV storage measurement")
         lines += [f"TLV object sizes: reader {storage['reader']}, stream {storage['stream']},",
                   f"element {storage['element']}, and nesting frame {storage['frame']} bytes.",
-                  "Frame storage is caller-owned; multiply its size by the allowed depth.",
+                  "Frame storage is caller-owned. Multiply its size by the allowed depth.",
                   f"The largest compiler-reported TLV/DER stack frame is {storage['largest_stack_frame']} bytes",
                   "at `-Os` without LTO. Called functions and callbacks need additional stack.", ""]
         pki = data["pki"]
@@ -383,10 +375,15 @@ def render(report):
     lines += ["## Feature definitions", "",
               "These are the build settings for each row. Options not listed use the",
               "library defaults.", ""]
-    for row in report["boards"]["uno"]["rows"]:
-        lines += ["### " + row["feature"], "", "```text"]
-        lines += [k + "=" + v for k, v in sorted(row["definitions"].items())]
-        lines += ["```", ""]
+    rendered = set()
+    for board in ("uno", "pico2"):
+        for row in report["boards"][board]["rows"]:
+            if row["feature"] in rendered:
+                continue
+            rendered.add(row["feature"])
+            lines += ["### " + row["feature"], "", "```text"]
+            lines += [k + "=" + v for k, v in sorted(row["definitions"].items())]
+            lines += ["```", ""]
     return "\n".join(lines)
 
 

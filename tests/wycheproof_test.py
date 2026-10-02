@@ -13,6 +13,56 @@ import munit_runner
 
 
 class ReaderTests(unittest.TestCase):
+    def test_primality_records_scope(self):
+        document = {"algorithm": "PrimalityTest", "schema": "primality_test_schema_v1.json",
+                    "numberOfTests": 5, "testGroups": [{"type": "PrimalityTest", "tests": [
+                        {"tcId": 1, "value": "03", "result": "valid", "flags": ["Prime"]},
+                        {"tcId": 2, "value": "09", "result": "invalid", "flags": []},
+                        {"tcId": 3, "value": "02", "result": "valid", "flags": ["Prime"]},
+                        {"tcId": 4, "value": "feff", "result": "acceptable", "flags": ["NegativeOfPrime"]},
+                        {"tcId": 5, "value": "04", "result": "invalid", "flags": []}]}]}
+        records, counts, derived, excluded = wycheproof.primality_records(document)
+        self.assertEqual(records,"03 valid 1\n09 invalid 2\nfeff invalid 4\n04 invalid 5\n")
+        self.assertEqual(counts,{"valid": 1, "invalid": 2})
+        self.assertEqual(derived,{"invalid": 1})
+        self.assertEqual(excluded,{"even-prime": 1})
+        document["numberOfTests"] = 6
+        with self.assertRaises(AssertionError):
+            wycheproof.primality_records(document)
+
+    def test_rsa_generation_records(self):
+        document = {"algorithm": "RSASSA-PKCS1-v1_5",
+                    "schema": "rsassa_pkcs1_generate_schema_v1.json",
+                    "numberOfTests": 2, "testGroups": [{
+                        "type": "RsassaPkcs1Generate", "keySize": 1024,
+                        "sha": "SHA-256", "privateKey": {
+                            "modulus": "80" + "00" * 127,
+                            "publicExponent": "010001", "privateExponent": "03"},
+                        "tests": [{"tcId": 1, "msg": "", "sig": "00" * 128,
+                                   "result": "valid"},
+                                  {"tcId": 2, "msg": "00", "sig": "01" * 128,
+                                   "result": "acceptable"}]}]}
+        records, counts = wycheproof.rsa_generation_records(document)
+        self.assertEqual(counts, {"valid": 1, "acceptable": 1})
+        fields = records.splitlines()[0].split()
+        self.assertEqual(len(fields), 8)
+        self.assertEqual(fields[3], "SHA-256")
+        self.assertEqual(fields[6:], ["match", "1"])
+        self.assertEqual(fields[4], wycheproof.signature_digest("SHA-256", b""))
+        excluded = copy.deepcopy(document)
+        excluded["testGroups"][0]["keySize"] = 8192
+        reasons = wycheproof.Counter()
+        self.assertEqual(wycheproof.rsa_generation_records(excluded,reasons), ("", {}))
+        self.assertEqual(reasons, {(8192,"SHA-256"): 2})
+        invalid = copy.deepcopy(document)
+        invalid["testGroups"][0]["tests"][0]["result"] = "invalid"
+        with self.assertRaises(AssertionError):
+            wycheproof.rsa_generation_records(invalid)
+        invalid = copy.deepcopy(document)
+        invalid["numberOfTests"] = 3
+        with self.assertRaises(AssertionError):
+            wycheproof.rsa_generation_records(invalid)
+
     def test_signature_digest(self):
         self.assertEqual(wycheproof.signature_digest("SHAKE128", b""),
             "7f9c2ba4e88f827d616045507605853ed73b8093f6efbc88eb1a6eacfa66ef26")
@@ -60,7 +110,7 @@ class ReaderTests(unittest.TestCase):
         for excluded in (False, True):
             bad = copy.deepcopy(document)
             if excluded:
-                bad["testGroups"][0]["keySize"] = 4096
+                bad["testGroups"][0]["keySize"] = 8192
             bad["testGroups"][0]["tests"][0]["result"] = "unknown"
             with self.assertRaises(AssertionError):
                 wycheproof.rsa_signature_records(bad, wycheproof.Counter())
@@ -73,7 +123,7 @@ class ReaderTests(unittest.TestCase):
         group["tests"][1]["flags"] = ["Unknown"]
         with self.assertRaises(AssertionError):
             wycheproof.rsa_signature_records(v15)
-        for field, value in (("keySize", 4096), ("sha", "SHA-512/256"), ("mgfSha", "SHA3-256")):
+        for field, value in (("keySize", 8192), ("sha", "SHA-512/256"), ("mgfSha", "SHA3-256")):
             bad = copy.deepcopy(document)
             bad["testGroups"][0][field] = value
             with self.assertRaises(AssertionError):
@@ -101,12 +151,12 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(fields[7:], ["-", "0001", "00", "valid", "1"])
         mixed = copy.deepcopy(document)
         extra = copy.deepcopy(document["testGroups"][0])
-        extra["keySize"] = 4096
+        extra["keySize"] = 8192
         mixed["testGroups"].append(extra)
         mixed["numberOfTests"] = 4
         exclusions = wycheproof.Counter()
         self.assertEqual(wycheproof.oaep_records(mixed, exclusions), (records, counts))
-        self.assertEqual(exclusions, {(4096, "SHA-256", "SHA-1"): 2})
+        self.assertEqual(exclusions, {(8192, "SHA-256", "SHA-1"): 2})
         excluded_only = copy.deepcopy(document)
         excluded_only["testGroups"] = [extra]
         excluded_only["testGroups"][0]["tests"][0]["result"] = "acceptable"
@@ -118,7 +168,7 @@ class ReaderTests(unittest.TestCase):
             wycheproof.oaep_records(excluded_only, wycheproof.Counter())
         with self.assertRaises(AssertionError):
             wycheproof.oaep_records(mixed)
-        for field, value in (("keySize", 4096), ("sha", "SHA-512/224"),
+        for field, value in (("keySize", 8192), ("sha", "SHA-512/224"),
                              ("mgf", "other"), ("type", "other")):
             bad = copy.deepcopy(document)
             bad["testGroups"][0][field] = value
@@ -133,6 +183,35 @@ class ReaderTests(unittest.TestCase):
             bad["testGroups"][0]["tests"][1]["result"] = verdict
             with self.assertRaises(AssertionError):
                 wycheproof.oaep_records(bad)
+
+    def test_oaep_records_key_size_shard(self):
+        group = {"keySize": 1024, "type": "RsaesOaepDecrypt", "mgf": "MGF1",
+                 "sha": "SHA-256", "mgfSha": "SHA-1",
+                 "privateKey": {"modulus": "00ff", "publicExponent": "0003",
+                                "privateExponent": "03", "prime1": "05", "prime2": "07"},
+                 "tests": [{"tcId": 1, "label": "", "ct": "0001", "msg": "00", "result": "valid"},
+                           {"tcId": 2, "label": "00", "ct": "", "msg": "", "result": "invalid"}]}
+        wide = copy.deepcopy(group)
+        wide["keySize"] = 2048
+        wide["privateKey"]["modulus"] = "00fe"
+        unsupported = copy.deepcopy(group)
+        unsupported["keySize"] = 8192
+        document = {"algorithm": "RSAES-OAEP", "numberOfTests": 6,
+                    "testGroups": [group, wide, unsupported]}
+        exclusions = wycheproof.Counter()
+        records, counts = wycheproof.oaep_records(document, exclusions, key_sizes={2048})
+        self.assertEqual(counts, {"valid": 1, "invalid": 1})
+        self.assertEqual({len(line.split()[0]) for line in records.splitlines()}, {512})
+        # Supported groups outside the shard stay out of the exclusion counts.
+        self.assertEqual(exclusions, {(8192, "SHA-256", "SHA-1"): 2})
+        exclusions = wycheproof.Counter()
+        self.assertEqual(wycheproof.oaep_records(document, exclusions, key_sizes={3072}), ("", {}))
+        self.assertEqual(exclusions, {(8192, "SHA-256", "SHA-1"): 2})
+        document["numberOfTests"] = 7
+        with self.assertRaises(AssertionError):
+            wycheproof.oaep_records(document, wycheproof.Counter(), key_sizes={2048})
+        with self.assertRaises(ValueError):
+            wycheproof.oaep_records(document, wycheproof.Counter(), key_sizes={1536})
 
     def test_ecdsa_records(self):
         document = {"numberOfTests": 2, "testGroups": [{
@@ -166,6 +245,49 @@ class ReaderTests(unittest.TestCase):
             bad["testGroups"][0]["tests"][1]["result"] = verdict
             with self.assertRaises(AssertionError):
                 wycheproof.ecdsa_records(bad, 256, "sha256")
+
+    def test_keywrap_records(self):
+        def case(tc_id, result, flags, msg="00" * 16, ct="11" * 24, key="22" * 16):
+            return {"tcId": tc_id, "key": key, "msg": msg, "ct": ct, "result": result,
+                    "flags": flags}
+        document = {"numberOfTests": 7, "testGroups": [
+            {"keySize": 128, "tests": [case(1, "valid", ["Normal"]),
+                                       case(2, "acceptable", ["ShortKey"], msg="00" * 8, ct="11" * 16),
+                                       case(3, "invalid", ["ModifiedIv"])]},
+            {"keySize": 192, "tests": [case(4, "valid", [], key="22" * 24),
+                                       case(5, "invalid", ["EmptyKey"], msg="", ct="11" * 8,
+                                            key="22" * 24)]},
+            {"keySize": 256, "tests": [case(6, "valid", [], key="22" * 32),
+                                       case(7, "invalid", [], key="22" * 32)]}]}
+        records, counts, derived = wycheproof.keywrap_records(document, "kw")
+        self.assertEqual(records[128][1], "kw 2 invalid " + "22" * 16 + " " + "00" * 8 + " " + "11" * 16)
+        self.assertEqual(records[192][1], "kw 5 invalid " + "22" * 24 + " - " + "11" * 8)
+        self.assertEqual([len(records[bits]) for bits in (128, 192, 256)], [3, 2, 2])
+        self.assertEqual(counts[(128, "invalid")], 2)
+        self.assertEqual(derived, {128: 1})
+        # Only KW ShortKey cases may be acceptable.
+        with self.assertRaises(AssertionError):
+            wycheproof.keywrap_records(document, "kwp")
+        bad = copy.deepcopy(document)
+        bad["testGroups"][0]["tests"][2]["flags"] = ["ShortKey", "Other"]
+        bad["testGroups"][0]["tests"][2]["result"] = "acceptable"
+        with self.assertRaises(AssertionError):
+            wycheproof.keywrap_records(bad, "kw")
+        # Every KEK size needs valid and invalid cases, and counts must add up.
+        bad = copy.deepcopy(document)
+        del bad["testGroups"][2]["tests"][1]
+        bad["numberOfTests"] = 6
+        with self.assertRaises(AssertionError):
+            wycheproof.keywrap_records(bad, "kw")
+        bad = copy.deepcopy(document)
+        bad["numberOfTests"] = 8
+        with self.assertRaises(AssertionError):
+            wycheproof.keywrap_records(bad, "kw")
+        # A KEK length must match its group.
+        bad = copy.deepcopy(document)
+        bad["testGroups"][1]["tests"][0]["key"] = "22" * 16
+        with self.assertRaises(AssertionError):
+            wycheproof.keywrap_records(bad, "kw")
 
     def test_requires_one_successful_test(self):
         summary = "1 of 1 (100%) tests successful, 0 (0%) test skipped."

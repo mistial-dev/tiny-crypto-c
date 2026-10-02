@@ -11,8 +11,7 @@
  *   hmac/HMAC.rsp                          - HMACVS groups [L=20/28/32/48/64]
  * Digest dispatch uses the digest length in bytes (20/28/32/48/64).
  *
- * This translation unit is part of the test executable only; it is never
- * linked into the library. Enable with TC_HASH_CAVP=1.
+ * Test-only translation unit. The test build enables it with TC_HASH_CAVP=1.
  */
 
 #include <stdio.h>
@@ -22,18 +21,18 @@
 #include <tiny_crypto/hash.h>
 #include "cavp.h"
 #include "munit.h"
-#include "test_io.h"
+#include "test_util.h"
 
 #ifndef CAVP_VECTOR_DIR
 #define CAVP_VECTOR_DIR "tests/vectors/hash/cavp"
 #endif
 
-#if defined(TC_HASH_CAVP) && (TC_HASH_CAVP == 1)
+#if TC_HASH_CAVP
 
 /* SHA-384/512 LongMsg lines carry up to 12800 message bytes (25600 hex
    characters plus the "Msg = " prefix and CRLF). */
 #define CAVP_MAX_LINE 32768
-#define CAVP_MAX_MSG  16384
+#define CAVP_MAX_MSG 16384
 
 static char cavp_line[CAVP_MAX_LINE];
 static uint8_t cavp_msg[CAVP_MAX_MSG];
@@ -41,31 +40,30 @@ static uint8_t cavp_msg[CAVP_MAX_MSG];
 /* Digest dispatch on the digest length in bytes. */
 static size_t cavp_digest(int alg, const uint8_t* msg, size_t len, uint8_t* out)
 {
-  switch (alg)
-  {
+  switch (alg) {
 #if TC_ENABLE_SHA1
   case TC_SHA1_DIGESTLEN:
-    munit_assert_int(TC_SHA1_digest(msg, len, out), ==, TC_OK);
+    munit_assert_int(TC_SHA1_digest((TC_bytes){msg, len}, out), ==, TC_OK);
     return TC_SHA1_DIGESTLEN;
 #endif
 #if TC_ENABLE_SHA224
   case TC_SHA224_DIGESTLEN:
-    munit_assert_int(TC_SHA224_digest(msg, len, out), ==, TC_OK);
+    munit_assert_int(TC_SHA224_digest((TC_bytes){msg, len}, out), ==, TC_OK);
     return TC_SHA224_DIGESTLEN;
 #endif
 #if TC_ENABLE_SHA256
   case TC_SHA256_DIGESTLEN:
-    munit_assert_int(TC_SHA256_digest(msg, len, out), ==, TC_OK);
+    munit_assert_int(TC_SHA256_digest((TC_bytes){msg, len}, out), ==, TC_OK);
     return TC_SHA256_DIGESTLEN;
 #endif
 #if TC_ENABLE_SHA384
   case TC_SHA384_DIGESTLEN:
-    munit_assert_int(TC_SHA384_digest(msg, len, out), ==, TC_OK);
+    munit_assert_int(TC_SHA384_digest((TC_bytes){msg, len}, out), ==, TC_OK);
     return TC_SHA384_DIGESTLEN;
 #endif
 #if TC_ENABLE_SHA512
   case TC_SHA512_DIGESTLEN:
-    munit_assert_int(TC_SHA512_digest(msg, len, out), ==, TC_OK);
+    munit_assert_int(TC_SHA512_digest((TC_bytes){msg, len}, out), ==, TC_OK);
     return TC_SHA512_DIGESTLEN;
 #endif
   default:
@@ -74,15 +72,21 @@ static size_t cavp_digest(int alg, const uint8_t* msg, size_t len, uint8_t* out)
   return 0;
 }
 
-static FILE* cavp_open(const char* relative)
+static void cavp_open(tc_cavp_reader* reader, const char* relative)
 {
-  char path[512];
-  FILE* file;
-  snprintf(path, sizeof(path), "%s/%s", CAVP_VECTOR_DIR, relative);
-  file = tc_test_fopen(path, "r");
-  if (file == NULL)
-    munit_errorf("cannot open CAVP file %s", path);
-  return file;
+  if (!tc_cavp_open(reader, CAVP_VECTOR_DIR, relative, cavp_line, sizeof cavp_line))
+    munit_errorf("cannot open CAVP file %s/%s", CAVP_VECTOR_DIR, relative);
+}
+
+/* Next field, skipping headers and record ends. Returns 0 at the end of the file. */
+static int cavp_next_field(tc_cavp_reader* reader, const char* relative)
+{
+  tc_cavp_event event;
+  while ((event = tc_cavp_next(reader)) == TC_CAVP_HEADER || event == TC_CAVP_RECORD_END) {
+  }
+  if (event == TC_CAVP_FAILURE)
+    munit_errorf("unreadable CAVP line %lu in %s", reader->line_number, relative);
+  return event == TC_CAVP_FIELD;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -91,44 +95,38 @@ static FILE* cavp_open(const char* relative)
 
 static long cavp_run_msg_file(int alg, const char* relative)
 {
-  FILE* file = cavp_open(relative);
+  tc_cavp_reader reader;
   long len_bits = -1;
   long msg_len = -1;
   uint8_t expected[TC_SHA512_DIGESTLEN];
   long expected_len = -1;
   long cases = 0;
 
-  while (fgets(cavp_line, sizeof(cavp_line), file) != NULL)
-  {
-    const char* v;
-    if ((v = tc_cavp_field_value(cavp_line, "Len")) != NULL)
-    {
+  cavp_open(&reader, relative);
+  while (cavp_next_field(&reader, relative)) {
+    const char* v = reader.value;
+    if (tc_cavp_is(&reader, "Len")) {
       len_bits = strtol(v, NULL, 10);
       munit_assert_long(len_bits % 8, ==, 0);
       msg_len = -1;
       expected_len = -1;
-    }
-    else if ((v = tc_cavp_field_value(cavp_line, "Msg")) != NULL)
-    {
-      msg_len = tc_cavp_parse_hex(v, cavp_msg, sizeof(cavp_msg));
+    } else if (tc_cavp_is(&reader, "Msg")) {
+      msg_len = (long)tc_test_hex(v, cavp_msg, sizeof(cavp_msg));
       munit_assert_long(msg_len, >=, 0);
       /* Len = 0 records carry a placeholder "Msg = 00". */
       if (len_bits == 0)
         msg_len = 0;
       munit_assert_long(msg_len, ==, len_bits / 8);
-    }
-    else if ((v = tc_cavp_field_value(cavp_line, "MD")) != NULL)
-    {
+    } else if (tc_cavp_is(&reader, "MD")) {
       uint8_t actual[TC_SHA512_DIGESTLEN];
       size_t actual_len;
-      expected_len = tc_cavp_parse_hex(v, expected, sizeof(expected));
+      expected_len = (long)tc_test_hex(v, expected, sizeof(expected));
       munit_assert_long(expected_len, >, 0);
       munit_assert_long(msg_len, >=, 0);
 
       actual_len = cavp_digest(alg, cavp_msg, (size_t)msg_len, actual);
       munit_assert_size(actual_len, ==, (size_t)expected_len);
-      if (memcmp(actual, expected, actual_len) != 0)
-      {
+      if (memcmp(actual, expected, actual_len) != 0) {
         fprintf(stderr, "CAVP mismatch in %s (Len = %ld)\n", relative, len_bits);
         tc_cavp_print_bytes("expected", expected, actual_len);
         tc_cavp_print_bytes("actual  ", actual, actual_len);
@@ -137,7 +135,7 @@ static long cavp_run_msg_file(int alg, const char* relative)
       cases++;
     }
   }
-  fclose(file);
+  tc_cavp_close(&reader);
   return cases;
 }
 
@@ -152,7 +150,7 @@ static long cavp_run_msg_file(int alg, const char* relative)
 
 static long cavp_run_monte_file(int alg, const char* relative)
 {
-  FILE* file = cavp_open(relative);
+  tc_cavp_reader reader;
   const size_t n = (size_t)alg;
   uint8_t seed[TC_SHA512_DIGESTLEN];
   uint8_t md[3][TC_SHA512_DIGESTLEN];
@@ -162,32 +160,26 @@ static long cavp_run_monte_file(int alg, const char* relative)
   long count = -1;
   long cases = 0;
 
-  while (fgets(cavp_line, sizeof(cavp_line), file) != NULL)
-  {
-    const char* v;
-    if ((v = tc_cavp_field_value(cavp_line, "Seed")) != NULL)
-    {
-      munit_assert_long(tc_cavp_parse_hex(v, seed, sizeof(seed)), ==, (long)n);
+  cavp_open(&reader, relative);
+  while (cavp_next_field(&reader, relative)) {
+    const char* v = reader.value;
+    if (tc_cavp_is(&reader, "Seed")) {
+      munit_assert_long((long)tc_test_hex(v, seed, sizeof(seed)), ==, (long)n);
       have_seed = 1;
-    }
-    else if ((v = tc_cavp_field_value(cavp_line, "COUNT")) != NULL)
-    {
+    } else if (tc_cavp_is(&reader, "COUNT")) {
       count = strtol(v, NULL, 10);
-    }
-    else if ((v = tc_cavp_field_value(cavp_line, "MD")) != NULL)
-    {
+    } else if (tc_cavp_is(&reader, "MD")) {
       uint8_t expected[TC_SHA512_DIGESTLEN];
       int i;
 
       munit_assert_true(have_seed);
       munit_assert_long(count, ==, cases);
-      munit_assert_long(tc_cavp_parse_hex(v, expected, sizeof(expected)), ==, (long)n);
+      munit_assert_long((long)tc_test_hex(v, expected, sizeof(expected)), ==, (long)n);
 
       memcpy(md[0], seed, n);
       memcpy(md[1], seed, n);
       memcpy(md[2], seed, n);
-      for (i = 3; i < 1003; ++i)
-      {
+      for (i = 3; i < 1003; ++i) {
         memcpy(m, md[0], n);
         memcpy(m + n, md[1], n);
         memcpy(m + 2 * n, md[2], n);
@@ -197,8 +189,7 @@ static long cavp_run_monte_file(int alg, const char* relative)
         memcpy(md[2], out, n);
       }
 
-      if (memcmp(out, expected, n) != 0)
-      {
+      if (memcmp(out, expected, n) != 0) {
         fprintf(stderr, "CAVP Monte mismatch in %s (COUNT = %ld)\n", relative, count);
         tc_cavp_print_bytes("expected", expected, n);
         tc_cavp_print_bytes("actual  ", out, n);
@@ -208,7 +199,7 @@ static long cavp_run_monte_file(int alg, const char* relative)
       cases++;
     }
   }
-  fclose(file);
+  tc_cavp_close(&reader);
   munit_assert_long(cases, ==, 100);
   return cases;
 }
@@ -217,38 +208,34 @@ static long cavp_run_monte_file(int alg, const char* relative)
    record per byte length from 0 to the block size (65 for 64-byte blocks,
    129 for 128-byte blocks), LongMsg 64 or 128 records, Monte 100. */
 static void cavp_run_sha_set(int alg, const char* short_file, long short_cases,
-                             const char* long_file, long long_cases,
-                             const char* monte_file)
+                             const char* long_file, long long_cases, const char* monte_file)
 {
   munit_assert_long(cavp_run_msg_file(alg, short_file), ==, short_cases);
   munit_assert_long(cavp_run_msg_file(alg, long_file), ==, long_cases);
   munit_assert_long(cavp_run_monte_file(alg, monte_file), ==, 100);
 }
 
-MunitResult test_cavp_sha(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_sha)
 {
-  (void) params;
-  (void) data;
-
 #if TC_ENABLE_SHA1
-  cavp_run_sha_set(TC_SHA1_DIGESTLEN, "sha/SHA1ShortMsg.rsp", 65,
-                   "sha/SHA1LongMsg.rsp", 64, "sha/SHA1Monte.rsp");
+  cavp_run_sha_set(TC_SHA1_DIGESTLEN, "sha/SHA1ShortMsg.rsp", 65, "sha/SHA1LongMsg.rsp", 64,
+                   "sha/SHA1Monte.rsp");
 #endif
 #if TC_ENABLE_SHA224
-  cavp_run_sha_set(TC_SHA224_DIGESTLEN, "sha/SHA224ShortMsg.rsp", 65,
-                   "sha/SHA224LongMsg.rsp", 64, "sha/SHA224Monte.rsp");
+  cavp_run_sha_set(TC_SHA224_DIGESTLEN, "sha/SHA224ShortMsg.rsp", 65, "sha/SHA224LongMsg.rsp", 64,
+                   "sha/SHA224Monte.rsp");
 #endif
 #if TC_ENABLE_SHA256
-  cavp_run_sha_set(TC_SHA256_DIGESTLEN, "sha/SHA256ShortMsg.rsp", 65,
-                   "sha/SHA256LongMsg.rsp", 64, "sha/SHA256Monte.rsp");
+  cavp_run_sha_set(TC_SHA256_DIGESTLEN, "sha/SHA256ShortMsg.rsp", 65, "sha/SHA256LongMsg.rsp", 64,
+                   "sha/SHA256Monte.rsp");
 #endif
 #if TC_ENABLE_SHA384
-  cavp_run_sha_set(TC_SHA384_DIGESTLEN, "sha/SHA384ShortMsg.rsp", 129,
-                   "sha/SHA384LongMsg.rsp", 128, "sha/SHA384Monte.rsp");
+  cavp_run_sha_set(TC_SHA384_DIGESTLEN, "sha/SHA384ShortMsg.rsp", 129, "sha/SHA384LongMsg.rsp", 128,
+                   "sha/SHA384Monte.rsp");
 #endif
 #if TC_ENABLE_SHA512
-  cavp_run_sha_set(TC_SHA512_DIGESTLEN, "sha/SHA512ShortMsg.rsp", 129,
-                   "sha/SHA512LongMsg.rsp", 128, "sha/SHA512Monte.rsp");
+  cavp_run_sha_set(TC_SHA512_DIGESTLEN, "sha/SHA512ShortMsg.rsp", 129, "sha/SHA512LongMsg.rsp", 128,
+                   "sha/SHA512Monte.rsp");
 #endif
   return MUNIT_OK;
 }
@@ -259,59 +246,70 @@ MunitResult test_cavp_sha(const MunitParameter params[], void* data)
 
 #if TC_ENABLE_HMAC
 
-#define CAVP_HMAC_FULL_CASE(N) \
-  { \
-    struct TC_HMAC_SHA##N##_ctx ctx; \
-    munit_assert_int(TC_HMAC_SHA##N##_init(&ctx, key, klen), ==, TC_OK); \
-    munit_assert_int(TC_HMAC_SHA##N##_update(&ctx, msg, mlen), ==, TC_OK); \
-    munit_assert_int(TC_HMAC_SHA##N##_final(&ctx, tag), ==, TC_OK); \
+#define CAVP_HMAC_FULL_CASE(N)                                                                     \
+  {                                                                                                \
+    struct TC_HMAC_SHA##N##_ctx ctx;                                                               \
+    munit_assert_int(TC_HMAC_SHA##N##_init(&ctx, (TC_bytes){key, klen}), ==, TC_OK);               \
+    munit_assert_int(TC_HMAC_SHA##N##_update(&ctx, (TC_bytes){msg, mlen}), ==, TC_OK);             \
+    munit_assert_int(TC_HMAC_SHA##N##_final(&ctx, tag), ==, TC_OK);                                \
   }
 
-static void cavp_hmac_full(int alg, const uint8_t* key, size_t klen,
-                           const uint8_t* msg, size_t mlen, uint8_t* tag)
+static void cavp_hmac_full(int alg, const uint8_t* key, size_t klen, const uint8_t* msg,
+                           size_t mlen, uint8_t* tag)
 {
-  switch (alg)
-  {
+  switch (alg) {
 #if TC_ENABLE_SHA1
-  case TC_SHA1_DIGESTLEN: CAVP_HMAC_FULL_CASE(1) break;
+  case TC_SHA1_DIGESTLEN:
+    CAVP_HMAC_FULL_CASE(1) break;
 #endif
 #if TC_ENABLE_SHA224
-  case TC_SHA224_DIGESTLEN: CAVP_HMAC_FULL_CASE(224) break;
+  case TC_SHA224_DIGESTLEN:
+    CAVP_HMAC_FULL_CASE(224) break;
 #endif
 #if TC_ENABLE_SHA256
-  case TC_SHA256_DIGESTLEN: CAVP_HMAC_FULL_CASE(256) break;
+  case TC_SHA256_DIGESTLEN:
+    CAVP_HMAC_FULL_CASE(256) break;
 #endif
 #if TC_ENABLE_SHA384
-  case TC_SHA384_DIGESTLEN: CAVP_HMAC_FULL_CASE(384) break;
+  case TC_SHA384_DIGESTLEN:
+    CAVP_HMAC_FULL_CASE(384) break;
 #endif
 #if TC_ENABLE_SHA512
-  case TC_SHA512_DIGESTLEN: CAVP_HMAC_FULL_CASE(512) break;
+  case TC_SHA512_DIGESTLEN:
+    CAVP_HMAC_FULL_CASE(512) break;
 #endif
   default:
     munit_errorf("digest length %d not compiled in", alg);
   }
 }
 
-static TC_status cavp_hmac_verify(int alg, const uint8_t* key, size_t klen,
-                                  const uint8_t* msg, size_t mlen,
-                                  const uint8_t* tag, size_t tlen)
+static TC_status cavp_hmac_verify(int alg, const uint8_t* key, size_t klen, const uint8_t* msg,
+                                  size_t mlen, const uint8_t* tag, size_t tlen)
 {
-  switch (alg)
-  {
+  switch (alg) {
 #if TC_ENABLE_SHA1
-  case TC_SHA1_DIGESTLEN: return TC_HMAC_SHA1_verify(key, klen, msg, mlen, tag, tlen);
+  case TC_SHA1_DIGESTLEN:
+    return TC_HMAC_SHA1_verify((TC_bytes){key, klen}, (TC_bytes){msg, mlen}, (TC_bytes){tag, tlen});
 #endif
 #if TC_ENABLE_SHA224
-  case TC_SHA224_DIGESTLEN: return TC_HMAC_SHA224_verify(key, klen, msg, mlen, tag, tlen);
+  case TC_SHA224_DIGESTLEN:
+    return TC_HMAC_SHA224_verify((TC_bytes){key, klen}, (TC_bytes){msg, mlen},
+                                 (TC_bytes){tag, tlen});
 #endif
 #if TC_ENABLE_SHA256
-  case TC_SHA256_DIGESTLEN: return TC_HMAC_SHA256_verify(key, klen, msg, mlen, tag, tlen);
+  case TC_SHA256_DIGESTLEN:
+    return TC_HMAC_SHA256_verify((TC_bytes){key, klen}, (TC_bytes){msg, mlen},
+                                 (TC_bytes){tag, tlen});
 #endif
 #if TC_ENABLE_SHA384
-  case TC_SHA384_DIGESTLEN: return TC_HMAC_SHA384_verify(key, klen, msg, mlen, tag, tlen);
+  case TC_SHA384_DIGESTLEN:
+    return TC_HMAC_SHA384_verify((TC_bytes){key, klen}, (TC_bytes){msg, mlen},
+                                 (TC_bytes){tag, tlen});
 #endif
 #if TC_ENABLE_SHA512
-  case TC_SHA512_DIGESTLEN: return TC_HMAC_SHA512_verify(key, klen, msg, mlen, tag, tlen);
+  case TC_SHA512_DIGESTLEN:
+    return TC_HMAC_SHA512_verify((TC_bytes){key, klen}, (TC_bytes){msg, mlen},
+                                 (TC_bytes){tag, tlen});
 #endif
   default:
     return TC_ERROR;
@@ -319,32 +317,33 @@ static TC_status cavp_hmac_verify(int alg, const uint8_t* key, size_t klen,
 }
 
 /* HMACVS record counts per [L=] group in the vendored CAVS 11.0 file. */
-#define CAVP_HMAC_CASES \
-  (TC_ENABLE_SHA1 * 300 + TC_ENABLE_SHA224 * 375 + TC_ENABLE_SHA256 * 225 + \
+#define CAVP_HMAC_CASES                                                                            \
+  (TC_ENABLE_SHA1 * 300 + TC_ENABLE_SHA224 * 375 + TC_ENABLE_SHA256 * 225 +                        \
    TC_ENABLE_SHA384 * 300 + TC_ENABLE_SHA512 * 375)
 
-MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_hmac)
 {
-  FILE* file = cavp_open("hmac/HMAC.rsp");
-  long group_len = -1;   /* [L=20] / [L=28] / [L=32] / [L=48] / [L=64] */
+  tc_cavp_reader reader;
+  long group_len = -1; /* [L=20] / [L=28] / [L=32] / [L=48] / [L=64] */
   int active = 0;
   long count = -1, klen = -1, tlen = -1;
   static uint8_t key[512];
   static uint8_t msg[512];
   long key_len = -1, msg_len = -1;
   long cases = 0;
-  (void) params;
-  (void) data;
+  tc_cavp_event event;
 
-  while (fgets(cavp_line, sizeof(cavp_line), file) != NULL)
-  {
-    const char* v;
-    if (cavp_line[0] == '[')
-    {
-      const char* p = cavp_line + 1;
-      while (*p == ' ' || *p == 'L' || *p == '=')
-        p++;
-      group_len = strtol(p, NULL, 10);
+  cavp_open(&reader, "hmac/HMAC.rsp");
+  while ((event = tc_cavp_next(&reader)) != TC_CAVP_END) {
+    const char* v = reader.value;
+    if (event == TC_CAVP_FAILURE)
+      munit_errorf("unreadable HMAC.rsp line %lu", reader.line_number);
+    if (event == TC_CAVP_RECORD_END)
+      continue;
+    if (event == TC_CAVP_HEADER) {
+      char text[16];
+      const char* l = tc_cavp_header_value(&reader, "L", text, sizeof text);
+      group_len = l == NULL ? -1 : strtol(l, NULL, 10);
       active = 0;
 #if TC_ENABLE_SHA1
       if (group_len == TC_SHA1_DIGESTLEN)
@@ -371,30 +370,23 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
     if (!active)
       continue;
 
-    if ((v = tc_cavp_field_value(cavp_line, "Count")) != NULL)
-    {
+    if (tc_cavp_is(&reader, "Count")) {
       count = strtol(v, NULL, 10);
       key_len = msg_len = -1;
-    }
-    else if ((v = tc_cavp_field_value(cavp_line, "Klen")) != NULL)
+    } else if (tc_cavp_is(&reader, "Klen"))
       klen = strtol(v, NULL, 10);
-    else if ((v = tc_cavp_field_value(cavp_line, "Tlen")) != NULL)
+    else if (tc_cavp_is(&reader, "Tlen"))
       tlen = strtol(v, NULL, 10);
-    else if ((v = tc_cavp_field_value(cavp_line, "Key")) != NULL)
-    {
-      key_len = tc_cavp_parse_hex(v, key, sizeof(key));
+    else if (tc_cavp_is(&reader, "Key")) {
+      key_len = (long)tc_test_hex(v, key, sizeof(key));
       munit_assert_long(key_len, ==, klen);
-    }
-    else if ((v = tc_cavp_field_value(cavp_line, "Msg")) != NULL)
-    {
-      msg_len = tc_cavp_parse_hex(v, msg, sizeof(msg));
+    } else if (tc_cavp_is(&reader, "Msg")) {
+      msg_len = (long)tc_test_hex(v, msg, sizeof(msg));
       munit_assert_long(msg_len, >=, 0);
-    }
-    else if ((v = tc_cavp_field_value(cavp_line, "Mac")) != NULL)
-    {
+    } else if (tc_cavp_is(&reader, "Mac")) {
       uint8_t expected[TC_SHA512_DIGESTLEN];
       uint8_t actual[TC_SHA512_DIGESTLEN];
-      long expected_len = tc_cavp_parse_hex(v, expected, sizeof(expected));
+      long expected_len = (long)tc_test_hex(v, expected, sizeof(expected));
       int alg = (int)group_len;
 
       munit_assert_long(expected_len, ==, tlen);
@@ -402,8 +394,7 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
       munit_assert_long(msg_len, >=, 0);
 
       cavp_hmac_full(alg, key, (size_t)key_len, msg, (size_t)msg_len, actual);
-      if (memcmp(actual, expected, (size_t)tlen) != 0)
-      {
+      if (memcmp(actual, expected, (size_t)tlen) != 0) {
         fprintf(stderr, "HMAC CAVP mismatch [L=%ld] Count = %ld\n", group_len, count);
         tc_cavp_print_bytes("expected", expected, (size_t)tlen);
         tc_cavp_print_bytes("actual  ", actual, (size_t)tlen);
@@ -411,26 +402,23 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
       }
 
       /* The one-shot and verify APIs agree whenever Tlen is in range. */
-      if (tlen >= TC_HMAC_MIN_TAG_LEN)
-      {
-        int rc = cavp_hmac_verify(alg, key, (size_t)key_len, msg, (size_t)msg_len,
-                                  expected, (size_t)tlen);
+      if (tlen >= TC_HMAC_MIN_TAG_LEN) {
+        int rc = cavp_hmac_verify(alg, key, (size_t)key_len, msg, (size_t)msg_len, expected,
+                                  (size_t)tlen);
         munit_assert_int(rc, ==, TC_OK);
       }
       cases++;
     }
   }
-  fclose(file);
+  tc_cavp_close(&reader);
   munit_assert_long(cases, ==, CAVP_HMAC_CASES);
   return MUNIT_OK;
 }
 
 #else /* !TC_ENABLE_HMAC */
 
-MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_hmac)
 {
-  (void) params;
-  (void) data;
   return MUNIT_SKIP;
 }
 
@@ -438,17 +426,13 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
 
 #else /* !TC_HASH_CAVP */
 
-MunitResult test_cavp_sha(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_sha)
 {
-  (void) params;
-  (void) data;
   return MUNIT_SKIP;
 }
 
-MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_hmac)
 {
-  (void) params;
-  (void) data;
   return MUNIT_SKIP;
 }
 

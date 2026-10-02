@@ -8,12 +8,11 @@ import json
 import os
 from pathlib import Path
 import tempfile
-import zipfile
 from munit_runner import run_reader
+from wycheproof_files import supported_vector_names
 
-REVISION = "3fa63dd0344abb611f1fb1d77e119938603ea230"
-ARCHIVE_SHA256 = "5dc00fae83575135c3147bfd4a04ee8889b1f0482ac6ca21aa486a8abccf2260"
-# https://github.com/C2SP/wycheproof, testvectors_v1, Apache-2.0.
+# tests/vectors/wycheproof holds the pinned C2SP Wycheproof testvectors_v1
+# tree. Its README records the source commit, and SHA256SUMS the file digests.
 
 
 def ec_records(document, bits):
@@ -26,7 +25,7 @@ def ec_records(document, bits):
             verdict = case["result"]
             if verdict not in ("valid", "invalid", "acceptable"):
                 raise AssertionError(f"Unknown verdict {verdict}")
-            # BigInt is a scalar value, not the library's fixed-width encoding.
+            # BigInt is a scalar value. Encode it at the curve's fixed width.
             scalar = int(case["private"], 16)
             width = max(bits // 8, (scalar.bit_length() + 7) // 8)
             private = scalar.to_bytes(width, "big").hex()
@@ -74,8 +73,20 @@ def ecdsa_records(document, bits, hash_name, encoding="p1363"):
     return "\n".join(records) + "\n", counts
 
 
-def oaep_records(document, exclusions=None):
+OAEP_KEY_SIZES = (1024, 2048, 3072, 4096)
+
+
+def oaep_records(document, exclusions=None, key_sizes=None):
+    """Return reader records for supported OAEP groups.
+
+    key_sizes selects one CTest shard. Supported groups of other sizes count
+    toward document coverage and are left to their own shard.
+    """
     hashes = {"SHA-1", "SHA-224", "SHA-256", "SHA-384", "SHA-512"}
+    if key_sizes is None:
+        key_sizes = set(OAEP_KEY_SIZES)
+    if not key_sizes or not set(key_sizes) <= set(OAEP_KEY_SIZES):
+        raise ValueError("Unsupported OAEP shard key size")
     if document["algorithm"] != "RSAES-OAEP":
         raise AssertionError("Unexpected OAEP algorithm")
     counts, records = Counter(), []
@@ -84,7 +95,7 @@ def oaep_records(document, exclusions=None):
         bits = group["keySize"]
         if group["type"] != "RsaesOaepDecrypt" or group["mgf"] != "MGF1":
             raise AssertionError("Unsupported OAEP group")
-        if (bits not in (1024, 2048, 3072) or group["sha"] not in hashes
+        if (bits not in OAEP_KEY_SIZES or group["sha"] not in hashes
                 or group["mgfSha"] not in hashes):
             if exclusions is None:
                 raise AssertionError("Unsupported OAEP group")
@@ -94,6 +105,9 @@ def oaep_records(document, exclusions=None):
             amount = len(group["tests"])
             exclusions[(bits, group["sha"], group["mgfSha"])] += amount
             excluded += amount
+            continue
+        if bits not in key_sizes:
+            excluded += len(group["tests"])
             continue
         key = group["privateKey"]
         components = []
@@ -134,7 +148,7 @@ def rsa_signature_records(document, exclusions=None):
         for case in group["tests"]:
             if case["result"] not in ("valid", "invalid", "acceptable"):
                 raise AssertionError("Unexpected RSA signature verdict")
-        if bits not in (1024, 2048, 3072) or sha not in hashes or mgf != "MGF1" or mgf_sha not in hashes:
+        if bits not in (1024, 2048, 3072, 4096) or sha not in hashes or mgf != "MGF1" or mgf_sha not in hashes:
             if exclusions is None:
                 raise AssertionError("Unsupported RSA signature parameters")
             amount = len(group["tests"])
@@ -169,66 +183,254 @@ def rsa_signature_records(document, exclusions=None):
     return "\n".join(records) + ("\n" if records else ""), counts
 
 
+def rsa_generation_records(document, exclusions=None):
+    """PKCS#1 v1.5 signatures have a fixed encoded message and signature."""
+    if document["algorithm"] != "RSASSA-PKCS1-v1_5" or document["schema"] != "rsassa_pkcs1_generate_schema_v1.json":
+        raise AssertionError("Unexpected RSA generation document")
+    hashes = {"SHA-1", "SHA-224", "SHA-256", "SHA-384", "SHA-512"}
+    counts, records, excluded = Counter(), [], Counter()
+    for group in document["testGroups"]:
+        if group["type"] != "RsassaPkcs1Generate":
+            raise AssertionError("Unexpected RSA generation group")
+        bits, sha = group["keySize"], group["sha"]
+        for case in group["tests"]:
+            if case["result"] not in ("valid", "acceptable"):
+                raise AssertionError("Unexpected RSA generation verdict")
+        if bits not in (1024, 2048, 3072, 4096) or sha not in hashes:
+            if exclusions is None:
+                raise AssertionError("Unsupported RSA generation parameters")
+            excluded[(bits,sha)] += len(group["tests"])
+            continue
+        key = group["privateKey"]
+        values = [int(key[field],16) for field in ("modulus","publicExponent","privateExponent")]
+        if any(value <= 0 or value.bit_length() > bits for value in values) or values[0].bit_length() != bits:
+            raise AssertionError("Invalid RSA generation key")
+        width = bits // 8
+        components = [values[0].to_bytes(width,"big").hex()]
+        components += [value.to_bytes((value.bit_length() + 7) // 8,"big").hex() for value in values[1:]]
+        for case in group["tests"]:
+            signature = bytes.fromhex(case["sig"])
+            if len(signature) != width:
+                raise AssertionError("Invalid RSA generation signature length")
+            digest = hashlib.new(sha.lower().replace("-",""),bytes.fromhex(case["msg"])).hexdigest()
+            records.append(" ".join(components + [sha,digest,signature.hex(),"match",str(case["tcId"])]))
+            counts[case["result"]] += 1
+    if sum(counts.values()) + sum(excluded.values()) != document["numberOfTests"]:
+        raise AssertionError("Incomplete RSA generation coverage")
+    if exclusions is not None:
+        exclusions.update(excluded)
+    return "\n".join(records) + ("\n" if records else ""), counts
+
+
+def probable_prime_magnitude(value):
+    """Independent deterministic test oracle for signed vector byte magnitudes."""
+    n = int.from_bytes(value,"big")
+    if n < 2:
+        return False
+    if n in (2,3):
+        return True
+    if n % 2 == 0:
+        return False
+    odd, twos = n - 1, 0
+    while odd % 2 == 0:
+        odd //= 2
+        twos += 1
+    for round_number in range(65):
+        seed = hashlib.sha256(value + round_number.to_bytes(2,"big")).digest()
+        base = 2 + int.from_bytes(seed,"big") % (n - 3)
+        x = pow(base,odd,n)
+        if x in (1,n - 1):
+            continue
+        for _ in range(twos - 1):
+            x = pow(x,2,n)
+            if x == n - 1:
+                break
+        else:
+            return False
+    return True
+
+
+def primality_records(document):
+    """Exercise odd RSA candidates and separately classify signed byte magnitudes."""
+    if document["algorithm"] != "PrimalityTest" or document["schema"] != "primality_test_schema_v1.json":
+        raise AssertionError("Unexpected primality document")
+    counts, exclusions, derived, records = Counter(), Counter(), Counter(), []
+    for group in document["testGroups"]:
+        if group["type"] != "PrimalityTest":
+            raise AssertionError("Unexpected primality group")
+        for case in group["tests"]:
+            verdict = case["result"]
+            if verdict not in ("valid", "invalid", "acceptable"):
+                raise AssertionError("Unexpected primality verdict")
+            value = bytes.fromhex(case["value"])
+            if not value or len(value) > 384:
+                exclusions["candidate-length"] += 1
+            elif value == b"\x02" and verdict == "valid":
+                # RSA key generation tests odd candidate factors only.
+                exclusions["even-prime"] += 1
+            elif value[0] & 0x80:
+                # Wycheproof interprets these as signed negatives. The RSA
+                # candidate API sees their positive magnitude instead.
+                result = "valid" if probable_prime_magnitude(value) else "invalid"
+                records.append(f"{value.hex()} {result} {case['tcId']}")
+                derived[result] += 1
+            else:
+                records.append(f"{value.hex()} {verdict} {case['tcId']}")
+                counts[verdict] += 1
+    if sum(counts.values()) + sum(derived.values()) + sum(exclusions.values()) != document["numberOfTests"]:
+        raise AssertionError("Incomplete primality coverage")
+    if not counts["valid"] or not counts["invalid"]:
+        raise AssertionError("Missing primality positive or negative vectors")
+    return "\n".join(records) + "\n", counts, derived, exclusions
+
+
+KEYWRAP_KEY_SIZES = (128, 192, 256)
+KEYWRAP_DOCUMENTS = (("kw", "aes_wrap_test.json"), ("kwp", "aes_kwp_test.json"))
+
+
+def keywrap_records(document, mode):
+    """Split an AES-KW or AES-KWP document into records per KEK size.
+
+    Each record is "mode tcId verdict key msg ct" with "-" for an empty
+    field. Wycheproof rates 8-byte KW key data (ShortKey) acceptable. SP
+    800-38F section 5.3.1 Table 1 requires at least two semiblocks, so those
+    cases run as invalid and are counted as derived verdicts."""
+    records = {bits: [] for bits in KEYWRAP_KEY_SIZES}
+    counts, derived = Counter(), Counter()
+    for group in document["testGroups"]:
+        bits = group["keySize"]
+        if bits not in records:
+            raise AssertionError("Unexpected key wrap KEK size")
+        for case in group["tests"]:
+            if len(bytes.fromhex(case["key"])) * 8 != bits:
+                raise AssertionError("Unexpected key wrap KEK length")
+            verdict = case["result"]
+            if verdict == "acceptable":
+                if mode != "kw" or case["flags"] != ["ShortKey"] or len(case["msg"]) != 16:
+                    raise AssertionError("Unexpected acceptable key wrap case")
+                verdict = "invalid"
+                derived[bits] += 1
+            elif verdict not in ("valid", "invalid"):
+                raise AssertionError("Unexpected key wrap verdict")
+            for field in ("msg", "ct"):
+                if len(bytes.fromhex(case[field])) > 1024:
+                    raise AssertionError("Key wrap field exceeds reader capacity")
+            records[bits].append(f"{mode} {case['tcId']} {verdict} {case['key']} "
+                                 f"{case['msg'] or '-'} {case['ct'] or '-'}")
+            counts[(bits, verdict)] += 1
+    if sum(counts.values()) != document["numberOfTests"]:
+        raise AssertionError("Incomplete key wrap coverage")
+    for bits in KEYWRAP_KEY_SIZES:
+        if not counts[(bits, "valid")] or not counts[(bits, "invalid")]:
+            raise AssertionError(f"Key wrap coverage lacks a verdict for {bits}-bit KEKs")
+    return records, counts, derived
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--archive", type=Path, required=True)
+    parser.add_argument("--vectors", type=Path, required=True,
+                        help="Wycheproof directory containing testvectors_v1")
     parser.add_argument("--ec-reader", type=Path, action="append", default=[])
     parser.add_argument("--ecdsa-reader", type=Path, action="append", default=[])
     parser.add_argument("--rsa-signature-reader", type=Path, action="append", default=[])
+    parser.add_argument("--rsa-generation-reader", type=Path, action="append", default=[])
+    parser.add_argument("--primality-reader", type=Path, action="append", default=[])
     parser.add_argument("--rsa-oaep-reader", type=Path, action="append", default=[])
+    parser.add_argument("--rsa-oaep-key-size", type=int, action="append", default=[],
+                        choices=OAEP_KEY_SIZES,
+                        help="Run only OAEP groups of this modulus size (repeatable)")
     parser.add_argument("--kmac-reader", type=Path, action="append", default=[])
     parser.add_argument("--cmac-reader", type=Path, action="append", default=[])
     parser.add_argument("--hmac-reader", type=Path, action="append", default=[])
     parser.add_argument("--aead-reader", action="append", default=[], metavar="BITS:PATH")
+    parser.add_argument("--keywrap-reader", action="append", default=[], metavar="BITS:PATH",
+                        help="AES-KW/KWP reader for one KEK size (one each for 128, 192, 256)")
+    parser.add_argument("--keywrap-dynamic-reader", type=Path, action="append", default=[],
+                        help="AES-KW/KWP reader that receives every KEK size")
     args = parser.parse_args()
-    if not any((args.ec_reader, args.ecdsa_reader, args.rsa_signature_reader, args.rsa_oaep_reader,
-                args.kmac_reader, args.cmac_reader, args.hmac_reader, args.aead_reader)):
+    if not any((args.ec_reader, args.ecdsa_reader, args.rsa_signature_reader, args.rsa_generation_reader, args.primality_reader, args.rsa_oaep_reader,
+                args.kmac_reader, args.cmac_reader, args.hmac_reader, args.aead_reader,
+                args.keywrap_reader, args.keywrap_dynamic_reader)):
         parser.error("At least one reader is required")
-    if hashlib.sha256(args.archive.read_bytes()).hexdigest() != ARCHIVE_SHA256:
-        raise AssertionError("Unexpected Wycheproof archive digest")
-    with zipfile.ZipFile(args.archive) as archive, tempfile.TemporaryDirectory(prefix="tiny-crypto-wycheproof-") as temporary:
+    vectors = args.vectors / "testvectors_v1"
+    available_names = {path.name for path in vectors.glob("*.json")}
+    names_all = sorted(available_names & supported_vector_names(available_names))
+
+    def read(name):
+        return (vectors / name).read_bytes()
+
+    with tempfile.TemporaryDirectory(prefix="tiny-crypto-wycheproof-") as temporary:
+        if args.primality_reader:
+            name = "primality_test.json"
+            records, counts, derived, exclusions = primality_records(json.loads(read(name)))
+            fixture = Path(temporary) / "primality.txt"
+            fixture.write_text(records)
+            for reader in args.primality_reader:
+                run_reader([reader,"--primality-vectors",fixture])
+            print(f"Primality tested: {dict(counts)}; signed-byte magnitudes with derived oracle: "
+                  f"{dict(derived)}; out-of-scope: {dict(exclusions)}",flush=True)
+        if args.rsa_generation_reader:
+            totals, exclusions = Counter(), Counter()
+            prefix = "rsa_pkcs1_"
+            names = [name for name in names_all
+                     if name.startswith(prefix) and name.endswith("_sig_gen_test.json")]
+            if not names:
+                raise AssertionError("Missing RSA generation corpus")
+            for name in names:
+                records, counts = rsa_generation_records(json.loads(read(name)),exclusions)
+                if records:
+                    fixture = Path(temporary) / "rsa-generation.txt"
+                    fixture.write_text(records)
+                    for reader in args.rsa_generation_reader:
+                        run_reader([reader,"--generation-vectors",fixture])
+                totals.update(counts)
+                print(f"{name}: {dict(counts)}",flush=True)
+            if not totals["valid"] or not totals["acceptable"]:
+                raise AssertionError("Incomplete RSA generation verdict coverage")
+            print(f"RSA generation tested: {dict(totals)}; out-of-scope parameters: {dict(exclusions)}",flush=True)
         if args.rsa_signature_reader:
             totals, exclusions = Counter(), Counter()
-            prefixes = tuple(f"wycheproof-{REVISION}/testvectors_v1/{name}" for name in ("rsa_pss_", "rsa_signature_"))
-            for name in sorted(archive.namelist()):
+            prefixes = ("rsa_pss_", "rsa_signature_")
+            for name in names_all:
                 if not name.startswith(prefixes) or not name.endswith("_test.json"):
                     continue
-                records, counts = rsa_signature_records(json.loads(archive.read(name)), exclusions)
+                records, counts = rsa_signature_records(json.loads(read(name)), exclusions)
                 if records:
                     fixture = Path(temporary) / "rsa-signatures.txt"
                     fixture.write_text(records)
                     for reader in args.rsa_signature_reader:
                         run_reader([reader, "--signature-vectors", fixture])
                 totals.update(counts)
-                print(f"{name.rsplit('/', 1)[-1]}: {dict(counts)}", flush=True)
+                print(f"{name}: {dict(counts)}", flush=True)
             if not totals["valid"] or not totals["invalid"]:
                 raise AssertionError("Incomplete RSA signature positive/negative coverage")
             print(f"RSA signatures tested: {dict(totals)}; out-of-scope parameters: {dict(exclusions)}", flush=True)
         if args.rsa_oaep_reader:
             totals, exclusions = Counter(), Counter()
-            prefix = f"wycheproof-{REVISION}/testvectors_v1/rsa_oaep_"
-            for name in sorted(archive.namelist()):
+            prefix = "rsa_oaep_"
+            for name in names_all:
                 if not name.startswith(prefix) or not name.endswith("_test.json"):
                     continue
-                records, counts = oaep_records(json.loads(archive.read(name)), exclusions)
+                records, counts = oaep_records(json.loads(read(name)), exclusions,
+                                               args.rsa_oaep_key_size or None)
                 if records:
                     fixture = Path(temporary) / "rsa-oaep.txt"
                     fixture.write_text(records)
                     for reader in args.rsa_oaep_reader:
                         run_reader([reader, "--vectors", fixture])
                 totals.update(counts)
-                print(f"{name.rsplit('/', 1)[-1]}: {dict(counts)}", flush=True)
+                print(f"{name}: {dict(counts)}", flush=True)
             if not totals["valid"] or not totals["invalid"]:
                 raise AssertionError("Incomplete OAEP positive/negative coverage")
             print(f"OAEP tested: {dict(totals)}; out-of-scope parameters: {dict(exclusions)}", flush=True)
         if args.ecdsa_reader:
             curves = {f"secp{bits}r1": bits for bits in (192, 256, 384)}
             totals, exclusions = Counter(), Counter()
-            prefix = f"wycheproof-{REVISION}/testvectors_v1/ecdsa_"
-            for name in sorted(archive.namelist()):
+            prefix = "ecdsa_"
+            for name in names_all:
                 if not name.startswith(prefix) or not name.endswith("_test.json"):
                     continue
-                document = json.loads(archive.read(name))
+                document = json.loads(read(name))
                 groups = document["testGroups"]
                 if not groups or sum(len(g["tests"]) for g in groups) != document["numberOfTests"]:
                     raise AssertionError("Incomplete ECDSA document")
@@ -252,7 +454,7 @@ def main():
                 for reader in args.ecdsa_reader:
                     run_reader([reader, option, fixture])
                 totals.update(counts)
-                print(f"{name.rsplit('/', 1)[-1]}: {dict(counts)}", flush=True)
+                print(f"{name}: {dict(counts)}", flush=True)
             if not totals["valid"] or not totals["invalid"]:
                 raise AssertionError("Incomplete ECDSA positive/negative coverage")
             print(f"ECDSA tested: {dict(totals)}; out-of-scope curves: {dict(exclusions)}", flush=True)
@@ -265,7 +467,7 @@ def main():
                 name = ("aes_siv_cmac_test.json" if algorithm == "siv" else
                         "aead_aes_siv_cmac_test.json" if algorithm == "siv-aead" else
                         f"aes_{algorithm}_test.json")
-                document = json.loads(archive.read(f"wycheproof-{REVISION}/testvectors_v1/{name}"))
+                document = json.loads(read(name))
                 records = {bits: [] for bits in readers}
                 counts = Counter()
                 for group in document["testGroups"]:
@@ -298,23 +500,41 @@ def main():
                     fixture.write_text("\n".join(records[bits]) + "\n")
                     run_reader([reader, "--vectors", fixture])
                 print(f"{name}: {counts['valid']} valid, {counts['invalid']} invalid", flush=True)
+        if args.keywrap_reader or args.keywrap_dynamic_reader:
+            readers = {int(pair.split(":", 1)[0]): Path(pair.split(":", 1)[1])
+                       for pair in args.keywrap_reader}
+            if set(readers) != set(KEYWRAP_KEY_SIZES) or len(args.keywrap_reader) != 3:
+                raise AssertionError("Key wrap coverage requires one reader for each AES key size")
+            for mode, name in KEYWRAP_DOCUMENTS:
+                records, counts, derived = keywrap_records(json.loads(read(name)), mode)
+                fixture = Path(temporary) / "keywrap.txt"
+                for bits, reader in readers.items():
+                    fixture.write_text("\n".join(records[bits]) + "\n")
+                    run_reader([reader, "--vectors", fixture])
+                for reader in args.keywrap_dynamic_reader:
+                    fixture.write_text("\n".join(line for bits in KEYWRAP_KEY_SIZES
+                                                 for line in records[bits]) + "\n")
+                    run_reader([reader, "--vectors", fixture])
+                summary = ", ".join(f"{bits}: {counts[(bits, 'valid')]} valid, "
+                                    f"{counts[(bits, 'invalid')]} invalid"
+                                    for bits in KEYWRAP_KEY_SIZES)
+                print(f"{name}: {summary}; acceptable ShortKey run as invalid: {dict(derived)}",
+                      flush=True)
         if args.hmac_reader:
             for bits in (1, 224, 256, 384, 512):
                 name = f"hmac_sha{bits}_test.json"
-                raw = archive.read(f"wycheproof-{REVISION}/testvectors_v1/{name}")
-                document = json.loads(raw)
+                document = json.loads(read(name))
                 counts = Counter(case["result"] for group in document["testGroups"] for case in group["tests"])
                 if set(counts) != {"valid", "invalid"} or sum(counts.values()) != document["numberOfTests"]:
                     raise AssertionError(f"Incomplete HMAC coverage: {name}")
-                (Path(temporary) / name).write_bytes(raw)
                 print(f"{name}: {counts['valid']} valid, {counts['invalid']} invalid", flush=True)
-            environment = dict(os.environ, TC_TEST_HMAC_WYCHEPROOF_DIR=temporary)
+            environment = dict(os.environ, TC_TEST_HMAC_WYCHEPROOF_DIR=str(vectors))
             for reader in args.hmac_reader:
                 run_reader([reader, "/tiny-crypto-c/hmac/wycheproof"], environment)
         for bits in ((256, 384) if args.ec_reader else ()):
             for suffix in ("_ecpoint", ""):
                 name = f"ecdh_secp{bits}r1{suffix}_test.json"
-                document = json.loads(archive.read(f"wycheproof-{REVISION}/testvectors_v1/{name}"))
+                document = json.loads(read(name))
                 records, counts = ec_records(document, bits)
                 fixture = Path(temporary) / "vectors.txt"
                 fixture.write_text(records)
@@ -326,7 +546,7 @@ def main():
                               ("aes_cmac_test.json", args.cmac_reader)):
             if not readers:
                 continue
-            document = json.loads(archive.read(f"wycheproof-{REVISION}/testvectors_v1/{name}"))
+            document = json.loads(read(name))
             counts = Counter()
             records = []
             for group in document["testGroups"]:

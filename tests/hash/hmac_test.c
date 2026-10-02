@@ -4,12 +4,13 @@
  *
  * HMAC tests for SHA-1/224/256/384/512: RFC 2202 / RFC 4231 KATs, API edge
  * cases, Wycheproof. Digest dispatch uses the digest length (20/28/32/48/64).
- * Test-only translation unit; never linked into the library.
+ * Test-only translation unit.
  */
 
 #include <tiny_crypto/hash.h>
 #include "munit.h"
 #include "test_io.h"
+#include "cavp.h"
 #include "test_util.h"
 #include "test_vectors.h"
 
@@ -18,66 +19,78 @@
 #include <string.h>
 
 #ifndef HMAC_WYCHEPROOF_DIR
-#define HMAC_WYCHEPROOF_DIR "tests/vectors/hash/wycheproof"
+#define HMAC_WYCHEPROOF_DIR "tests/vectors/wycheproof/testvectors_v1"
 #endif
 
 #if TC_ENABLE_HMAC
 
-/* Full-tag streaming MAC; alg is the digest length in bytes (20/28/32/48/64). */
-#define HMAC_FULL_TAG_CASE(N) \
-  { \
-    struct TC_HMAC_SHA##N##_ctx ctx; \
-    munit_assert_int(TC_HMAC_SHA##N##_init(&ctx, key, key_len), ==, TC_OK); \
-    munit_assert_int(TC_HMAC_SHA##N##_update(&ctx, msg, msg_len), ==, TC_OK); \
-    munit_assert_int(TC_HMAC_SHA##N##_final(&ctx, tag), ==, TC_OK); \
+/* Full-tag streaming MAC. alg is the digest length in bytes (20/28/32/48/64). */
+#define HMAC_FULL_TAG_CASE(N)                                                                      \
+  {                                                                                                \
+    struct TC_HMAC_SHA##N##_ctx ctx;                                                               \
+    munit_assert_int(TC_HMAC_SHA##N##_init(&ctx, (TC_bytes){key, key_len}), ==, TC_OK);            \
+    munit_assert_int(TC_HMAC_SHA##N##_update(&ctx, (TC_bytes){msg, msg_len}), ==, TC_OK);          \
+    munit_assert_int(TC_HMAC_SHA##N##_final(&ctx, tag), ==, TC_OK);                                \
   }
 
-static void full_tag(int alg, const uint8_t* key, size_t key_len,
-                     const uint8_t* msg, size_t msg_len, uint8_t* tag)
+static void full_tag(int alg, const uint8_t* key, size_t key_len, const uint8_t* msg,
+                     size_t msg_len, uint8_t* tag)
 {
-  switch (alg)
-  {
+  switch (alg) {
 #if TC_ENABLE_SHA1
-  case TC_SHA1_DIGESTLEN: HMAC_FULL_TAG_CASE(1) break;
+  case TC_SHA1_DIGESTLEN:
+    HMAC_FULL_TAG_CASE(1) break;
 #endif
 #if TC_ENABLE_SHA224
-  case TC_SHA224_DIGESTLEN: HMAC_FULL_TAG_CASE(224) break;
+  case TC_SHA224_DIGESTLEN:
+    HMAC_FULL_TAG_CASE(224) break;
 #endif
 #if TC_ENABLE_SHA256
-  case TC_SHA256_DIGESTLEN: HMAC_FULL_TAG_CASE(256) break;
+  case TC_SHA256_DIGESTLEN:
+    HMAC_FULL_TAG_CASE(256) break;
 #endif
 #if TC_ENABLE_SHA384
-  case TC_SHA384_DIGESTLEN: HMAC_FULL_TAG_CASE(384) break;
+  case TC_SHA384_DIGESTLEN:
+    HMAC_FULL_TAG_CASE(384) break;
 #endif
 #if TC_ENABLE_SHA512
-  case TC_SHA512_DIGESTLEN: HMAC_FULL_TAG_CASE(512) break;
+  case TC_SHA512_DIGESTLEN:
+    HMAC_FULL_TAG_CASE(512) break;
 #endif
   default:
     munit_errorf("digest length %d not compiled in", alg);
   }
 }
 
-/* Public verify API for the same dispatch; TC_ERROR when alg is compiled out. */
-static TC_status hmac_verify(int alg, const uint8_t* key, size_t key_len,
-                             const uint8_t* msg, size_t msg_len,
-                             const uint8_t* tag, size_t tag_len)
+/* Public verify API for the same dispatch. TC_ERROR when alg is compiled out. */
+static TC_status hmac_verify(int alg, const uint8_t* key, size_t key_len, const uint8_t* msg,
+                             size_t msg_len, const uint8_t* tag, size_t tag_len)
 {
-  switch (alg)
-  {
+  switch (alg) {
 #if TC_ENABLE_SHA1
-  case TC_SHA1_DIGESTLEN: return TC_HMAC_SHA1_verify(key, key_len, msg, msg_len, tag, tag_len);
+  case TC_SHA1_DIGESTLEN:
+    return TC_HMAC_SHA1_verify((TC_bytes){key, key_len}, (TC_bytes){msg, msg_len},
+                               (TC_bytes){tag, tag_len});
 #endif
 #if TC_ENABLE_SHA224
-  case TC_SHA224_DIGESTLEN: return TC_HMAC_SHA224_verify(key, key_len, msg, msg_len, tag, tag_len);
+  case TC_SHA224_DIGESTLEN:
+    return TC_HMAC_SHA224_verify((TC_bytes){key, key_len}, (TC_bytes){msg, msg_len},
+                                 (TC_bytes){tag, tag_len});
 #endif
 #if TC_ENABLE_SHA256
-  case TC_SHA256_DIGESTLEN: return TC_HMAC_SHA256_verify(key, key_len, msg, msg_len, tag, tag_len);
+  case TC_SHA256_DIGESTLEN:
+    return TC_HMAC_SHA256_verify((TC_bytes){key, key_len}, (TC_bytes){msg, msg_len},
+                                 (TC_bytes){tag, tag_len});
 #endif
 #if TC_ENABLE_SHA384
-  case TC_SHA384_DIGESTLEN: return TC_HMAC_SHA384_verify(key, key_len, msg, msg_len, tag, tag_len);
+  case TC_SHA384_DIGESTLEN:
+    return TC_HMAC_SHA384_verify((TC_bytes){key, key_len}, (TC_bytes){msg, msg_len},
+                                 (TC_bytes){tag, tag_len});
 #endif
 #if TC_ENABLE_SHA512
-  case TC_SHA512_DIGESTLEN: return TC_HMAC_SHA512_verify(key, key_len, msg, msg_len, tag, tag_len);
+  case TC_SHA512_DIGESTLEN:
+    return TC_HMAC_SHA512_verify((TC_bytes){key, key_len}, (TC_bytes){msg, msg_len},
+                                 (TC_bytes){tag, tag_len});
 #endif
   default:
     return TC_ERROR;
@@ -88,67 +101,90 @@ static TC_status hmac_verify(int alg, const uint8_t* key, size_t key_len,
 /* RFC 2202 / RFC 4231                                                       */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_rfc(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_rfc)
 {
   uint8_t tag[TC_SHA512_DIGESTLEN];
   size_t i;
-  (void) params;
-  (void) data;
 
 #if TC_ENABLE_SHA1
-  for (i = 0; i < RFC2202_COUNT; ++i)
-  {
+  for (i = 0; i < RFC2202_COUNT; ++i) {
     const struct hmac_vector* v = &rfc2202[i];
     full_tag(TC_SHA1_DIGESTLEN, v->key, v->key_len, v->msg, v->msg_len, tag);
     munit_assert_memory_equal(TC_SHA1_DIGESTLEN, tag, v->tag);
     /* Case 5 is the RFC's 96-bit truncation example; its full tag is above. */
-    munit_assert_int(TC_HMAC_SHA1_digest(v->key, v->key_len, v->msg, v->msg_len, tag, TC_SHA1_DIGESTLEN), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){v->key, v->key_len},
+                                         (TC_bytes){v->msg, v->msg_len},
+                                         (TC_buffer){tag, TC_SHA1_DIGESTLEN}),
+                     ==, TC_OK);
     munit_assert_memory_equal(TC_SHA1_DIGESTLEN, tag, v->tag);
-    munit_assert_int(TC_HMAC_SHA1_verify(v->key, v->key_len, v->msg, v->msg_len, v->tag, TC_SHA1_DIGESTLEN), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA1_verify((TC_bytes){v->key, v->key_len},
+                                         (TC_bytes){v->msg, v->msg_len},
+                                         (TC_bytes){v->tag, TC_SHA1_DIGESTLEN}),
+                     ==, TC_OK);
   }
 #endif
 #if TC_ENABLE_SHA256
-  for (i = 0; i < RFC4231_COUNT; ++i)
-  {
+  for (i = 0; i < RFC4231_COUNT; ++i) {
     const struct hmac_vector* v = &rfc4231[i];
     full_tag(TC_SHA256_DIGESTLEN, v->key, v->key_len, v->msg, v->msg_len, tag);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, tag, v->tag);
-    munit_assert_int(TC_HMAC_SHA256_digest(v->key, v->key_len, v->msg, v->msg_len, tag, TC_SHA256_DIGESTLEN), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){v->key, v->key_len},
+                                           (TC_bytes){v->msg, v->msg_len},
+                                           (TC_buffer){tag, TC_SHA256_DIGESTLEN}),
+                     ==, TC_OK);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, tag, v->tag);
-    munit_assert_int(TC_HMAC_SHA256_verify(v->key, v->key_len, v->msg, v->msg_len, v->tag, TC_SHA256_DIGESTLEN), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){v->key, v->key_len},
+                                           (TC_bytes){v->msg, v->msg_len},
+                                           (TC_bytes){v->tag, TC_SHA256_DIGESTLEN}),
+                     ==, TC_OK);
   }
 #endif
 #if TC_ENABLE_SHA224
-  for (i = 0; i < RFC4231_COUNT; ++i)
-  {
+  for (i = 0; i < RFC4231_COUNT; ++i) {
     const struct hmac_vector* v = &rfc4231_sha224[i];
     full_tag(TC_SHA224_DIGESTLEN, v->key, v->key_len, v->msg, v->msg_len, tag);
     munit_assert_memory_equal(TC_SHA224_DIGESTLEN, tag, v->tag);
-    munit_assert_int(TC_HMAC_SHA224_digest(v->key, v->key_len, v->msg, v->msg_len, tag, TC_SHA224_DIGESTLEN), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){v->key, v->key_len},
+                                           (TC_bytes){v->msg, v->msg_len},
+                                           (TC_buffer){tag, TC_SHA224_DIGESTLEN}),
+                     ==, TC_OK);
     munit_assert_memory_equal(TC_SHA224_DIGESTLEN, tag, v->tag);
-    munit_assert_int(TC_HMAC_SHA224_verify(v->key, v->key_len, v->msg, v->msg_len, v->tag, TC_SHA224_DIGESTLEN), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){v->key, v->key_len},
+                                           (TC_bytes){v->msg, v->msg_len},
+                                           (TC_bytes){v->tag, TC_SHA224_DIGESTLEN}),
+                     ==, TC_OK);
   }
 #endif
 #if TC_ENABLE_SHA384
-  for (i = 0; i < RFC4231_COUNT; ++i)
-  {
+  for (i = 0; i < RFC4231_COUNT; ++i) {
     const struct hmac_vector* v = &rfc4231_sha384[i];
     full_tag(TC_SHA384_DIGESTLEN, v->key, v->key_len, v->msg, v->msg_len, tag);
     munit_assert_memory_equal(TC_SHA384_DIGESTLEN, tag, v->tag);
-    munit_assert_int(TC_HMAC_SHA384_digest(v->key, v->key_len, v->msg, v->msg_len, tag, TC_SHA384_DIGESTLEN), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){v->key, v->key_len},
+                                           (TC_bytes){v->msg, v->msg_len},
+                                           (TC_buffer){tag, TC_SHA384_DIGESTLEN}),
+                     ==, TC_OK);
     munit_assert_memory_equal(TC_SHA384_DIGESTLEN, tag, v->tag);
-    munit_assert_int(TC_HMAC_SHA384_verify(v->key, v->key_len, v->msg, v->msg_len, v->tag, TC_SHA384_DIGESTLEN), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){v->key, v->key_len},
+                                           (TC_bytes){v->msg, v->msg_len},
+                                           (TC_bytes){v->tag, TC_SHA384_DIGESTLEN}),
+                     ==, TC_OK);
   }
 #endif
 #if TC_ENABLE_SHA512
-  for (i = 0; i < RFC4231_COUNT; ++i)
-  {
+  for (i = 0; i < RFC4231_COUNT; ++i) {
     const struct hmac_vector* v = &rfc4231_sha512[i];
     full_tag(TC_SHA512_DIGESTLEN, v->key, v->key_len, v->msg, v->msg_len, tag);
     munit_assert_memory_equal(TC_SHA512_DIGESTLEN, tag, v->tag);
-    munit_assert_int(TC_HMAC_SHA512_digest(v->key, v->key_len, v->msg, v->msg_len, tag, TC_SHA512_DIGESTLEN), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){v->key, v->key_len},
+                                           (TC_bytes){v->msg, v->msg_len},
+                                           (TC_buffer){tag, TC_SHA512_DIGESTLEN}),
+                     ==, TC_OK);
     munit_assert_memory_equal(TC_SHA512_DIGESTLEN, tag, v->tag);
-    munit_assert_int(TC_HMAC_SHA512_verify(v->key, v->key_len, v->msg, v->msg_len, v->tag, TC_SHA512_DIGESTLEN), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){v->key, v->key_len},
+                                           (TC_bytes){v->msg, v->msg_len},
+                                           (TC_bytes){v->tag, TC_SHA512_DIGESTLEN}),
+                     ==, TC_OK);
   }
 #endif
   return MUNIT_OK;
@@ -158,69 +194,66 @@ MunitResult test_hmac_rfc(const MunitParameter params[], void* data)
 /* Key lengths: 0, 1, 63, 64, 65, 131; long keys equal HMAC(H(K)).           */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_key_lengths(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_key_lengths)
 {
   uint8_t key[256];
   uint8_t tag[TC_SHA512_DIGESTLEN];
   uint8_t tag2[TC_SHA512_DIGESTLEN];
   uint8_t hashed[TC_SHA512_DIGESTLEN];
   size_t i;
-  (void) params;
-  (void) data;
 
   tc_test_fill_incrementing(key, sizeof(key));
 
-  for (i = 0; i < HMAC_KEYLEN_COUNT; ++i)
-  {
+  for (i = 0; i < HMAC_KEYLEN_COUNT; ++i) {
     size_t klen = hmac_key_lengths[i];
     const uint8_t* kp = (klen == 0) ? NULL : key;
 #if TC_ENABLE_SHA1
     full_tag(TC_SHA1_DIGESTLEN, kp, klen, hmac_keylen_msg, sizeof(hmac_keylen_msg), tag);
     munit_assert_memory_equal(TC_SHA1_DIGESTLEN, tag, hmac_keylen_sha1[i]);
-    if (klen > TC_SHA1_BLOCKLEN)
-    {
-      TC_SHA1_digest(key, klen, hashed);
-      full_tag(TC_SHA1_DIGESTLEN, hashed, TC_SHA1_DIGESTLEN, hmac_keylen_msg, sizeof(hmac_keylen_msg), tag2);
+    if (klen > TC_SHA1_BLOCKLEN) {
+      TC_SHA1_digest((TC_bytes){key, klen}, hashed);
+      full_tag(TC_SHA1_DIGESTLEN, hashed, TC_SHA1_DIGESTLEN, hmac_keylen_msg,
+               sizeof(hmac_keylen_msg), tag2);
       munit_assert_memory_equal(TC_SHA1_DIGESTLEN, tag, tag2);
     }
 #endif
 #if TC_ENABLE_SHA256
     full_tag(TC_SHA256_DIGESTLEN, kp, klen, hmac_keylen_msg, sizeof(hmac_keylen_msg), tag);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, tag, hmac_keylen_sha256[i]);
-    if (klen > TC_SHA256_BLOCKLEN)
-    {
-      TC_SHA256_digest(key, klen, hashed);
-      full_tag(TC_SHA256_DIGESTLEN, hashed, TC_SHA256_DIGESTLEN, hmac_keylen_msg, sizeof(hmac_keylen_msg), tag2);
+    if (klen > TC_SHA256_BLOCKLEN) {
+      TC_SHA256_digest((TC_bytes){key, klen}, hashed);
+      full_tag(TC_SHA256_DIGESTLEN, hashed, TC_SHA256_DIGESTLEN, hmac_keylen_msg,
+               sizeof(hmac_keylen_msg), tag2);
       munit_assert_memory_equal(TC_SHA256_DIGESTLEN, tag, tag2);
     }
 #endif
 #if TC_ENABLE_SHA224
     full_tag(TC_SHA224_DIGESTLEN, kp, klen, hmac_keylen_msg, sizeof(hmac_keylen_msg), tag);
     munit_assert_memory_equal(TC_SHA224_DIGESTLEN, tag, hmac_keylen_sha224[i]);
-    if (klen > TC_SHA224_BLOCKLEN)
-    {
-      TC_SHA224_digest(key, klen, hashed);
-      full_tag(TC_SHA224_DIGESTLEN, hashed, TC_SHA224_DIGESTLEN, hmac_keylen_msg, sizeof(hmac_keylen_msg), tag2);
+    if (klen > TC_SHA224_BLOCKLEN) {
+      TC_SHA224_digest((TC_bytes){key, klen}, hashed);
+      full_tag(TC_SHA224_DIGESTLEN, hashed, TC_SHA224_DIGESTLEN, hmac_keylen_msg,
+               sizeof(hmac_keylen_msg), tag2);
       munit_assert_memory_equal(TC_SHA224_DIGESTLEN, tag, tag2);
     }
 #endif
 #if TC_ENABLE_SHA384
     full_tag(TC_SHA384_DIGESTLEN, kp, klen, hmac_keylen_msg, sizeof(hmac_keylen_msg), tag);
     munit_assert_memory_equal(TC_SHA384_DIGESTLEN, tag, hmac_keylen_sha384[i]);
-    if (klen > TC_SHA384_BLOCKLEN)
-    {
-      TC_SHA384_digest(key, klen, hashed);
-      full_tag(TC_SHA384_DIGESTLEN, hashed, TC_SHA384_DIGESTLEN, hmac_keylen_msg, sizeof(hmac_keylen_msg), tag2);
+    if (klen > TC_SHA384_BLOCKLEN) {
+      TC_SHA384_digest((TC_bytes){key, klen}, hashed);
+      full_tag(TC_SHA384_DIGESTLEN, hashed, TC_SHA384_DIGESTLEN, hmac_keylen_msg,
+               sizeof(hmac_keylen_msg), tag2);
       munit_assert_memory_equal(TC_SHA384_DIGESTLEN, tag, tag2);
     }
 #endif
 #if TC_ENABLE_SHA512
     full_tag(TC_SHA512_DIGESTLEN, kp, klen, hmac_keylen_msg, sizeof(hmac_keylen_msg), tag);
     munit_assert_memory_equal(TC_SHA512_DIGESTLEN, tag, hmac_keylen_sha512[i]);
-    if (klen > TC_SHA512_BLOCKLEN)
-    {
-      TC_SHA512_digest(key, klen, hashed);
-      full_tag(TC_SHA512_DIGESTLEN, hashed, TC_SHA512_DIGESTLEN, hmac_keylen_msg, sizeof(hmac_keylen_msg), tag2);
+    if (klen > TC_SHA512_BLOCKLEN) {
+      TC_SHA512_digest((TC_bytes){key, klen}, hashed);
+      full_tag(TC_SHA512_DIGESTLEN, hashed, TC_SHA512_DIGESTLEN, hmac_keylen_msg,
+               sizeof(hmac_keylen_msg), tag2);
       munit_assert_memory_equal(TC_SHA512_DIGESTLEN, tag, tag2);
     }
 #endif
@@ -230,61 +263,64 @@ MunitResult test_hmac_key_lengths(const MunitParameter params[], void* data)
 #if TC_ENABLE_SHA256
   {
     struct TC_HMAC_SHA256_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA256_init(&ctx, NULL, 1), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA256_init(NULL, key, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_init(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_init(NULL, (TC_bytes){key, 1}), ==, TC_ERROR);
   }
 #endif
 #if TC_ENABLE_SHA224
   {
     struct TC_HMAC_SHA224_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA224_init(&ctx, NULL, 1), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA224_init(NULL, key, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA224_init(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA224_init(NULL, (TC_bytes){key, 1}), ==, TC_ERROR);
   }
 #endif
 #if TC_ENABLE_SHA384
   {
     struct TC_HMAC_SHA384_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA384_init(&ctx, NULL, 1), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA384_init(NULL, key, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA384_init(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA384_init(NULL, (TC_bytes){key, 1}), ==, TC_ERROR);
   }
 #endif
 #if TC_ENABLE_SHA512
   {
     struct TC_HMAC_SHA512_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA512_init(&ctx, NULL, 1), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA512_init(NULL, key, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA512_init(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA512_init(NULL, (TC_bytes){key, 1}), ==, TC_ERROR);
   }
 #endif
 #if TC_ENABLE_SHA1
   {
     struct TC_HMAC_SHA1_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA1_init(&ctx, NULL, 1), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA1_init(NULL, key, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA1_init(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA1_init(NULL, (TC_bytes){key, 1}), ==, TC_ERROR);
   }
 #endif
 
 #if SIZE_MAX > (UINT64_MAX >> 3)
-  /* A length rejected by the digest must propagate through HMAC. The pointer
-     is never read because the length check happens before compression. */
+  /* A length rejected by the digest must propagate through HMAC. The length
+     check precedes compression, so the pointer stays unread. */
   {
     const size_t excessive = (size_t)(UINT64_MAX >> 3) + 1U;
 #if TC_ENABLE_SHA256
     struct TC_HMAC_SHA256_ctx sha256_ctx;
-    munit_assert_int(TC_HMAC_SHA256_init(&sha256_ctx, key, excessive), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA256_digest(key, 1, key, excessive,
-                                tag, TC_SHA256_DIGESTLEN), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_init(&sha256_ctx, (TC_bytes){key, excessive}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, 1}, (TC_bytes){key, excessive},
+                                           (TC_buffer){tag, TC_SHA256_DIGESTLEN}),
+                     ==, TC_ERROR);
 #endif
 #if TC_ENABLE_SHA224
     struct TC_HMAC_SHA224_ctx sha224_ctx;
-    munit_assert_int(TC_HMAC_SHA224_init(&sha224_ctx, key, excessive), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA224_digest(key, 1, key, excessive,
-                                tag, TC_SHA224_DIGESTLEN), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA224_init(&sha224_ctx, (TC_bytes){key, excessive}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){key, 1}, (TC_bytes){key, excessive},
+                                           (TC_buffer){tag, TC_SHA224_DIGESTLEN}),
+                     ==, TC_ERROR);
 #endif
 #if TC_ENABLE_SHA1
     struct TC_HMAC_SHA1_ctx sha1_ctx;
-    munit_assert_int(TC_HMAC_SHA1_init(&sha1_ctx, key, excessive), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA1_digest(key, 1, key, excessive,
-                              tag, TC_SHA1_DIGESTLEN), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA1_init(&sha1_ctx, (TC_bytes){key, excessive}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){key, 1}, (TC_bytes){key, excessive},
+                                         (TC_buffer){tag, TC_SHA1_DIGESTLEN}),
+                     ==, TC_ERROR);
 #endif
   }
 #endif
@@ -295,113 +331,273 @@ MunitResult test_hmac_key_lengths(const MunitParameter params[], void* data)
 /* Truncation bounds                                                         */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_truncation(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_truncation)
 {
   uint8_t key[16];
   uint8_t msg[40];
   uint8_t full[TC_SHA512_DIGESTLEN];
   uint8_t tag[TC_SHA512_DIGESTLEN + 1];
-  (void) params;
-  (void) data;
+  const size_t minimum =
+      TC_HMAC_MIN_TAG_LEN > TC_MIN_TAG_LEN ? TC_HMAC_MIN_TAG_LEN : TC_MIN_TAG_LEN;
 
   tc_test_fill_incrementing(key, sizeof(key));
   tc_test_fill_incrementing(msg, sizeof(msg));
 
 #if TC_ENABLE_SHA256
   full_tag(TC_SHA256_DIGESTLEN, key, sizeof(key), msg, sizeof(msg), full);
-  munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_HMAC_MIN_TAG_LEN, tag, full);
-  munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA256_DIGESTLEN - 1), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA256_DIGESTLEN - 1}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_SHA256_DIGESTLEN - 1, tag, full);
-  munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA256_DIGESTLEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA256_DIGESTLEN}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_SHA256_DIGESTLEN, tag, full);
 
-  munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), msg, sizeof(msg), tag, 0), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN - 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA256_DIGESTLEN + 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), msg, sizeof(msg), NULL, TC_SHA256_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), NULL, 1, tag, TC_SHA256_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA256_digest(NULL, 1, msg, sizeof(msg), tag, TC_SHA256_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA256_verify(key, sizeof(key), msg, sizeof(msg), full, 0), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA256_verify(key, sizeof(key), msg, sizeof(msg), full, TC_HMAC_MIN_TAG_LEN - 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA256_verify(key, sizeof(key), msg, sizeof(msg), full, TC_SHA256_DIGESTLEN + 1), ==, TC_ERROR);
+  /* The tag is written last, so it may overwrite the message or the key. */
+  {
+    uint8_t shared[sizeof(msg)];
+    memcpy(shared, msg, sizeof(msg));
+    munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, sizeof(key)},
+                                           (TC_bytes){shared, sizeof(shared)},
+                                           (TC_buffer){shared, TC_SHA256_DIGESTLEN}),
+                     ==, TC_OK);
+    munit_assert_memory_equal(TC_SHA256_DIGESTLEN, shared, full);
+    memcpy(shared, key, sizeof(key));
+    munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){shared, sizeof(key)},
+                                           (TC_bytes){msg, sizeof(msg)},
+                                           (TC_buffer){shared, TC_SHA256_DIGESTLEN}),
+                     ==, TC_OK);
+    munit_assert_memory_equal(TC_SHA256_DIGESTLEN, shared, full);
+  }
+
+  /* Rejected one-shot calls leave the tag buffer unchanged. */
+  memset(tag, 0xA5, sizeof(tag));
+  munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_HMAC_MIN_TAG_LEN - 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA256_digest_short_tag((TC_bytes){key, sizeof(key)},
+                                                   (TC_bytes){msg, sizeof(msg)},
+                                                   (TC_buffer){tag, minimum - 1}),
+                   ==, TC_OK);
+  munit_assert_memory_equal(minimum - 1, tag, full);
+  munit_assert_int(TC_HMAC_SHA256_verify_short_tag((TC_bytes){key, sizeof(key)},
+                                                   (TC_bytes){msg, sizeof(msg)},
+                                                   (TC_bytes){tag, minimum - 1}),
+                   ==, TC_OK);
+  tag[minimum - 2] ^= 1;
+  munit_assert_int(TC_HMAC_SHA256_verify_short_tag((TC_bytes){key, sizeof(key)},
+                                                   (TC_bytes){msg, sizeof(msg)},
+                                                   (TC_bytes){tag, minimum - 1}),
+                   ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA256_digest_short_tag((TC_bytes){key, sizeof(key)},
+                                                   (TC_bytes){msg, sizeof(msg)},
+                                                   (TC_buffer){tag, minimum}),
+                   ==, TC_ERROR);
+  memset(tag, 0xA5, sizeof(tag));
+  munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA256_DIGESTLEN + 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){NULL, TC_SHA256_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 1},
+                                         (TC_buffer){tag, TC_SHA256_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){NULL, 1}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA256_DIGESTLEN}),
+                   ==, TC_ERROR);
+  for (size_t i = 0; i < sizeof(tag); ++i)
+    munit_assert_uint8(tag[i], ==, 0xA5);
+  munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, TC_HMAC_MIN_TAG_LEN - 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, TC_SHA256_DIGESTLEN + 1}),
+                   ==, TC_ERROR);
 #endif
 #if TC_ENABLE_SHA224
   full_tag(TC_SHA224_DIGESTLEN, key, sizeof(key), msg, sizeof(msg), full);
-  munit_assert_int(TC_HMAC_SHA224_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_HMAC_MIN_TAG_LEN, tag, full);
-  munit_assert_int(TC_HMAC_SHA224_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA224_DIGESTLEN - 1), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA224_DIGESTLEN - 1}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_SHA224_DIGESTLEN - 1, tag, full);
-  munit_assert_int(TC_HMAC_SHA224_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA224_DIGESTLEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA224_DIGESTLEN}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_SHA224_DIGESTLEN, tag, full);
 
-  munit_assert_int(TC_HMAC_SHA224_digest(key, sizeof(key), msg, sizeof(msg), tag, 0), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA224_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN - 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA224_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA224_DIGESTLEN + 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA224_digest(key, sizeof(key), msg, sizeof(msg), NULL, TC_SHA224_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA224_digest(key, sizeof(key), NULL, 1, tag, TC_SHA224_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA224_digest(NULL, 1, msg, sizeof(msg), tag, TC_SHA224_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA224_verify(key, sizeof(key), msg, sizeof(msg), full, 0), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA224_verify(key, sizeof(key), msg, sizeof(msg), full, TC_HMAC_MIN_TAG_LEN - 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA224_verify(key, sizeof(key), msg, sizeof(msg), full, TC_SHA224_DIGESTLEN + 1), ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_HMAC_MIN_TAG_LEN - 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA224_DIGESTLEN + 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){NULL, TC_SHA224_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 1},
+                                         (TC_buffer){tag, TC_SHA224_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){NULL, 1}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA224_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, TC_HMAC_MIN_TAG_LEN - 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, TC_SHA224_DIGESTLEN + 1}),
+                   ==, TC_ERROR);
 #endif
 #if TC_ENABLE_SHA384
   full_tag(TC_SHA384_DIGESTLEN, key, sizeof(key), msg, sizeof(msg), full);
-  munit_assert_int(TC_HMAC_SHA384_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_HMAC_MIN_TAG_LEN, tag, full);
-  munit_assert_int(TC_HMAC_SHA384_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA384_DIGESTLEN - 1), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA384_DIGESTLEN - 1}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_SHA384_DIGESTLEN - 1, tag, full);
-  munit_assert_int(TC_HMAC_SHA384_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA384_DIGESTLEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA384_DIGESTLEN}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_SHA384_DIGESTLEN, tag, full);
 
-  munit_assert_int(TC_HMAC_SHA384_digest(key, sizeof(key), msg, sizeof(msg), tag, 0), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA384_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN - 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA384_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA384_DIGESTLEN + 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA384_digest(key, sizeof(key), msg, sizeof(msg), NULL, TC_SHA384_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA384_digest(key, sizeof(key), NULL, 1, tag, TC_SHA384_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA384_digest(NULL, 1, msg, sizeof(msg), tag, TC_SHA384_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA384_verify(key, sizeof(key), msg, sizeof(msg), full, 0), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA384_verify(key, sizeof(key), msg, sizeof(msg), full, TC_HMAC_MIN_TAG_LEN - 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA384_verify(key, sizeof(key), msg, sizeof(msg), full, TC_SHA384_DIGESTLEN + 1), ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_HMAC_MIN_TAG_LEN - 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA384_DIGESTLEN + 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){NULL, TC_SHA384_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 1},
+                                         (TC_buffer){tag, TC_SHA384_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){NULL, 1}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA384_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, TC_HMAC_MIN_TAG_LEN - 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, TC_SHA384_DIGESTLEN + 1}),
+                   ==, TC_ERROR);
 #endif
 #if TC_ENABLE_SHA512
   full_tag(TC_SHA512_DIGESTLEN, key, sizeof(key), msg, sizeof(msg), full);
-  munit_assert_int(TC_HMAC_SHA512_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_HMAC_MIN_TAG_LEN, tag, full);
-  munit_assert_int(TC_HMAC_SHA512_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA512_DIGESTLEN - 1), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA512_DIGESTLEN - 1}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_SHA512_DIGESTLEN - 1, tag, full);
-  munit_assert_int(TC_HMAC_SHA512_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA512_DIGESTLEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA512_DIGESTLEN}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_SHA512_DIGESTLEN, tag, full);
 
-  munit_assert_int(TC_HMAC_SHA512_digest(key, sizeof(key), msg, sizeof(msg), tag, 0), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA512_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN - 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA512_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA512_DIGESTLEN + 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA512_digest(key, sizeof(key), msg, sizeof(msg), NULL, TC_SHA512_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA512_digest(key, sizeof(key), NULL, 1, tag, TC_SHA512_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA512_digest(NULL, 1, msg, sizeof(msg), tag, TC_SHA512_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA512_verify(key, sizeof(key), msg, sizeof(msg), full, 0), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA512_verify(key, sizeof(key), msg, sizeof(msg), full, TC_HMAC_MIN_TAG_LEN - 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA512_verify(key, sizeof(key), msg, sizeof(msg), full, TC_SHA512_DIGESTLEN + 1), ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_HMAC_MIN_TAG_LEN - 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA512_DIGESTLEN + 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){NULL, TC_SHA512_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 1},
+                                         (TC_buffer){tag, TC_SHA512_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){NULL, 1}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_SHA512_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, TC_HMAC_MIN_TAG_LEN - 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){full, TC_SHA512_DIGESTLEN + 1}),
+                   ==, TC_ERROR);
 #endif
 
 #if TC_ENABLE_SHA1
   full_tag(TC_SHA1_DIGESTLEN, key, sizeof(key), msg, sizeof(msg), full);
-  munit_assert_int(TC_HMAC_SHA1_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_buffer){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_HMAC_MIN_TAG_LEN, tag, full);
-  munit_assert_int(TC_HMAC_SHA1_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA1_DIGESTLEN - 1), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_buffer){tag, TC_SHA1_DIGESTLEN - 1}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_SHA1_DIGESTLEN - 1, tag, full);
-  munit_assert_int(TC_HMAC_SHA1_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA1_DIGESTLEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_buffer){tag, TC_SHA1_DIGESTLEN}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_SHA1_DIGESTLEN, tag, full);
 
-  munit_assert_int(TC_HMAC_SHA1_digest(key, sizeof(key), msg, sizeof(msg), tag, 0), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA1_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN - 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA1_digest(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA1_DIGESTLEN + 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA1_digest(key, sizeof(key), msg, sizeof(msg), NULL, TC_SHA1_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA1_digest(key, sizeof(key), NULL, 1, tag, TC_SHA1_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA1_digest(NULL, 1, msg, sizeof(msg), tag, TC_SHA1_DIGESTLEN), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA1_verify(key, sizeof(key), msg, sizeof(msg), full, 0), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA1_verify(key, sizeof(key), msg, sizeof(msg), full, TC_HMAC_MIN_TAG_LEN - 1), ==, TC_ERROR);
-  munit_assert_int(TC_HMAC_SHA1_verify(key, sizeof(key), msg, sizeof(msg), full, TC_SHA1_DIGESTLEN + 1), ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_buffer){tag, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_buffer){tag, TC_HMAC_MIN_TAG_LEN - 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_buffer){tag, TC_SHA1_DIGESTLEN + 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_buffer){NULL, TC_SHA1_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 1},
+                                       (TC_buffer){tag, TC_SHA1_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){NULL, 1}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_buffer){tag, TC_SHA1_DIGESTLEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA1_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_bytes){full, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA1_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_bytes){full, TC_HMAC_MIN_TAG_LEN - 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA1_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_bytes){full, TC_SHA1_DIGESTLEN + 1}),
+                   ==, TC_ERROR);
 #endif
   return MUNIT_OK;
 }
@@ -410,116 +606,190 @@ MunitResult test_hmac_truncation(const MunitParameter params[], void* data)
 /* Verify: correct tags pass, single-byte flips fail                         */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_verify(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_verify)
 {
   uint8_t key[20];
   uint8_t msg[70];
   uint8_t tag[TC_SHA512_DIGESTLEN];
-  (void) params;
-  (void) data;
 
   tc_test_fill_incrementing(key, sizeof(key));
   tc_test_fill_incrementing(msg, sizeof(msg));
 
 #if TC_ENABLE_SHA256
   full_tag(TC_SHA256_DIGESTLEN, key, sizeof(key), msg, sizeof(msg), tag);
-  munit_assert_int(TC_HMAC_SHA256_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA256_DIGESTLEN), ==, TC_OK);
-  munit_assert_int(TC_HMAC_SHA256_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA256_DIGESTLEN}),
+                   ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   tag[0] ^= 0x01U;
-  munit_assert_int(TC_HMAC_SHA256_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA256_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA256_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   tag[0] ^= 0x01U;
   tag[TC_SHA256_DIGESTLEN - 1] ^= 0x80U;
-  munit_assert_int(TC_HMAC_SHA256_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA256_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA256_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   /* The flipped byte is outside a MIN-length prefix, so that prefix still verifies */
-  munit_assert_int(TC_HMAC_SHA256_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   tag[TC_SHA256_DIGESTLEN - 1] ^= 0x80U;
   tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 0x10U;
-  munit_assert_int(TC_HMAC_SHA256_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_MISMATCH);
   tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 0x10U;
-  munit_assert_int(TC_HMAC_SHA256_verify(key, sizeof(key), msg, sizeof(msg), NULL, TC_SHA256_DIGESTLEN), ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){NULL, TC_SHA256_DIGESTLEN}),
+                   ==, TC_ERROR);
   /* Wrong key */
   key[0] ^= 0xFFU;
-  munit_assert_int(TC_HMAC_SHA256_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA256_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA256_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA256_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   key[0] ^= 0xFFU;
 #endif
 #if TC_ENABLE_SHA224
   full_tag(TC_SHA224_DIGESTLEN, key, sizeof(key), msg, sizeof(msg), tag);
-  munit_assert_int(TC_HMAC_SHA224_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA224_DIGESTLEN), ==, TC_OK);
-  munit_assert_int(TC_HMAC_SHA224_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA224_DIGESTLEN}),
+                   ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   tag[0] ^= 0x01U;
-  munit_assert_int(TC_HMAC_SHA224_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA224_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA224_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   tag[0] ^= 0x01U;
   tag[TC_SHA224_DIGESTLEN - 1] ^= 0x80U;
-  munit_assert_int(TC_HMAC_SHA224_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA224_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA224_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   /* The flipped byte is outside a MIN-length prefix, so that prefix still verifies */
-  munit_assert_int(TC_HMAC_SHA224_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   tag[TC_SHA224_DIGESTLEN - 1] ^= 0x80U;
   tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 0x10U;
-  munit_assert_int(TC_HMAC_SHA224_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_MISMATCH);
   tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 0x10U;
-  munit_assert_int(TC_HMAC_SHA224_verify(key, sizeof(key), msg, sizeof(msg), NULL, TC_SHA224_DIGESTLEN), ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){NULL, TC_SHA224_DIGESTLEN}),
+                   ==, TC_ERROR);
   /* Wrong key */
   key[0] ^= 0xFFU;
-  munit_assert_int(TC_HMAC_SHA224_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA224_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA224_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA224_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   key[0] ^= 0xFFU;
 #endif
 #if TC_ENABLE_SHA384
   full_tag(TC_SHA384_DIGESTLEN, key, sizeof(key), msg, sizeof(msg), tag);
-  munit_assert_int(TC_HMAC_SHA384_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA384_DIGESTLEN), ==, TC_OK);
-  munit_assert_int(TC_HMAC_SHA384_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA384_DIGESTLEN}),
+                   ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   tag[0] ^= 0x01U;
-  munit_assert_int(TC_HMAC_SHA384_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA384_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA384_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   tag[0] ^= 0x01U;
   tag[TC_SHA384_DIGESTLEN - 1] ^= 0x80U;
-  munit_assert_int(TC_HMAC_SHA384_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA384_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA384_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   /* The flipped byte is outside a MIN-length prefix, so that prefix still verifies */
-  munit_assert_int(TC_HMAC_SHA384_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   tag[TC_SHA384_DIGESTLEN - 1] ^= 0x80U;
   tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 0x10U;
-  munit_assert_int(TC_HMAC_SHA384_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_MISMATCH);
   tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 0x10U;
-  munit_assert_int(TC_HMAC_SHA384_verify(key, sizeof(key), msg, sizeof(msg), NULL, TC_SHA384_DIGESTLEN), ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){NULL, TC_SHA384_DIGESTLEN}),
+                   ==, TC_ERROR);
   /* Wrong key */
   key[0] ^= 0xFFU;
-  munit_assert_int(TC_HMAC_SHA384_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA384_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA384_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA384_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   key[0] ^= 0xFFU;
 #endif
 #if TC_ENABLE_SHA512
   full_tag(TC_SHA512_DIGESTLEN, key, sizeof(key), msg, sizeof(msg), tag);
-  munit_assert_int(TC_HMAC_SHA512_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA512_DIGESTLEN), ==, TC_OK);
-  munit_assert_int(TC_HMAC_SHA512_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA512_DIGESTLEN}),
+                   ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   tag[0] ^= 0x01U;
-  munit_assert_int(TC_HMAC_SHA512_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA512_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA512_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   tag[0] ^= 0x01U;
   tag[TC_SHA512_DIGESTLEN - 1] ^= 0x80U;
-  munit_assert_int(TC_HMAC_SHA512_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA512_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA512_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   /* The flipped byte is outside a MIN-length prefix, so that prefix still verifies */
-  munit_assert_int(TC_HMAC_SHA512_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   tag[TC_SHA512_DIGESTLEN - 1] ^= 0x80U;
   tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 0x10U;
-  munit_assert_int(TC_HMAC_SHA512_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_MISMATCH);
   tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 0x10U;
-  munit_assert_int(TC_HMAC_SHA512_verify(key, sizeof(key), msg, sizeof(msg), NULL, TC_SHA512_DIGESTLEN), ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){NULL, TC_SHA512_DIGESTLEN}),
+                   ==, TC_ERROR);
   /* Wrong key */
   key[0] ^= 0xFFU;
-  munit_assert_int(TC_HMAC_SHA512_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA512_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA512_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_bytes){tag, TC_SHA512_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   key[0] ^= 0xFFU;
 #endif
 
 #if TC_ENABLE_SHA1
   full_tag(TC_SHA1_DIGESTLEN, key, sizeof(key), msg, sizeof(msg), tag);
-  munit_assert_int(TC_HMAC_SHA1_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA1_DIGESTLEN), ==, TC_OK);
-  munit_assert_int(TC_HMAC_SHA1_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA1_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_bytes){tag, TC_SHA1_DIGESTLEN}),
+                   ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA1_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   tag[0] ^= 0x01U;
-  munit_assert_int(TC_HMAC_SHA1_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA1_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA1_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_bytes){tag, TC_SHA1_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   tag[0] ^= 0x01U;
   tag[TC_SHA1_DIGESTLEN - 1] ^= 0x80U;
-  munit_assert_int(TC_HMAC_SHA1_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_SHA1_DIGESTLEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA1_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_bytes){tag, TC_SHA1_DIGESTLEN}),
+                   ==, TC_MISMATCH);
   tag[TC_SHA1_DIGESTLEN - 1] ^= 0x80U;
   tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 0x10U;
-  munit_assert_int(TC_HMAC_SHA1_verify(key, sizeof(key), msg, sizeof(msg), tag, TC_HMAC_MIN_TAG_LEN), ==, TC_MISMATCH);
+  munit_assert_int(TC_HMAC_SHA1_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_bytes){tag, TC_HMAC_MIN_TAG_LEN}),
+                   ==, TC_MISMATCH);
   tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 0x10U;
-  munit_assert_int(TC_HMAC_SHA1_verify(key, sizeof(key), msg, sizeof(msg), NULL, TC_SHA1_DIGESTLEN), ==, TC_ERROR);
+  munit_assert_int(TC_HMAC_SHA1_verify((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_bytes){NULL, TC_SHA1_DIGESTLEN}),
+                   ==, TC_ERROR);
 #endif
   return MUNIT_OK;
 }
@@ -528,148 +798,172 @@ MunitResult test_hmac_verify(const MunitParameter params[], void* data)
 /* Streaming equals one-shot; empty message with NULL pointer                */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_streaming(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_streaming)
 {
   uint8_t key[33];
   uint8_t msg[150];
   uint8_t expected[TC_SHA512_DIGESTLEN];
   uint8_t tag[TC_SHA512_DIGESTLEN];
   size_t split;
-  (void) params;
-  (void) data;
 
   tc_test_fill_incrementing(key, sizeof(key));
   tc_test_fill_incrementing(msg, sizeof(msg));
 
 #if TC_ENABLE_SHA256
-  munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), msg, sizeof(msg), expected, TC_SHA256_DIGESTLEN), ==, TC_OK);
-  for (split = 0; split <= sizeof(msg); split += 7)
-  {
+  munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){expected, TC_SHA256_DIGESTLEN}),
+                   ==, TC_OK);
+  for (split = 0; split <= sizeof(msg); split += 7) {
     struct TC_HMAC_SHA256_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA256_init(&ctx, key, sizeof(key)), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA256_update(&ctx, msg, split), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA256_update(&ctx, msg + split, sizeof(msg) - split), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA256_init(&ctx, (TC_bytes){key, sizeof(key)}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, (TC_bytes){msg, split}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, (TC_bytes){msg + split, sizeof(msg) - split}), ==,
+                     TC_OK);
     munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, tag, expected);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, (TC_bytes){msg, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_ERROR);
   }
   {
     struct TC_HMAC_SHA256_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), NULL, 0, expected, TC_SHA256_DIGESTLEN), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA256_init(&ctx, key, sizeof(key)), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA256_update(&ctx, NULL, 0), ==, TC_OK);
+    memset(&ctx, 0, sizeof ctx);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, (TC_bytes){msg, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_init(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 0},
+                                           (TC_buffer){expected, TC_SHA256_DIGESTLEN}),
+                     ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA256_init(&ctx, (TC_bytes){key, sizeof(key)}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, (TC_bytes){NULL, 0}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, (TC_bytes){(const uint8_t*)ctx.outer_state, 1}),
+                     ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&ctx, (uint8_t*)ctx.outer_state), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, tag, expected);
-#if TC_STRICT
-    munit_assert_int(TC_HMAC_SHA256_update(NULL, msg, 1), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA256_update(&ctx, NULL, 1), ==, TC_ERROR);
+    TC_HMAC_SHA256_ctx_clear(&ctx);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, (TC_bytes){msg, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_update(NULL, (TC_bytes){msg, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA256_final(NULL, tag), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA256_final(&ctx, NULL), ==, TC_ERROR);
-#endif
   }
 #endif
 #if TC_ENABLE_SHA224
-  munit_assert_int(TC_HMAC_SHA224_digest(key, sizeof(key), msg, sizeof(msg), expected, TC_SHA224_DIGESTLEN), ==, TC_OK);
-  for (split = 0; split <= sizeof(msg); split += 7)
-  {
+  munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){expected, TC_SHA224_DIGESTLEN}),
+                   ==, TC_OK);
+  for (split = 0; split <= sizeof(msg); split += 7) {
     struct TC_HMAC_SHA224_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA224_init(&ctx, key, sizeof(key)), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA224_update(&ctx, msg, split), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA224_update(&ctx, msg + split, sizeof(msg) - split), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA224_init(&ctx, (TC_bytes){key, sizeof(key)}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA224_update(&ctx, (TC_bytes){msg, split}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA224_update(&ctx, (TC_bytes){msg + split, sizeof(msg) - split}), ==,
+                     TC_OK);
     munit_assert_int(TC_HMAC_SHA224_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA224_DIGESTLEN, tag, expected);
   }
   {
     struct TC_HMAC_SHA224_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA224_digest(key, sizeof(key), NULL, 0, expected, TC_SHA224_DIGESTLEN), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA224_init(&ctx, key, sizeof(key)), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA224_update(&ctx, NULL, 0), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA224_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 0},
+                                           (TC_buffer){expected, TC_SHA224_DIGESTLEN}),
+                     ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA224_init(&ctx, (TC_bytes){key, sizeof(key)}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA224_update(&ctx, (TC_bytes){NULL, 0}), ==, TC_OK);
     munit_assert_int(TC_HMAC_SHA224_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA224_DIGESTLEN, tag, expected);
-#if TC_STRICT
-    munit_assert_int(TC_HMAC_SHA224_update(NULL, msg, 1), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA224_update(&ctx, NULL, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA224_update(NULL, (TC_bytes){msg, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA224_update(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA224_final(NULL, tag), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA224_final(&ctx, NULL), ==, TC_ERROR);
-#endif
   }
 #endif
 #if TC_ENABLE_SHA384
-  munit_assert_int(TC_HMAC_SHA384_digest(key, sizeof(key), msg, sizeof(msg), expected, TC_SHA384_DIGESTLEN), ==, TC_OK);
-  for (split = 0; split <= sizeof(msg); split += 7)
-  {
+  munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){expected, TC_SHA384_DIGESTLEN}),
+                   ==, TC_OK);
+  for (split = 0; split <= sizeof(msg); split += 7) {
     struct TC_HMAC_SHA384_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA384_init(&ctx, key, sizeof(key)), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA384_update(&ctx, msg, split), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA384_update(&ctx, msg + split, sizeof(msg) - split), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA384_init(&ctx, (TC_bytes){key, sizeof(key)}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA384_update(&ctx, (TC_bytes){msg, split}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA384_update(&ctx, (TC_bytes){msg + split, sizeof(msg) - split}), ==,
+                     TC_OK);
     munit_assert_int(TC_HMAC_SHA384_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA384_DIGESTLEN, tag, expected);
   }
   {
     struct TC_HMAC_SHA384_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA384_digest(key, sizeof(key), NULL, 0, expected, TC_SHA384_DIGESTLEN), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA384_init(&ctx, key, sizeof(key)), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA384_update(&ctx, NULL, 0), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA384_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 0},
+                                           (TC_buffer){expected, TC_SHA384_DIGESTLEN}),
+                     ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA384_init(&ctx, (TC_bytes){key, sizeof(key)}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA384_update(&ctx, (TC_bytes){NULL, 0}), ==, TC_OK);
     munit_assert_int(TC_HMAC_SHA384_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA384_DIGESTLEN, tag, expected);
-#if TC_STRICT
-    munit_assert_int(TC_HMAC_SHA384_update(NULL, msg, 1), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA384_update(&ctx, NULL, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA384_update(NULL, (TC_bytes){msg, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA384_update(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA384_final(NULL, tag), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA384_final(&ctx, NULL), ==, TC_ERROR);
-#endif
   }
 #endif
 #if TC_ENABLE_SHA512
-  munit_assert_int(TC_HMAC_SHA512_digest(key, sizeof(key), msg, sizeof(msg), expected, TC_SHA512_DIGESTLEN), ==, TC_OK);
-  for (split = 0; split <= sizeof(msg); split += 7)
-  {
+  munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){expected, TC_SHA512_DIGESTLEN}),
+                   ==, TC_OK);
+  for (split = 0; split <= sizeof(msg); split += 7) {
     struct TC_HMAC_SHA512_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA512_init(&ctx, key, sizeof(key)), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA512_update(&ctx, msg, split), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA512_update(&ctx, msg + split, sizeof(msg) - split), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA512_init(&ctx, (TC_bytes){key, sizeof(key)}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA512_update(&ctx, (TC_bytes){msg, split}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA512_update(&ctx, (TC_bytes){msg + split, sizeof(msg) - split}), ==,
+                     TC_OK);
     munit_assert_int(TC_HMAC_SHA512_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA512_DIGESTLEN, tag, expected);
   }
   {
     struct TC_HMAC_SHA512_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA512_digest(key, sizeof(key), NULL, 0, expected, TC_SHA512_DIGESTLEN), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA512_init(&ctx, key, sizeof(key)), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA512_update(&ctx, NULL, 0), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA512_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 0},
+                                           (TC_buffer){expected, TC_SHA512_DIGESTLEN}),
+                     ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA512_init(&ctx, (TC_bytes){key, sizeof(key)}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA512_update(&ctx, (TC_bytes){NULL, 0}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA512_update(&ctx, (TC_bytes){(const uint8_t*)ctx.outer_state, 1}),
+                     ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA512_final(&ctx, (uint8_t*)ctx.outer_state), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA512_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA512_DIGESTLEN, tag, expected);
-#if TC_STRICT
-    munit_assert_int(TC_HMAC_SHA512_update(NULL, msg, 1), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA512_update(&ctx, NULL, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA512_update(NULL, (TC_bytes){msg, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA512_update(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA512_final(NULL, tag), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA512_final(&ctx, NULL), ==, TC_ERROR);
-#endif
   }
 #endif
 
 #if TC_ENABLE_SHA1
-  munit_assert_int(TC_HMAC_SHA1_digest(key, sizeof(key), msg, sizeof(msg), expected, TC_SHA1_DIGESTLEN), ==, TC_OK);
-  for (split = 0; split <= sizeof(msg); split += 7)
-  {
+  munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){msg, sizeof(msg)},
+                                       (TC_buffer){expected, TC_SHA1_DIGESTLEN}),
+                   ==, TC_OK);
+  for (split = 0; split <= sizeof(msg); split += 7) {
     struct TC_HMAC_SHA1_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA1_init(&ctx, key, sizeof(key)), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA1_update(&ctx, msg, split), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA1_update(&ctx, msg + split, sizeof(msg) - split), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA1_init(&ctx, (TC_bytes){key, sizeof(key)}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA1_update(&ctx, (TC_bytes){msg, split}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA1_update(&ctx, (TC_bytes){msg + split, sizeof(msg) - split}), ==,
+                     TC_OK);
     munit_assert_int(TC_HMAC_SHA1_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA1_DIGESTLEN, tag, expected);
   }
   {
     struct TC_HMAC_SHA1_ctx ctx;
-    munit_assert_int(TC_HMAC_SHA1_digest(key, sizeof(key), NULL, 0, expected, TC_SHA1_DIGESTLEN), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA1_init(&ctx, key, sizeof(key)), ==, TC_OK);
-    munit_assert_int(TC_HMAC_SHA1_update(&ctx, NULL, 0), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA1_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 0},
+                                         (TC_buffer){expected, TC_SHA1_DIGESTLEN}),
+                     ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA1_init(&ctx, (TC_bytes){key, sizeof(key)}), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA1_update(&ctx, (TC_bytes){NULL, 0}), ==, TC_OK);
     munit_assert_int(TC_HMAC_SHA1_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA1_DIGESTLEN, tag, expected);
-#if TC_STRICT
-    munit_assert_int(TC_HMAC_SHA1_update(NULL, msg, 1), ==, TC_ERROR);
-    munit_assert_int(TC_HMAC_SHA1_update(&ctx, NULL, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA1_update(NULL, (TC_bytes){msg, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA1_update(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA1_final(NULL, tag), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA1_final(&ctx, NULL), ==, TC_ERROR);
-#endif
   }
 #endif
   return MUNIT_OK;
@@ -679,25 +973,21 @@ MunitResult test_hmac_streaming(const MunitParameter params[], void* data)
 /* Zeroization                                                               */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_zeroize(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_zeroize)
 {
   uint8_t key[16];
   uint8_t tag[TC_SHA512_DIGESTLEN];
-  (void) params;
-  (void) data;
 
   tc_test_fill_incrementing(key, sizeof(key));
 
 #if TC_ENABLE_SHA256
   {
     struct TC_HMAC_SHA256_ctx ctx;
-    TC_HMAC_SHA256_init(&ctx, key, sizeof(key));
+    TC_HMAC_SHA256_init(&ctx, (TC_bytes){key, sizeof(key)});
     munit_assert_false(tc_test_all_zero(&ctx, sizeof(ctx)));
     TC_HMAC_SHA256_final(&ctx, tag);
-#if TC_ZEROIZE
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx)));
-#endif
-    TC_HMAC_SHA256_init(&ctx, key, sizeof(key));
+    TC_HMAC_SHA256_init(&ctx, (TC_bytes){key, sizeof(key)});
     TC_HMAC_SHA256_ctx_clear(&ctx);
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx)));
     TC_HMAC_SHA256_ctx_clear(NULL);
@@ -706,13 +996,11 @@ MunitResult test_hmac_zeroize(const MunitParameter params[], void* data)
 #if TC_ENABLE_SHA224
   {
     struct TC_HMAC_SHA224_ctx ctx;
-    TC_HMAC_SHA224_init(&ctx, key, sizeof(key));
+    TC_HMAC_SHA224_init(&ctx, (TC_bytes){key, sizeof(key)});
     munit_assert_false(tc_test_all_zero(&ctx, sizeof(ctx)));
     TC_HMAC_SHA224_final(&ctx, tag);
-#if TC_ZEROIZE
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx)));
-#endif
-    TC_HMAC_SHA224_init(&ctx, key, sizeof(key));
+    TC_HMAC_SHA224_init(&ctx, (TC_bytes){key, sizeof(key)});
     TC_HMAC_SHA224_ctx_clear(&ctx);
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx)));
     TC_HMAC_SHA224_ctx_clear(NULL);
@@ -721,13 +1009,11 @@ MunitResult test_hmac_zeroize(const MunitParameter params[], void* data)
 #if TC_ENABLE_SHA384
   {
     struct TC_HMAC_SHA384_ctx ctx;
-    TC_HMAC_SHA384_init(&ctx, key, sizeof(key));
+    TC_HMAC_SHA384_init(&ctx, (TC_bytes){key, sizeof(key)});
     munit_assert_false(tc_test_all_zero(&ctx, sizeof(ctx)));
     TC_HMAC_SHA384_final(&ctx, tag);
-#if TC_ZEROIZE
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx)));
-#endif
-    TC_HMAC_SHA384_init(&ctx, key, sizeof(key));
+    TC_HMAC_SHA384_init(&ctx, (TC_bytes){key, sizeof(key)});
     TC_HMAC_SHA384_ctx_clear(&ctx);
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx)));
     TC_HMAC_SHA384_ctx_clear(NULL);
@@ -736,13 +1022,11 @@ MunitResult test_hmac_zeroize(const MunitParameter params[], void* data)
 #if TC_ENABLE_SHA512
   {
     struct TC_HMAC_SHA512_ctx ctx;
-    TC_HMAC_SHA512_init(&ctx, key, sizeof(key));
+    TC_HMAC_SHA512_init(&ctx, (TC_bytes){key, sizeof(key)});
     munit_assert_false(tc_test_all_zero(&ctx, sizeof(ctx)));
     TC_HMAC_SHA512_final(&ctx, tag);
-#if TC_ZEROIZE
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx)));
-#endif
-    TC_HMAC_SHA512_init(&ctx, key, sizeof(key));
+    TC_HMAC_SHA512_init(&ctx, (TC_bytes){key, sizeof(key)});
     TC_HMAC_SHA512_ctx_clear(&ctx);
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx)));
     TC_HMAC_SHA512_ctx_clear(NULL);
@@ -751,13 +1035,11 @@ MunitResult test_hmac_zeroize(const MunitParameter params[], void* data)
 #if TC_ENABLE_SHA1
   {
     struct TC_HMAC_SHA1_ctx ctx;
-    TC_HMAC_SHA1_init(&ctx, key, sizeof(key));
+    TC_HMAC_SHA1_init(&ctx, (TC_bytes){key, sizeof(key)});
     munit_assert_false(tc_test_all_zero(&ctx, sizeof(ctx)));
     TC_HMAC_SHA1_final(&ctx, tag);
-#if TC_ZEROIZE
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx)));
-#endif
-    TC_HMAC_SHA1_init(&ctx, key, sizeof(key));
+    TC_HMAC_SHA1_init(&ctx, (TC_bytes){key, sizeof(key)});
     TC_HMAC_SHA1_ctx_clear(&ctx);
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx)));
     TC_HMAC_SHA1_ctx_clear(NULL);
@@ -795,16 +1077,15 @@ static long json_number(const char* p)
   return strtol(p, NULL, 10);
 }
 
-/* Decodes the quoted hex string at p. */
+/* Decode the quoted hex string at p and return its byte count. A missing
+ * quote or malformed hex fails the current test. */
 static size_t json_hex(const char* p, uint8_t* out, size_t capacity)
 {
-  if (*p != '"')
-    return SIZE_MAX;
-  return tc_test_decode_hex(p + 1, out, capacity);
+  munit_assert_char(*p, ==, '"');
+  return tc_test_hex(p + 1, out, capacity);
 }
 
-struct wycheproof_case
-{
+struct wycheproof_case {
   long tc_id;
   long key_bits;
   long tag_bits;
@@ -830,8 +1111,8 @@ static void run_wycheproof_file(int alg, const char* path)
 
   if (directory != NULL) {
     const char* name = strrchr(path, '/');
-    int length = snprintf(external_path, sizeof external_path, "%s/%s", directory,
-                           name ? name + 1 : path);
+    int length =
+        snprintf(external_path, sizeof external_path, "%s/%s", directory, name ? name + 1 : path);
     munit_assert_int(length, >=, 0);
     munit_assert_size((size_t)length, <, sizeof external_path);
     path = external_path;
@@ -843,8 +1124,7 @@ static void run_wycheproof_file(int alg, const char* path)
 
   memset(&tc, 0, sizeof(tc));
 
-  while (fgets(line, sizeof(line), file) != NULL)
-  {
+  while (fgets(line, sizeof(line), file) != NULL) {
     const char* p;
 
     if (expected_total < 0 && (p = json_field(line, "numberOfTests")) != NULL)
@@ -853,31 +1133,19 @@ static void run_wycheproof_file(int alg, const char* path)
       tc.key_bits = json_number(p);
     else if ((p = json_field(line, "tagSize")) != NULL)
       tc.tag_bits = json_number(p);
-    else if ((p = json_field(line, "tcId")) != NULL)
-    {
+    else if ((p = json_field(line, "tcId")) != NULL) {
       tc.tc_id = json_number(p);
       tc.have_key = tc.have_msg = tc.have_tag = 0;
-    }
-    else if ((p = json_field(line, "key")) != NULL)
-    {
+    } else if ((p = json_field(line, "key")) != NULL) {
       tc.key_len = json_hex(p, tc.key, sizeof(tc.key));
-      munit_assert_size(tc.key_len, !=, SIZE_MAX);
       tc.have_key = 1;
-    }
-    else if ((p = json_field(line, "msg")) != NULL)
-    {
+    } else if ((p = json_field(line, "msg")) != NULL) {
       tc.msg_len = json_hex(p, tc.msg, sizeof(tc.msg));
-      munit_assert_size(tc.msg_len, !=, SIZE_MAX);
       tc.have_msg = 1;
-    }
-    else if ((p = json_field(line, "tag")) != NULL)
-    {
+    } else if ((p = json_field(line, "tag")) != NULL) {
       tc.tag_len = json_hex(p, tc.tag, sizeof(tc.tag));
-      munit_assert_size(tc.tag_len, !=, SIZE_MAX);
       tc.have_tag = 1;
-    }
-    else if ((p = json_field(line, "result")) != NULL)
-    {
+    } else if ((p = json_field(line, "result")) != NULL) {
       uint8_t computed[TC_SHA512_DIGESTLEN];
       int valid;
       int matches;
@@ -897,15 +1165,13 @@ static void run_wycheproof_file(int alg, const char* path)
         munit_errorf("%s tcId %ld: expected %s", path, tc.tc_id, valid ? "match" : "mismatch");
 
       /* The public verify API agrees whenever the tag length is in range. */
-      if (tc.tag_len >= TC_HMAC_MIN_TAG_LEN)
-      {
+      if (tc.tag_len >= TC_HMAC_MIN_TAG_LEN) {
         int rc = hmac_verify(alg, tc.key, tc.key_len, tc.msg, tc.msg_len, tc.tag, tc.tag_len);
         munit_assert_int(rc, ==, valid ? TC_OK : TC_MISMATCH);
-      }
-      else
-      {
-        munit_assert_int(hmac_verify(alg, tc.key, tc.key_len, tc.msg, tc.msg_len,
-                                     tc.tag, tc.tag_len), ==, TC_ERROR);
+      } else {
+        munit_assert_int(
+            hmac_verify(alg, tc.key, tc.key_len, tc.msg, tc.msg_len, tc.tag, tc.tag_len), ==,
+            TC_ERROR);
       }
       ran++;
     }
@@ -917,10 +1183,45 @@ static void run_wycheproof_file(int alg, const char* path)
   munit_assert_long(ran, ==, expected_total);
 }
 
-MunitResult test_hmac_wycheproof(const MunitParameter params[], void* data)
+/* The key is read after init wipes the context, so a key stored inside the
+ * context must be rejected. Accepting it would key the MAC with zeros. */
+TC_TEST_SHARED(test_hmac_key_overlap)
 {
-  (void) params;
-  (void) data;
+#if TC_ENABLE_SHA256
+  struct {
+    struct TC_HMAC_SHA256_ctx ctx;
+    uint8_t after[32];
+  } storage;
+  uint8_t* const base = (uint8_t*)&storage.ctx;
+  const size_t offsets[] = {0, sizeof storage.ctx / 2, sizeof storage.ctx - 1};
+  const uint8_t message = 'm';
+  uint8_t tag[TC_SHA256_DIGESTLEN], expected[TC_SHA256_DIGESTLEN];
+  for (size_t i = 0; i < sizeof offsets / sizeof *offsets; ++i) {
+    memset(&storage, 0xab, sizeof storage);
+    munit_assert_int(TC_HMAC_SHA256_init(&storage.ctx, (TC_bytes){base + offsets[i], 16}), ==,
+                     TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_update(&storage.ctx, (TC_bytes){&message, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&storage.ctx, tag), ==, TC_ERROR);
+  }
+  /* A key directly after the context is disjoint and accepted. */
+  memset(&storage, 0xab, sizeof storage);
+  munit_assert_int(
+      TC_HMAC_SHA256_init(&storage.ctx, (TC_bytes){storage.after, sizeof storage.after}), ==,
+      TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_update(&storage.ctx, (TC_bytes){&message, 1}), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_final(&storage.ctx, tag), ==, TC_OK);
+  memset(storage.after, 0xab, sizeof storage.after);
+  munit_assert_int(TC_HMAC_SHA256_digest((TC_bytes){storage.after, sizeof storage.after},
+                                         (TC_bytes){&message, 1},
+                                         (TC_buffer){expected, sizeof expected}),
+                   ==, TC_OK);
+  munit_assert_memory_equal(sizeof tag, tag, expected);
+#endif
+  return MUNIT_OK;
+}
+
+TC_TEST_SHARED(test_hmac_wycheproof)
+{
 #if TC_ENABLE_SHA1
   run_wycheproof_file(TC_SHA1_DIGESTLEN, HMAC_WYCHEPROOF_DIR "/hmac_sha1_test.json");
 #endif
@@ -941,19 +1242,37 @@ MunitResult test_hmac_wycheproof(const MunitParameter params[], void* data)
 
 #else /* !TC_ENABLE_HMAC */
 
-MunitResult test_hmac_rfc(const MunitParameter params[], void* data)
-{ (void) params; (void) data; return MUNIT_SKIP; }
-MunitResult test_hmac_key_lengths(const MunitParameter params[], void* data)
-{ (void) params; (void) data; return MUNIT_SKIP; }
-MunitResult test_hmac_truncation(const MunitParameter params[], void* data)
-{ (void) params; (void) data; return MUNIT_SKIP; }
-MunitResult test_hmac_verify(const MunitParameter params[], void* data)
-{ (void) params; (void) data; return MUNIT_SKIP; }
-MunitResult test_hmac_streaming(const MunitParameter params[], void* data)
-{ (void) params; (void) data; return MUNIT_SKIP; }
-MunitResult test_hmac_zeroize(const MunitParameter params[], void* data)
-{ (void) params; (void) data; return MUNIT_SKIP; }
-MunitResult test_hmac_wycheproof(const MunitParameter params[], void* data)
-{ (void) params; (void) data; return MUNIT_SKIP; }
+TC_TEST_SHARED(test_hmac_rfc)
+{
+  return MUNIT_SKIP;
+}
+TC_TEST_SHARED(test_hmac_key_lengths)
+{
+  return MUNIT_SKIP;
+}
+TC_TEST_SHARED(test_hmac_truncation)
+{
+  return MUNIT_SKIP;
+}
+TC_TEST_SHARED(test_hmac_verify)
+{
+  return MUNIT_SKIP;
+}
+TC_TEST_SHARED(test_hmac_streaming)
+{
+  return MUNIT_SKIP;
+}
+TC_TEST_SHARED(test_hmac_zeroize)
+{
+  return MUNIT_SKIP;
+}
+TC_TEST_SHARED(test_hmac_key_overlap)
+{
+  return MUNIT_SKIP;
+}
+TC_TEST_SHARED(test_hmac_wycheproof)
+{
+  return MUNIT_SKIP;
+}
 
 #endif /* TC_ENABLE_HMAC */

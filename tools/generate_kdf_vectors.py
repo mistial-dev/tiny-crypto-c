@@ -23,6 +23,9 @@ import os
 import re
 import sys
 
+from cavp_rsp import header_records
+from c_emitter import byte_array
+
 from cryptography.hazmat.primitives import cmac, hashes
 from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.kdf.kbkdf import (
@@ -152,34 +155,8 @@ def cryptography_counter(name, key, before, after, rlen, out_len):
 
 def parse_rsp(path):
     """Yield (section, record) pairs; section is a dict of the bracket headers."""
-    section = {}
-    record = None
     with open(path, "r", newline="") as handle:
-        for raw in handle:
-            line = raw.rstrip("\r\n")
-            if not line or line.startswith("#"):
-                continue
-            if line.startswith("["):
-                if record is not None:
-                    yield dict(section), record
-                    record = None
-                key, _, value = line[1:-1].partition("=")
-                if key == "PRF":
-                    section = {"PRF": value}
-                else:
-                    section[key] = value
-                continue
-            key, _, value = line.partition("=")
-            key = key.strip()
-            value = value.strip()
-            if key == "COUNT":
-                if record is not None:
-                    yield dict(section), record
-                record = {"COUNT": int(value)}
-            else:
-                record[key] = value
-        if record is not None:
-            yield dict(section), record
+        yield from header_records(handle.read())
 
 
 def select_vectors(filename, mode, has_counter, offset):
@@ -260,17 +237,6 @@ def check_and_convert(filename, mode, has_counter, section, record):
 
 # --- C emission -------------------------------------------------------------
 
-def c_array(name, data):
-    if len(data) == 0:
-        return f"static const uint8_t {name}[1] = {{ 0x00 }}; /* empty; length 0 */\n"
-    lines = []
-    for offset in range(0, len(data), 12):
-        chunk = data[offset:offset + 12]
-        lines.append("  " + ", ".join(f"0x{b:02x}" for b in chunk) + ",")
-    body = "\n".join(lines).rstrip(",")
-    return f"static const uint8_t {name}[{len(data)}] = {{\n{body}\n}};\n"
-
-
 def known_vector():
     """Kdf108 cross-check: label/context fixed input, HMAC-SHA-256 counter r=32."""
     key = bytes.fromhex("00112233445566778899AABBCCDDEEFF")
@@ -299,11 +265,11 @@ def main():
 
     out.append("/* --- Kdf108 cross-check vector (HMAC-SHA-256, counter mode, r = 32) --- */\n")
     key, label, context, fixed, expected = known_vector()
-    out.append(c_array("kbkdf_known_key", key))
-    out.append(c_array("kbkdf_known_label", label))
-    out.append(c_array("kbkdf_known_context", context))
-    out.append(c_array("kbkdf_known_fixed", fixed))
-    out.append(c_array("kbkdf_known_out", expected))
+    out.append(byte_array("kbkdf_known_key", key))
+    out.append(byte_array("kbkdf_known_label", label))
+    out.append(byte_array("kbkdf_known_context", context))
+    out.append(byte_array("kbkdf_known_fixed", fixed))
+    out.append(byte_array("kbkdf_known_out", expected))
     out.append("\n")
 
     out.append("/* --- NIST CAVP KBKDFVS subset; see tests/vectors/kdf/cavp/README.md --- */\n")
@@ -313,7 +279,7 @@ def main():
         out.append(f"#define KBKDF_MODE_{name.upper()} {value}\n")
     out.append("/* location: 0 for counter mode (position is the in1/in2 split), otherwise\n"
                "   1 = BEFORE_ITER, 2 = AFTER_ITER, 3 = AFTER_FIXED (TC_KBKDF_CTR_*).\n"
-               "   in1/in2: counter mode = before/after the counter; other modes = unused/fixed. */\n")
+               "   in1/in2: counter mode = before/after the counter. Other modes = unused/fixed. */\n")
     out.append("struct kbkdf_vector {\n"
                "  uint8_t prf; uint8_t mode; uint8_t use_counter; uint8_t counter_bits; uint8_t location;\n"
                "  const uint8_t* key; size_t key_len;\n"
@@ -325,7 +291,7 @@ def main():
                "};\n\n")
     for index, v in enumerate(vectors):
         for field in ("key", "iv", "in1", "in2", "out"):
-            out.append(c_array(f"kbkdf_{index}_{field}", v[field]))
+            out.append(byte_array(f"kbkdf_{index}_{field}", v[field]))
     out.append(f"#define KBKDF_VECTOR_COUNT {len(vectors)}\n")
     out.append("static const struct kbkdf_vector kbkdf_vectors[KBKDF_VECTOR_COUNT] = {\n")
     for index, v in enumerate(vectors):

@@ -10,24 +10,45 @@ on:
     branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+  format:
+    name: Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Install pre-commit
+        run: python -m pip install pre-commit==4.6.2
+      - name: Check formatting and text files without modifying them
+        run: pre-commit run --all-files --hook-stage manual
+
   esp32p4:
-    name: ESP32-P4 ${{ matrix.role }}
+    name: ESP32-P4 ${{ matrix.role }} ${{ matrix.config }}
     runs-on: ubuntu-latest
     container: espressif/idf:v5.5.1
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        role: [piv-acu, piv-pd]
+        include:
+          - {role: piv-acu, config: default, defaults: sdkconfig.defaults}
+          - {role: piv-pd, config: default, defaults: sdkconfig.defaults}
+          - {role: piv-acu, config: signed-rsa, defaults: 'sdkconfig.defaults;sdkconfig.signed-rsa'}
+          - {role: piv-acu, config: signed-ecdsa, defaults: 'sdkconfig.defaults;sdkconfig.signed-ecdsa'}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Build ESP-IDF target
         shell: bash
         run: |
           . "$IDF_PATH/export.sh"
           idf.py -C examples/esp32-p4 -B /tmp/tiny-crypto-esp32p4 \
-            -DTINY_CRYPTO_TARGET=${{ matrix.role }} build size-components
+            -DTINY_CRYPTO_TARGET=${{ matrix.role }} \
+            '-DSDKCONFIG_DEFAULTS=${{ matrix.defaults }}' build size-components
 
   host:
     name: ${{ matrix.os }} ${{ matrix.compiler }}
@@ -41,12 +62,19 @@ jobs:
           - {os: macos-latest, compiler: clang, cc: clang, cxx: clang++}
           - {os: windows-latest, compiler: msvc, cc: cl, cxx: cl}
     env:
+      CTEST_PARALLEL_LEVEL: 4
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install OpenSSL development files
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+        shell: bash
+        run: >-
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+          -DTINY_CRYPTO_TEST_OPENSSL=${{ runner.os == 'Linux' && 'ON' || 'OFF' }}
       - name: Build
         run: cmake --build build --config Release --parallel 4
       - name: Test
@@ -67,10 +95,10 @@ jobs:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Install AVR compiler
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install AVR compiler and emulator
         if: matrix.compiler == 'gcc'
-        run: sudo apt-get update && sudo apt-get install -y gcc-avr avr-libc
+        run: sudo apt-get update && sudo apt-get install -y gcc-avr avr-libc qemu-system-misc
       - name: Install OpenSSL development files
         run: sudo apt-get update && sudo apt-get install -y libssl-dev
       - name: Fetch Unicode reference data
@@ -90,6 +118,11 @@ jobs:
       - name: AVR C++ header gate
         if: matrix.compiler == 'gcc'
         run: ctest --test-dir build-full --output-on-failure -R test_cpp_headers_avr
+      - name: AVR 32-bit work budget gate
+        if: matrix.compiler == 'gcc'
+        run: >-
+          ctest --test-dir build-full --output-on-failure
+          -R '^test_(work_budget_types_avr|rsa_[a-z]+_compile_avr|ec_compile_avr|key_challenge_compile_avr)$'
       - name: Address and undefined behavior sanitizers
         run: make test-sanitize TINY_CRYPTO_TEST_OPENSSL=ON
       - name: Sanitizer benchmark linkage
@@ -102,24 +135,24 @@ jobs:
       - name: SHA-384-only core gating under -Werror
         run: make test BUILD_DIR=build-sha384 CMAKE_ARGS=-DCMAKE_COMPILE_WARNING_AS_ERROR=ON TINY_CRYPTO_ENABLE_SHA256=OFF TINY_CRYPTO_ENABLE_SHA384=ON TINY_CRYPTO_ENABLE_HMAC=ON
       - name: KDF shipped-library profile
-        run: make test BUILD_DIR=build-kdf CMAKE_ARGS=-DCMAKE_COMPILE_WARNING_AS_ERROR=ON TINY_CRYPTO_ENABLE_KDF=ON TINY_CRYPTO_ENABLE_HMAC=ON TINY_CRYPTO_AES_CMAC=ON
-      - uses: actions/setup-python@v5
+        run: make test BUILD_DIR=build-kdf CMAKE_ARGS=-DCMAKE_COMPILE_WARNING_AS_ERROR=ON TINY_CRYPTO_ENABLE_KDF=ON TINY_CRYPTO_ENABLE_HMAC=ON TINY_CRYPTO_AES_ENABLE_CMAC=ON
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         if: matrix.compiler == 'gcc'
         with:
           python-version: '3.x'
       - name: PlatformIO example builds
         if: matrix.compiler == 'gcc'
         run: |
-          pip install --upgrade platformio
-          pio ci --lib="." --board=uno --board=esp32dev --board=nucleo_f401re examples/aes_ctr.ino
-          pio ci --lib="." --board=uno examples/kbkdf.cpp --project-option="build_flags=-DTC_ENABLE_HMAC=1 -DTC_ENABLE_KDF=1"
+          pip install platformio==6.1.19
+          pio ci --lib="." --board=uno --board=esp32dev --board=nucleo_f401re examples/AESCTR/AESCTR.ino
+          pio ci --lib="." --board=uno --board=esp32dev examples/SHA256/SHA256.ino
 
   resources:
     name: Embedded resource reports
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.x'
       - name: Install pinned measurement toolchain
@@ -128,18 +161,21 @@ jobs:
           pio pkg install --global --tool "platformio/toolchain-atmelavr@1.70300.191015"
           pio pkg install --global --tool "platformio/toolchain-gccarmnoneeabi@1.120301.0"
       - name: Checkout pinned Pico SDK
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: raspberrypi/pico-sdk
           ref: 079c6f39023649b154152db30f1d781e884879bc
           path: build-tools/pico-sdk
       - name: Test report generator
-        run: python3 tests/test_benchmark_report.py
+        run: |
+          python3 tests/test_benchmark_report.py
+          python3 tests/test_measure_avr_resources.py
       - name: Check library package
         run: |
-          pio pkg pack . --output "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
+          python3 tools/stage_embedded_package.py "$RUNNER_TEMP/tiny-crypto-c-embedded"
+          pio pkg pack "$RUNNER_TEMP/tiny-crypto-c-embedded" --output "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
           python3 tests/test_package_boundaries.py --archive "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
-      - name: Validate fixtures and check benchmark document
+      - name: Validate fixtures and check benchmark report
         run: |
           export PICO_SDK_PATH="$GITHUB_WORKSPACE/build-tools/pico-sdk"
           export PICO_TOOLCHAIN_PATH="$HOME/.platformio/packages/toolchain-gccarmnoneeabi/bin"
@@ -148,8 +184,9 @@ jobs:
         run: |
           export AVR_CC="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-gcc"
           export AVR_SIZE="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-size"
+          export AVR_NM="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-nm"
           python3 tools/measure_avr_resources.py --check tests/budgets/avr.json --output avr-resources.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: embedded-resources
           path: |
@@ -161,7 +198,7 @@ jobs:
     name: Parser fuzz and external tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Fetch pinned ASN.1 length tests
         run: |
           curl --fail --location --retry 3 https://raw.githubusercontent.com/Mbed-TLS/mbedtls/091fd1b18806098d74bd58ace7aacb7f171bcb42/tests/suites/test_suite_asn1parse.data -o "$RUNNER_TEMP/asn1parse.data"
@@ -170,22 +207,47 @@ jobs:
           cmake -S . -B build-parser
           -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
           -DTINY_CRYPTO_BUILD_FUZZERS=ON
-          -DTINY_CRYPTO_TLV_MBEDTLS_SUITE="$RUNNER_TEMP/asn1parse.data"
+          -DTINY_CRYPTO_TEST_TLV_MBEDTLS_SUITE="$RUNNER_TEMP/asn1parse.data"
       - name: Build
         run: >-
           cmake --build build-parser --target
-          fuzz_tlv fuzz_pki fuzz_piv_sm fuzz_gzip
+          fuzz_tlv fuzz_pki fuzz_piv_apdu fuzz_gzip fuzz_ocsp fuzz_twic
           test_tlv_corpus_reader test_x509_reader test_piv_cvc test_piv_chuid
           test_x509_key test_eac_cvc test_eac_reader --parallel 4
       - name: External length cases
         run: ctest --test-dir build-parser -R test_tlv_external_lengths --output-on-failure
       - name: Certificate and PIV cases
         run: ctest --test-dir build-parser -R 'test_(x509_schema|x509_key|piv_cvc|piv_chuid|eac_cvc|eac_schema)$' --output-on-failure
+      - name: Replay fuzz regression corpora
+        run: ctest --test-dir build-parser -R '^test_fuzz_' --output-on-failure
+      - name: Seed fuzz corpora
+        run: |
+          # Start each harness from its regression corpus plus small fixtures.
+          seed() {
+            target=$1
+            shift
+            mkdir -p "$RUNNER_TEMP/corpus/$target"
+            cp tests/fuzz/"$target"/* "$RUNNER_TEMP/corpus/$target/"
+            for pattern in "$@"; do
+              find tests/vectors -type f -path "$pattern" -size -40k \
+                -exec cp --backup=numbered {} "$RUNNER_TEMP/corpus/$target/" \;
+            done
+          }
+          seed tlv '*.der' '*.cer' '*.crl'
+          seed pki '*.der' '*.cer' '*.crt' '*.crl' '*.p7c' '*/twic/synthetic/*.bin'
+          seed piv_apdu '*/piv/sd33/*'
+          seed gzip '*.gz'
+          seed ocsp '*/x509/ocsp/*.der'
+          seed twic '*/twic/synthetic/*/tpk.bin'
       - name: Fuzz TLV
-        run: build-parser/fuzz_tlv -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
-      - name: Fuzz certificates and PIV objects
-        run: build-parser/fuzz_pki -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
-      - name: Fuzz PIV secure messaging responses
-        run: build-parser/fuzz_piv_sm -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+        run: build-parser/fuzz_tlv "$RUNNER_TEMP/corpus/tlv" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz certificates, trust anchors and PIV objects
+        run: build-parser/fuzz_pki "$RUNNER_TEMP/corpus/pki" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz PIV card answers
+        run: build-parser/fuzz_piv_apdu "$RUNNER_TEMP/corpus/piv_apdu" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
       - name: Fuzz certificate decompression
-        run: build-parser/fuzz_gzip -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+        run: build-parser/fuzz_gzip "$RUNNER_TEMP/corpus/gzip" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz OCSP responses and requests
+        run: build-parser/fuzz_ocsp "$RUNNER_TEMP/corpus/ocsp" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz TWIC CCL, AAMVA and privacy key inputs
+        run: build-parser/fuzz_twic "$RUNNER_TEMP/corpus/twic" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"

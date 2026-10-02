@@ -8,8 +8,7 @@
  *   mmt/  - Multi-block Message Tests (keying options 2 and 3)
  *   mct/  - Monte Carlo Tests per NIST SP 800-20 (keying options 2 and 3)
  *
- * This translation unit is part of the test executable only; it is never
- * linked into the library. Enable with TC_DES_CAVP=1.
+ * Test-only translation unit. The test build enables it with TC_DES_CAVP=1.
  */
 
 #include <stdio.h>
@@ -18,39 +17,25 @@
 #include <tiny_crypto/des.h>
 #include "cavp.h"
 #include "munit.h"
-#include "test_io.h"
+#include "test_util.h"
 
 #ifndef CAVP_VECTOR_DIR
 #define CAVP_VECTOR_DIR "tests/vectors/des/cavp"
 #endif
 
-/* The corpus needs every mode and TDES; skip the whole TU otherwise */
-#if defined(TC_DES_CAVP) && (TC_DES_CAVP == 1) && \
-    (TC_DES_ENABLE_ECB == 1) && (TC_DES_ENABLE_CBC == 1) && (TC_DES_ENABLE_CFB1 == 1) && (TC_DES_ENABLE_CFB8 == 1) && \
-    (TC_DES_ENABLE_CFB64 == 1) && (TC_DES_ENABLE_OFB == 1) && (TC_DES_ENABLE_TDES == 1)
+/* The corpus needs every mode and TDES. Skip the whole TU otherwise. */
+#if TC_DES_CAVP && (TC_DES_ENABLE_ECB == 1) && (TC_DES_ENABLE_CBC == 1) &&                         \
+    (TC_DES_ENABLE_CFB1 == 1) && (TC_DES_ENABLE_CFB8 == 1) && (TC_DES_ENABLE_CFB64 == 1) &&        \
+    (TC_DES_ENABLE_OFB == 1) && (TC_DES_ENABLE_TDES == 1)
 
-enum cavp_mode
-{
-  CAVP_TECB,
-  CAVP_TCBC,
-  CAVP_TCFB1,
-  CAVP_TCFB8,
-  CAVP_TCFB64,
-  CAVP_TOFB
-};
+enum cavp_mode { CAVP_TECB, CAVP_TCBC, CAVP_TCFB1, CAVP_TCFB8, CAVP_TCFB64, CAVP_TOFB };
 
-enum cavp_suite
-{
-  CAVP_KAT,
-  CAVP_MMT,
-  CAVP_MCT
-};
+enum cavp_suite { CAVP_KAT, CAVP_MMT, CAVP_MCT };
 
 /* MMT cases carry at most 10 blocks (80 bytes); KAT at most one block */
 #define CAVP_MAX_DATA 96
 
-struct cavp_record
-{
+struct cavp_record {
   long count;
   uint8_t key[24];
   int have_key;
@@ -70,14 +55,13 @@ static void cavp_record_reset(struct cavp_record* r)
   r->pt_len = r->ct_len = 0;
 }
 
-/* Parse a binary digit string (CFB1 payloads) into MSB-first packed bits;
-   returns bit count or -1 */
+/* Parse a binary digit string (CFB1 payloads) into MSB-first packed bits.
+   Returns the bit count or -1. */
 static int cavp_parse_bits(const char* s, uint8_t* out, size_t max_bytes)
 {
   size_t n = 0;
   memset(out, 0, max_bytes);
-  while (s[0] == '0' || s[0] == '1')
-  {
+  while (s[0] == '0' || s[0] == '1') {
     if (n / 8 >= max_bytes)
       return -1;
     if (s[0] == '1')
@@ -90,67 +74,58 @@ static int cavp_parse_bits(const char* s, uint8_t* out, size_t max_bytes)
   return (int)n;
 }
 
-/* If line begins with "name" followed by optional spaces and '=', return the
-   value (trailing whitespace stripped in place is not needed; parsers stop at
-   CR/LF). Otherwise NULL. */
 /* ------------------------------------------------------------------------- */
 /* KAT / MMT execution                                                       */
 /* ------------------------------------------------------------------------- */
 
-/* Apply the mode to buf in place. len is bytes (bits for CAVP_TCFB1). */
-static void cavp_apply(int mode, int encrypt, const uint8_t key[24],
-                       const uint8_t* iv, int have_iv, uint8_t* buf, size_t len)
+/* Run one IV mode over buf in place. len is bytes (bits for CAVP_TCFB1). */
+static TC_status cavp_apply_iv_mode(struct TC_DES_ctx* ctx, int mode, int encrypt, uint8_t* buf,
+                                    size_t len)
 {
-  struct TC_DES3_ctx ctx;
-  size_t i;
-
-  TC_DES3_init_ctx(&ctx, key, 24);
-  if (have_iv)
-    TC_DES3_ctx_set_iv(&ctx, iv);
-
-  switch (mode)
-  {
-    case CAVP_TECB:
-      for (i = 0; i < len; i += TC_DES_BLOCKLEN)
-      {
-        if (encrypt)
-          TC_DES3_ECB_encrypt(&ctx, buf + i);
-        else
-          TC_DES3_ECB_decrypt(&ctx, buf + i);
-      }
-      break;
-    case CAVP_TCBC:
-      if (encrypt)
-        TC_DES3_CBC_encrypt(&ctx, buf, len);
-      else
-        TC_DES3_CBC_decrypt(&ctx, buf, len);
-      break;
-    case CAVP_TCFB1:
-      if (encrypt)
-        TC_DES3_CFB1_encrypt(&ctx, buf, len);
-      else
-        TC_DES3_CFB1_decrypt(&ctx, buf, len);
-      break;
-    case CAVP_TCFB8:
-      if (encrypt)
-        TC_DES3_CFB8_encrypt(&ctx, buf, len);
-      else
-        TC_DES3_CFB8_decrypt(&ctx, buf, len);
-      break;
-    case CAVP_TCFB64:
-      if (encrypt)
-        TC_DES3_CFB64_encrypt(&ctx, buf, len);
-      else
-        TC_DES3_CFB64_decrypt(&ctx, buf, len);
-      break;
-    default: /* CAVP_TOFB */
-      TC_DES3_OFB_crypt(&ctx, buf, len);
-      break;
+  switch (mode) {
+  case CAVP_TCBC:
+    return encrypt ? TC_DES_CBC_encrypt(ctx, (TC_buffer){buf, len})
+                   : TC_DES_CBC_decrypt(ctx, (TC_buffer){buf, len});
+  case CAVP_TCFB1:
+    return encrypt
+               ? TC_DES_CFB1_encrypt(ctx, (TC_buffer){buf, ((len) / 8u + ((len) % 8u != 0))}, len)
+               : TC_DES_CFB1_decrypt(ctx, (TC_buffer){buf, ((len) / 8u + ((len) % 8u != 0))}, len);
+  case CAVP_TCFB8:
+    return encrypt ? TC_DES_CFB8_encrypt(ctx, (TC_buffer){buf, len})
+                   : TC_DES_CFB8_decrypt(ctx, (TC_buffer){buf, len});
+  case CAVP_TCFB64:
+    return encrypt ? TC_DES_CFB64_encrypt(ctx, (TC_buffer){buf, len})
+                   : TC_DES_CFB64_decrypt(ctx, (TC_buffer){buf, len});
+  default: /* CAVP_TOFB */
+    return TC_DES_OFB_crypt(ctx, (TC_buffer){buf, len});
   }
 }
 
-static int cavp_standard_case(int mode, const char* file, int encrypt,
-                              const struct cavp_record* r)
+/* Apply the mode to buf in place. len is bytes (bits for CAVP_TCFB1). IV
+ * modes need an explicit IV, so a record without one runs under an explicit
+ * all-zero IV. */
+static TC_status cavp_apply(int mode, int encrypt, const uint8_t key[24], const uint8_t* iv,
+                            int have_iv, uint8_t* buf, size_t len)
+{
+  static const uint8_t zero_iv[TC_DES_BLOCKLEN] = {0};
+  struct TC_DES_ctx ctx;
+  TC_status status = TC_DES_init(&ctx, (TC_bytes){key, 24});
+  size_t i;
+
+  if (status == TC_OK && mode == CAVP_TECB) {
+    for (i = 0; status == TC_OK && i < len; i += TC_DES_BLOCKLEN)
+      status = encrypt ? TC_DES_ECB_encrypt(&ctx, (TC_buffer){buf + i, TC_DES_BLOCKLEN})
+                       : TC_DES_ECB_decrypt(&ctx, (TC_buffer){buf + i, TC_DES_BLOCKLEN});
+  } else if (status == TC_OK) {
+    status = TC_DES_set_iv(&ctx, (TC_bytes){have_iv ? iv : zero_iv, TC_DES_BLOCKLEN});
+    if (status == TC_OK)
+      status = cavp_apply_iv_mode(&ctx, mode, encrypt, buf, len);
+  }
+  TC_DES_ctx_clear(&ctx);
+  return status;
+}
+
+static int cavp_standard_case(int mode, const char* file, int encrypt, const struct cavp_record* r)
 {
   uint8_t buf[CAVP_MAX_DATA];
   const uint8_t* input = encrypt ? r->pt : r->ct;
@@ -159,15 +134,16 @@ static int cavp_standard_case(int mode, const char* file, int encrypt,
   size_t out_len = encrypt ? r->ct_len : r->pt_len;
   size_t cmp_bytes = (mode == CAVP_TCFB1) ? (out_len + 7) / 8 : out_len;
 
-  if (in_len != out_len || cmp_bytes > sizeof(buf))
-  {
+  if (in_len != out_len || cmp_bytes > sizeof(buf)) {
     fprintf(stderr, "CAVP malformed: %s Count=%ld\n", file, r->count);
     return 0;
   }
   memcpy(buf, input, (mode == CAVP_TCFB1) ? (in_len + 7) / 8 : in_len);
-  cavp_apply(mode, encrypt, r->key, r->iv, r->have_iv, buf, in_len);
-  if (memcmp(buf, expected, cmp_bytes) != 0)
-  {
+  if (cavp_apply(mode, encrypt, r->key, r->iv, r->have_iv, buf, in_len) != TC_OK) {
+    fprintf(stderr, "CAVP mode error: %s Count=%ld\n", file, r->count);
+    return 0;
+  }
+  if (memcmp(buf, expected, cmp_bytes) != 0) {
     fprintf(stderr, "CAVP failure: %s Count=%ld [%s]\n", file, r->count,
             encrypt ? "ENCRYPT" : "DECRYPT");
     tc_cavp_print_bytes("expected", expected, cmp_bytes);
@@ -222,12 +198,10 @@ static void mct_shift_iv_bit(uint8_t iv[8], uint8_t bit)
 static void mct_set_odd_parity(uint8_t* key, size_t len)
 {
   size_t i;
-  for (i = 0; i < len; i++)
-  {
+  for (i = 0; i < len; i++) {
     uint8_t b = key[i] >> 1;
     uint8_t parity = 0;
-    while (b)
-    {
+    while (b) {
       parity ^= b & 1U;
       b >>= 1;
     }
@@ -257,145 +231,126 @@ static void mct_set_odd_parity(uint8_t* key, size_t len)
  * state->text/iv/key are updated in place; the round output (the value the
  * .rsp file records as CIPHERTEXT/PLAINTEXT) is written to result.
  */
-struct mct_state
-{
+struct mct_state {
   uint8_t key[24];
-  uint8_t iv[8]; /* unused for TECB */
+  uint8_t iv[8];   /* unused for TECB */
   uint8_t text[8]; /* block; byte in text[0]; bit in text[0] bit 7 */
 };
 
-static void mct_round(int mode, int encrypt, struct mct_state* st,
-                      uint8_t result[8])
+static void mct_round(int mode, int encrypt, struct mct_state* st, uint8_t result[8])
 {
-  struct TC_DES3_ctx ctx;
+  struct TC_DES_ctx ctx;
   uint8_t hist[24];
   uint8_t cur[8], cv[8], tmp[8], text0[8], last_ks[8];
   int j;
 
-  TC_DES3_init_ctx(&ctx, st->key, 24);
+  TC_DES_init(&ctx, (TC_bytes){st->key, 24});
   memset(hist, 0, sizeof(hist));
   memcpy(cur, st->text, 8);
   memcpy(cv, st->iv, 8);
   memcpy(text0, st->text, 8);
   memset(last_ks, 0, sizeof(last_ks));
 
-  for (j = 0; j < MCT_INNER; j++)
-  {
-    switch (mode)
-    {
-      case CAVP_TECB:
-        if (encrypt)
-          TC_DES3_ECB_encrypt(&ctx, cur);
-        else
-          TC_DES3_ECB_decrypt(&ctx, cur);
-        mct_hist_push_block(hist, cur);
-        break;
+  for (j = 0; j < MCT_INNER; j++) {
+    switch (mode) {
+    case CAVP_TECB:
+      if (encrypt)
+        TC_DES_ECB_encrypt(&ctx, (TC_buffer){cur, TC_DES_BLOCKLEN});
+      else
+        TC_DES_ECB_decrypt(&ctx, (TC_buffer){cur, TC_DES_BLOCKLEN});
+      mct_hist_push_block(hist, cur);
+      break;
 
-      case CAVP_TCBC:
-        if (encrypt)
-        {
-          uint8_t k;
-          for (k = 0; k < 8; k++)
-            tmp[k] = (uint8_t)(cur[k] ^ cv[k]);
-          TC_DES3_ECB_encrypt(&ctx, tmp);
-          mct_hist_push_block(hist, tmp);
-          memcpy(cur, cv, 8); /* P' = CV */
-          memcpy(cv, tmp, 8);
-        }
-        else
-        {
-          uint8_t k;
-          memcpy(tmp, cur, 8);
-          TC_DES3_ECB_decrypt(&ctx, tmp);
-          for (k = 0; k < 8; k++)
-            tmp[k] ^= cv[k];
-          mct_hist_push_block(hist, tmp);
-          memcpy(cv, cur, 8); /* CV' = C */
-          memcpy(cur, tmp, 8); /* C' = P */
-        }
-        break;
-
-      case CAVP_TOFB:
-      {
+    case CAVP_TCBC:
+      if (encrypt) {
         uint8_t k;
-        memcpy(tmp, cv, 8); /* cv doubles as the OFB feedback register */
-        TC_DES3_ECB_encrypt(&ctx, tmp); /* O = E(FB) */
         for (k = 0; k < 8; k++)
-          last_ks[k] = (uint8_t)(cur[k] ^ tmp[k]); /* R = in ^ O (reuse) */
-        mct_hist_push_block(hist, last_ks);
-        memcpy(cur, cv, 8); /* in' = FB */
-        memcpy(cv, tmp, 8); /* FB' = O */
-        break;
-      }
-
-      case CAVP_TCFB64:
-      {
-        uint8_t k;
-        memcpy(tmp, cv, 8);
-        TC_DES3_ECB_encrypt(&ctx, tmp); /* O = E(CV) */
-        for (k = 0; k < 8; k++)
-          tmp[k] ^= cur[k]; /* R = in ^ O; O = R ^ in later if needed */
+          tmp[k] = (uint8_t)(cur[k] ^ cv[k]);
+        TC_DES_ECB_encrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN});
         mct_hist_push_block(hist, tmp);
-        if (encrypt)
-        {
-          memcpy(last_ks, cv, 8); /* remember CV for in' */
-          memcpy(cv, tmp, 8); /* CV' = C */
-          memcpy(cur, last_ks, 8); /* in' = CV */
-        }
-        else
-        {
-          uint8_t o[8];
-          for (k = 0; k < 8; k++)
-            o[k] = (uint8_t)(tmp[k] ^ cur[k]); /* recover keystream */
-          memcpy(cv, cur, 8); /* CV' = C */
-          memcpy(cur, o, 8); /* in' = O */
-        }
-        break;
+        memcpy(cur, cv, 8); /* P' = CV */
+        memcpy(cv, tmp, 8);
+      } else {
+        uint8_t k;
+        memcpy(tmp, cur, 8);
+        TC_DES_ECB_decrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN});
+        for (k = 0; k < 8; k++)
+          tmp[k] ^= cv[k];
+        mct_hist_push_block(hist, tmp);
+        memcpy(cv, cur, 8);  /* CV' = C */
+        memcpy(cur, tmp, 8); /* C' = P */
       }
+      break;
 
-      case CAVP_TCFB8:
-      {
-        uint8_t o, res, in = cur[0];
-        memcpy(tmp, cv, 8);
-        TC_DES3_ECB_encrypt(&ctx, tmp);
-        o = tmp[0];
-        res = (uint8_t)(in ^ o);
-        mct_hist_push_byte(hist, res);
-        if (encrypt)
-        {
-          cur[0] = cv[0]; /* in' = lead(CV) */
-          mct_shift_iv_byte(cv, res);
-        }
-        else
-        {
-          mct_shift_iv_byte(cv, in);
-          cur[0] = o; /* in' = keystream byte */
-        }
-        result[0] = res;
-        break;
-      }
+    case CAVP_TOFB: {
+      uint8_t k;
+      memcpy(tmp, cv, 8); /* cv doubles as the OFB feedback register */
+      TC_DES_ECB_encrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN}); /* O = E(FB) */
+      for (k = 0; k < 8; k++)
+        last_ks[k] = (uint8_t)(cur[k] ^ tmp[k]); /* R = in ^ O (reuse) */
+      mct_hist_push_block(hist, last_ks);
+      memcpy(cur, cv, 8); /* in' = FB */
+      memcpy(cv, tmp, 8); /* FB' = O */
+      break;
+    }
 
-      default: /* CAVP_TCFB1 */
-      {
-        uint8_t o, res, in = (uint8_t)(cur[0] >> 7);
-        memcpy(tmp, cv, 8);
-        TC_DES3_ECB_encrypt(&ctx, tmp);
-        o = (uint8_t)(tmp[0] >> 7);
-        res = (uint8_t)(in ^ o);
-        mct_hist_push_bit(hist, res);
-        if (encrypt)
-        {
-          cur[0] = (uint8_t)((cv[0] >> 7) << 7); /* in' = lead(CV) */
-          mct_shift_iv_bit(cv, res);
-        }
-        else
-        {
-          mct_shift_iv_bit(cv, in);
-          cur[0] = (uint8_t)(o << 7); /* in' = keystream bit */
-        }
-        result[0] = (uint8_t)(res << 7);
-        break;
+    case CAVP_TCFB64: {
+      uint8_t k;
+      memcpy(tmp, cv, 8);
+      TC_DES_ECB_encrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN}); /* O = E(CV) */
+      for (k = 0; k < 8; k++)
+        tmp[k] ^= cur[k]; /* R = in ^ O; O = R ^ in later if needed */
+      mct_hist_push_block(hist, tmp);
+      if (encrypt) {
+        memcpy(last_ks, cv, 8);  /* remember CV for in' */
+        memcpy(cv, tmp, 8);      /* CV' = C */
+        memcpy(cur, last_ks, 8); /* in' = CV */
+      } else {
+        uint8_t o[8];
+        for (k = 0; k < 8; k++)
+          o[k] = (uint8_t)(tmp[k] ^ cur[k]); /* recover keystream */
+        memcpy(cv, cur, 8);                  /* CV' = C */
+        memcpy(cur, o, 8);                   /* in' = O */
       }
+      break;
+    }
+
+    case CAVP_TCFB8: {
+      uint8_t o, res, in = cur[0];
+      memcpy(tmp, cv, 8);
+      TC_DES_ECB_encrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN});
+      o = tmp[0];
+      res = (uint8_t)(in ^ o);
+      mct_hist_push_byte(hist, res);
+      if (encrypt) {
+        cur[0] = cv[0]; /* in' = lead(CV) */
+        mct_shift_iv_byte(cv, res);
+      } else {
+        mct_shift_iv_byte(cv, in);
+        cur[0] = o; /* in' = keystream byte */
+      }
+      result[0] = res;
+      break;
+    }
+
+    default: /* CAVP_TCFB1 */
+    {
+      uint8_t o, res, in = (uint8_t)(cur[0] >> 7);
+      memcpy(tmp, cv, 8);
+      TC_DES_ECB_encrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN});
+      o = (uint8_t)(tmp[0] >> 7);
+      res = (uint8_t)(in ^ o);
+      mct_hist_push_bit(hist, res);
+      if (encrypt) {
+        cur[0] = (uint8_t)((cv[0] >> 7) << 7); /* in' = lead(CV) */
+        mct_shift_iv_bit(cv, res);
+      } else {
+        mct_shift_iv_bit(cv, in);
+        cur[0] = (uint8_t)(o << 7); /* in' = keystream bit */
+      }
+      result[0] = (uint8_t)(res << 7);
+      break;
+    }
     }
   }
 
@@ -408,14 +363,11 @@ static void mct_round(int mode, int encrypt, struct mct_state* st,
     result[0] = (uint8_t)((hist[23] & 1U) << 7);
 
   /* Next-round text and IV */
-  if (mode == CAVP_TOFB)
-  {
+  if (mode == CAVP_TOFB) {
     uint8_t k;
     for (k = 0; k < 8; k++)
       st->text[k] = (uint8_t)(text0[k] ^ cur[k]); /* cur = O[9998] here */
-  }
-  else
-  {
+  } else {
     memcpy(st->text, cur, 8);
   }
   memcpy(st->iv, cv, 8);
@@ -425,8 +377,7 @@ static void mct_round(int mode, int encrypt, struct mct_state* st,
     int two_key = (memcmp(st->key, st->key + 16, 8) == 0);
     int one_key = two_key && (memcmp(st->key, st->key + 8, 8) == 0);
     uint8_t k;
-    for (k = 0; k < 8; k++)
-    {
+    for (k = 0; k < 8; k++) {
       st->key[k] ^= hist[16 + k];
       st->key[8 + k] ^= one_key ? hist[16 + k] : hist[8 + k];
       st->key[16 + k] ^= (two_key || one_key) ? hist[16 + k] : hist[k];
@@ -439,41 +390,35 @@ static void mct_round(int mode, int encrypt, struct mct_state* st,
 /* File driver                                                               */
 /* ------------------------------------------------------------------------- */
 
-struct mct_chain
-{
+struct mct_chain {
   struct mct_state st;
   int active;
 };
 
-static int cavp_mct_case(int mode, const char* file, int encrypt,
-                         const struct cavp_record* r, struct mct_chain* chain)
+static int cavp_mct_case(int mode, const char* file, int encrypt, const struct cavp_record* r,
+                         struct mct_chain* chain)
 {
   const uint8_t* input = encrypt ? r->pt : r->ct;
   const uint8_t* expected = encrypt ? r->ct : r->pt;
   size_t cmp = (mode == CAVP_TCFB1 || mode == CAVP_TCFB8) ? 1 : 8;
   uint8_t result[8];
 
-  if (!chain->active)
-  {
+  if (!chain->active) {
     memcpy(chain->st.key, r->key, 24);
     memcpy(chain->st.iv, r->have_iv ? r->iv : (const uint8_t*)"\0\0\0\0\0\0\0\0", 8);
     memset(chain->st.text, 0, 8);
     memcpy(chain->st.text, input, cmp);
     chain->active = 1;
-  }
-  else
-  {
+  } else {
     /* Our computed chain state must reproduce the recorded case inputs */
     if (memcmp(chain->st.key, r->key, 24) != 0 ||
         (r->have_iv && memcmp(chain->st.iv, r->iv, 8) != 0) ||
-        memcmp(chain->st.text, input, cmp) != 0)
-    {
-      fprintf(stderr, "CAVP MCT chain mismatch: %s Count=%ld [%s]\n", file,
-              r->count, encrypt ? "ENCRYPT" : "DECRYPT");
+        memcmp(chain->st.text, input, cmp) != 0) {
+      fprintf(stderr, "CAVP MCT chain mismatch: %s Count=%ld [%s]\n", file, r->count,
+              encrypt ? "ENCRYPT" : "DECRYPT");
       tc_cavp_print_bytes("state key ", chain->st.key, 24);
       tc_cavp_print_bytes("record key", r->key, 24);
-      if (r->have_iv)
-      {
+      if (r->have_iv) {
         tc_cavp_print_bytes("state iv  ", chain->st.iv, 8);
         tc_cavp_print_bytes("record iv ", r->iv, 8);
       }
@@ -485,8 +430,7 @@ static int cavp_mct_case(int mode, const char* file, int encrypt,
   }
 
   mct_round(mode, encrypt, &chain->st, result);
-  if (memcmp(result, expected, cmp) != 0)
-  {
+  if (memcmp(result, expected, cmp) != 0) {
     fprintf(stderr, "CAVP MCT failure: %s Count=%ld [%s]\n", file, r->count,
             encrypt ? "ENCRYPT" : "DECRYPT");
     tc_cavp_print_bytes("expected", expected, cmp);
@@ -521,30 +465,29 @@ static int cavp_mode_from_name(const char* name)
 
 static int cavp_run_file(const char* subdir, const char* filename)
 {
-  char path[512];
+  char relative[512];
   char line[512];
-  FILE* f;
+  tc_cavp_reader reader;
+  tc_cavp_event event;
   struct cavp_record rec;
   struct mct_chain chain;
   int mode = cavp_mode_from_name(filename);
-  int suite = (strstr(filename, "Monte") != NULL) ? CAVP_MCT :
-              (strstr(filename, "MMT") != NULL) ? CAVP_MMT : CAVP_KAT;
+  int suite = (strstr(filename, "Monte") != NULL) ? CAVP_MCT
+              : (strstr(filename, "MMT") != NULL) ? CAVP_MMT
+                                                  : CAVP_KAT;
   int bitmode = (mode == CAVP_TCFB1);
   int encrypt = 1;
   int ok = 1;
   long cases = 0;
 
-  if (mode < 0)
-  {
+  if (mode < 0) {
     fprintf(stderr, "CAVP unknown file name: %s\n", filename);
     return 0;
   }
 
-  snprintf(path, sizeof(path), "%s/%s/%s", CAVP_VECTOR_DIR, subdir, filename);
-  f = tc_test_fopen(path, "r");
-  if (f == NULL)
-  {
-    fprintf(stderr, "CAVP file not found: %s\n", path);
+  snprintf(relative, sizeof(relative), "%s/%s", subdir, filename);
+  if (!tc_cavp_open(&reader, CAVP_VECTOR_DIR, relative, line, sizeof line)) {
+    fprintf(stderr, "CAVP file not found: %s/%s\n", CAVP_VECTOR_DIR, relative);
     return 0;
   }
 
@@ -552,39 +495,35 @@ static int cavp_run_file(const char* subdir, const char* filename)
   rec.count = -1;
   chain.active = 0;
 
-  while (fgets(line, sizeof(line), f) != NULL)
-  {
-    const char* v;
+  while ((event = tc_cavp_next(&reader)) != TC_CAVP_END) {
+    const char* v = reader.value;
     int n;
 
-    if (line[0] == '#' || line[0] == '\r' || line[0] == '\n')
-      continue;
-    if (line[0] == '[')
-    {
-      if (strncmp(line, "[ENCRYPT]", 9) == 0)
-      {
+    if (event == TC_CAVP_FAILURE) {
+      ok = 0;
+      break;
+    }
+    if (event == TC_CAVP_HEADER) {
+      if (tc_cavp_is(&reader, "ENCRYPT")) {
         encrypt = 1;
         chain.active = 0;
-      }
-      else if (strncmp(line, "[DECRYPT]", 9) == 0)
-      {
+      } else if (tc_cavp_is(&reader, "DECRYPT")) {
         encrypt = 0;
         chain.active = 0;
       }
       continue;
     }
+    if (event != TC_CAVP_FIELD)
+      continue;
 
-    if ((v = tc_cavp_field_value(line, "COUNT")) != NULL)
-    {
+    if (tc_cavp_is(&reader, "COUNT")) {
       rec.count = 0;
       while (*v >= '0' && *v <= '9')
         rec.count = rec.count * 10 + (*v++ - '0');
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "KEYs")) != NULL)
-    {
-      if (tc_cavp_parse_hex(v, rec.key, 8) != 8)
-      {
+    if (tc_cavp_is(&reader, "KEYs")) {
+      if (tc_test_hex(v, rec.key, 8) != 8) {
         ok = 0;
         break;
       }
@@ -593,60 +532,48 @@ static int cavp_run_file(const char* subdir, const char* filename)
       rec.have_key = 1;
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "KEY1")) != NULL)
-    {
-      ok &= tc_cavp_parse_hex(v, rec.key, 8) == 8;
+    if (tc_cavp_is(&reader, "KEY1")) {
+      ok &= tc_test_hex(v, rec.key, 8) == 8;
       rec.have_key = 1;
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "KEY2")) != NULL)
-    {
-      ok &= tc_cavp_parse_hex(v, rec.key + 8, 8) == 8;
+    if (tc_cavp_is(&reader, "KEY2")) {
+      ok &= tc_test_hex(v, rec.key + 8, 8) == 8;
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "KEY3")) != NULL)
-    {
-      ok &= tc_cavp_parse_hex(v, rec.key + 16, 8) == 8;
+    if (tc_cavp_is(&reader, "KEY3")) {
+      ok &= tc_test_hex(v, rec.key + 16, 8) == 8;
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "IV")) != NULL)
-    {
-      ok &= tc_cavp_parse_hex(v, rec.iv, 8) == 8;
+    if (tc_cavp_is(&reader, "IV")) {
+      ok &= tc_test_hex(v, rec.iv, 8) == 8;
       rec.have_iv = 1;
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "PLAINTEXT")) != NULL)
-    {
+    if (tc_cavp_is(&reader, "PLAINTEXT")) {
       n = bitmode ? cavp_parse_bits(v, rec.pt, sizeof(rec.pt))
-                  : tc_cavp_parse_hex(v, rec.pt, sizeof(rec.pt));
-      if (n < 0)
-      {
+                  : (int)tc_test_hex(v, rec.pt, sizeof(rec.pt));
+      if (n < 0) {
         ok = 0;
         break;
       }
       rec.pt_len = (size_t)n;
       rec.have_pt = 1;
-    }
-    else if ((v = tc_cavp_field_value(line, "CIPHERTEXT")) != NULL)
-    {
+    } else if (tc_cavp_is(&reader, "CIPHERTEXT")) {
       n = bitmode ? cavp_parse_bits(v, rec.ct, sizeof(rec.ct))
-                  : tc_cavp_parse_hex(v, rec.ct, sizeof(rec.ct));
-      if (n < 0)
-      {
+                  : (int)tc_test_hex(v, rec.ct, sizeof(rec.ct));
+      if (n < 0) {
         ok = 0;
         break;
       }
       rec.ct_len = (size_t)n;
       rec.have_ct = 1;
-    }
-    else
-    {
+    } else {
       continue;
     }
 
     /* A case is complete once both payload fields have been read */
-    if (rec.have_pt && rec.have_ct && rec.have_key)
-    {
+    if (rec.have_pt && rec.have_ct && rec.have_key) {
       if (suite == CAVP_MCT)
         ok &= cavp_mct_case(mode, filename, encrypt, &rec, &chain);
       else
@@ -657,10 +584,9 @@ static int cavp_run_file(const char* subdir, const char* filename)
     }
   }
 
-  fclose(f);
-  if (cases == 0)
-  {
-    fprintf(stderr, "CAVP no cases parsed: %s\n", path);
+  tc_cavp_close(&reader);
+  if (cases == 0) {
+    fprintf(stderr, "CAVP no cases parsed: %s/%s\n", CAVP_VECTOR_DIR, relative);
     return 0;
   }
   return ok;
@@ -671,46 +597,33 @@ static int cavp_run_file(const char* subdir, const char* filename)
 /* ------------------------------------------------------------------------- */
 
 static const char* const cavp_kat_files[] = {
-  "TECBinvperm.rsp",   "TECBpermop.rsp",   "TECBsubtab.rsp",
-  "TECBvarkey.rsp",    "TECBvartext.rsp",
-  "TCBCinvperm.rsp",   "TCBCpermop.rsp",   "TCBCsubtab.rsp",
-  "TCBCvarkey.rsp",    "TCBCvartext.rsp",
-  "TCFB1invperm.rsp",  "TCFB1permop.rsp",  "TCFB1subtab.rsp",
-  "TCFB1varkey.rsp",   "TCFB1vartext.rsp",
-  "TCFB8invperm.rsp",  "TCFB8permop.rsp",  "TCFB8subtab.rsp",
-  "TCFB8varkey.rsp",   "TCFB8vartext.rsp",
-  "TCFB64invperm.rsp", "TCFB64permop.rsp", "TCFB64subtab.rsp",
-  "TCFB64varkey.rsp",  "TCFB64vartext.rsp",
-  "TOFBinvperm.rsp",   "TOFBpermop.rsp",   "TOFBsubtab.rsp",
-  "TOFBvarkey.rsp",    "TOFBvartext.rsp"
-};
+    "TECBinvperm.rsp",   "TECBpermop.rsp",   "TECBsubtab.rsp",   "TECBvarkey.rsp",
+    "TECBvartext.rsp",   "TCBCinvperm.rsp",  "TCBCpermop.rsp",   "TCBCsubtab.rsp",
+    "TCBCvarkey.rsp",    "TCBCvartext.rsp",  "TCFB1invperm.rsp", "TCFB1permop.rsp",
+    "TCFB1subtab.rsp",   "TCFB1varkey.rsp",  "TCFB1vartext.rsp", "TCFB8invperm.rsp",
+    "TCFB8permop.rsp",   "TCFB8subtab.rsp",  "TCFB8varkey.rsp",  "TCFB8vartext.rsp",
+    "TCFB64invperm.rsp", "TCFB64permop.rsp", "TCFB64subtab.rsp", "TCFB64varkey.rsp",
+    "TCFB64vartext.rsp", "TOFBinvperm.rsp",  "TOFBpermop.rsp",   "TOFBsubtab.rsp",
+    "TOFBvarkey.rsp",    "TOFBvartext.rsp"};
 
-static const char* const cavp_mmt_files[] = {
-  "TECBMMT2.rsp",   "TECBMMT3.rsp",   "TCBCMMT2.rsp",   "TCBCMMT3.rsp",
-  "TCFB1MMT2.rsp",  "TCFB1MMT3.rsp",  "TCFB8MMT2.rsp",  "TCFB8MMT3.rsp",
-  "TCFB64MMT2.rsp", "TCFB64MMT3.rsp", "TOFBMMT2.rsp",   "TOFBMMT3.rsp"
-};
+static const char* const cavp_mmt_files[] = {"TECBMMT2.rsp",   "TECBMMT3.rsp",  "TCBCMMT2.rsp",
+                                             "TCBCMMT3.rsp",   "TCFB1MMT2.rsp", "TCFB1MMT3.rsp",
+                                             "TCFB8MMT2.rsp",  "TCFB8MMT3.rsp", "TCFB64MMT2.rsp",
+                                             "TCFB64MMT3.rsp", "TOFBMMT2.rsp",  "TOFBMMT3.rsp"};
 
 static const char* const cavp_mct_files[] = {
-  "TECBMonte2.rsp",   "TECBMonte3.rsp",   "TCBCMonte2.rsp",   "TCBCMonte3.rsp",
-  "TCFB1Monte2.rsp",  "TCFB1Monte3.rsp",  "TCFB8Monte2.rsp",  "TCFB8Monte3.rsp",
-  "TCFB64Monte2.rsp", "TCFB64Monte3.rsp", "TOFBMonte2.rsp",   "TOFBMonte3.rsp"
-};
+    "TECBMonte2.rsp",   "TECBMonte3.rsp",   "TCBCMonte2.rsp",  "TCBCMonte3.rsp",
+    "TCFB1Monte2.rsp",  "TCFB1Monte3.rsp",  "TCFB8Monte2.rsp", "TCFB8Monte3.rsp",
+    "TCFB64Monte2.rsp", "TCFB64Monte3.rsp", "TOFBMonte2.rsp",  "TOFBMonte3.rsp"};
 
-static MunitResult cavp_run_group(const MunitParameter params[], void* data,
-                                  const char* subdir,
-                                  const char* const* files, size_t file_count,
+static MunitResult cavp_run_group(const char* subdir, const char* const* files, size_t file_count,
                                   const char* prefix)
 {
   size_t i;
   size_t ran = 0;
   int failures = 0;
 
-  (void) params;
-  (void) data;
-
-  for (i = 0; i < file_count; ++i)
-  {
+  for (i = 0; i < file_count; ++i) {
     if (prefix != NULL && strncmp(files[i], prefix, strlen(prefix)) != 0)
       continue;
     failures += !cavp_run_file(subdir, files[i]);
@@ -722,23 +635,23 @@ static MunitResult cavp_run_group(const MunitParameter params[], void* data,
   return MUNIT_OK;
 }
 
-MunitResult test_cavp_kat(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_kat)
 {
-  return cavp_run_group(params, data, "kat", cavp_kat_files,
-                        sizeof(cavp_kat_files) / sizeof(cavp_kat_files[0]), NULL);
+  return cavp_run_group("kat", cavp_kat_files, sizeof(cavp_kat_files) / sizeof(cavp_kat_files[0]),
+                        NULL);
 }
 
-MunitResult test_cavp_mmt(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_mmt)
 {
-  return cavp_run_group(params, data, "mmt", cavp_mmt_files,
-                        sizeof(cavp_mmt_files) / sizeof(cavp_mmt_files[0]), NULL);
+  return cavp_run_group("mmt", cavp_mmt_files, sizeof(cavp_mmt_files) / sizeof(cavp_mmt_files[0]),
+                        NULL);
 }
 
-#define TC_DES_CAVP_MCT_TEST(name, prefix) \
-  MunitResult test_cavp_mct_##name(const MunitParameter params[], void* data) \
-  { \
-    return cavp_run_group(params, data, "mct", cavp_mct_files, \
-                          sizeof(cavp_mct_files) / sizeof(cavp_mct_files[0]), prefix); \
+#define TC_DES_CAVP_MCT_TEST(name, prefix)                                                         \
+  TC_TEST_SHARED(test_cavp_mct_##name)                                                             \
+  {                                                                                                \
+    return cavp_run_group("mct", cavp_mct_files,                                                   \
+                          sizeof(cavp_mct_files) / sizeof(cavp_mct_files[0]), prefix);             \
   }
 
 TC_DES_CAVP_MCT_TEST(ecb, "TECB")

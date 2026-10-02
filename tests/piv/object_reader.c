@@ -10,7 +10,8 @@ static void field(const char* name, TC_bytes span)
 {
   size_t i;
   printf("%s=", name);
-  for (i = 0; i < span.length; ++i) printf("%02x", span.data[i]);
+  for (i = 0; i < span.length; ++i)
+    printf("%02x", span.data[i]);
   putchar('\n');
 }
 
@@ -21,32 +22,47 @@ int main(int argc, char** argv)
   FILE* file;
   TC_PIV_CVC cvc, saved;
   TC_TLV_result result;
-  if (argc != 2 && argc != 3) return 2;
+  if (argc != 2 && argc != 3)
+    return 2;
   file = fopen(argv[argc - 1], "rb");
-  if (!file) return 2;
+  if (!file)
+    return 2;
   length = fread(data, 1, sizeof data, file);
-  if (ferror(file) || !feof(file)) { fclose(file); return 2; }
+  if (ferror(file) || !feof(file)) {
+    fclose(file);
+    return 2;
+  }
   fclose(file);
   if (argc == 3) {
     TC_PIV_CHUID chuid, previous;
-    TC_PIV_CHUID_encoding encoding = strcmp(argv[1], "contents") == 0 ?
-      TC_PIV_CHUID_CONTENTS : TC_PIV_CHUID_CONTAINER;
-    result = TC_PIV_CHUID_read(data, length, encoding, &chuid);
-    if (result != TC_TLV_OK) { fprintf(stderr, "%s: %d\n", argv[2], result); return 1; }
+    TC_PIV_CHUID_encoding encoding =
+        strcmp(argv[1], "contents") == 0 ? TC_PIV_CHUID_CONTENTS : TC_PIV_CHUID_CONTAINER;
+    result = TC_PIV_CHUID_read((TC_bytes){data, length}, encoding, TC_CHUID_PROFILE_PIV, &chuid);
+    if (result != TC_TLV_OK) {
+      fprintf(stderr, "%s: %d\n", argv[2], result);
+      return 1;
+    }
     field("fascn", chuid.fascn);
     field("card_uuid", chuid.card_uuid);
     field("cardholder_uuid", chuid.cardholder_uuid);
     field("expiration", chuid.expiration);
     field("signature", chuid.signature);
-    previous = chuid;
+    field("signed_content_0", chuid.signed_content[0]);
+    field("signed_content_1", chuid.signed_content[1]);
+    memcpy(&previous, &chuid, sizeof previous);
     for (i = 0; i < length; ++i) {
-      if (TC_PIV_CHUID_read(data, i, encoding, &chuid) == TC_TLV_OK ||
-          memcmp(&chuid, &previous, sizeof chuid)) return 1;
+      if (TC_PIV_CHUID_read((TC_bytes){data, i}, encoding, TC_CHUID_PROFILE_PIV, &chuid) ==
+              TC_TLV_OK ||
+          memcmp(&chuid, &previous, sizeof chuid))
+        return 1;
     }
     return 0;
   }
-  result = TC_PIV_CVC_read(data, length, &cvc);
-  if (result != TC_TLV_OK) { fprintf(stderr, "%s: %d\n", argv[1], result); return 1; }
+  result = TC_PIV_CVC_read((TC_bytes){data, length}, &cvc);
+  if (result != TC_TLV_OK) {
+    fprintf(stderr, "%s: %d\n", argv[1], result);
+    return 1;
+  }
   field("iin", cvc.issuer);
   field("subject", cvc.subject);
   field("public_key_oid", cvc.curve_oid);
@@ -55,11 +71,14 @@ int main(int argc, char** argv)
   field("signature_value", cvc.signature);
   field("signed_data", cvc.signed_data);
   printf("role=%02x\nkey_bits=%u\n", cvc.role, cvc.key_bits);
-  saved = cvc;
+  memcpy(&saved, &cvc, sizeof saved);
   for (i = 0; i < length; ++i) {
-    if (TC_PIV_CVC_read(data, i, &cvc) == TC_TLV_OK || memcmp(&cvc, &saved, sizeof cvc)) return 1;
+    if (TC_PIV_CVC_read((TC_bytes){data, i}, &cvc) == TC_TLV_OK || memcmp(&cvc, &saved, sizeof cvc))
+      return 1;
   }
   data[0] ^= 1;
-  if (TC_PIV_CVC_read(data, length, &cvc) == TC_TLV_OK || memcmp(&cvc, &saved, sizeof cvc)) return 1;
+  if (TC_PIV_CVC_read((TC_bytes){data, length}, &cvc) == TC_TLV_OK ||
+      memcmp(&cvc, &saved, sizeof cvc))
+    return 1;
   return 0;
 }

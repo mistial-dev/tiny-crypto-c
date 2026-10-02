@@ -12,7 +12,7 @@ marks `tests/vectors/**` as binary so CRLF, "Bag Attributes" prefixes and
 trailing junk survive). Derived files say so, and the tool that produced them
 is in `tools/`. Assembled 2026-09-06.
 
-Private keys are never checked in. Expect the GSA ICAM and PIV demo files to
+The corpus excludes private keys. Expect the GSA ICAM and PIV demo files to
 carry OpenSSL "Bag Attributes" text before the PEM block: a parser has to skip
 leading text (RFC 7468 §2 allows it).
 
@@ -69,9 +69,9 @@ NIST test suites are US Government works, public domain.
 * `pkits/certs`, `pkits/crls`, `pkits/certpairs` are the archive's directories
   as-is (`.cp` files are X.509 `crossCertificatePair` structures, not
   PKCS#7). The PKCS#12 and S/MIME directories were left out. The 4.x test
-  descriptions are in the PKITS PDF in the Reference Library.
+  descriptions are in the NIST PKITS document.
 * `pdts/`: `End Entity Certs` and `Trust Anchor Certs` renamed to
-  `end_entity_certs` / `trust_anchor_certs`; the file names are unchanged.
+  `end_entity_certs` / `trust_anchor_certs`. The file names are unchanged.
 * `x509tests_2001/testNN/`: the `.crt`/`.crl` files of each test with spaces
   in file names replaced by `_`. The `.crtx` files (PKCS#8 private keys) and
   the `.p7m`/`.p12` files were dropped. These are 2000-era 1024-bit RSA,
@@ -81,7 +81,7 @@ NIST test suites are US Government works, public domain.
 
 GSA ICAM test-card artefacts from
 <https://github.com/GSA/gsa-icam-card-builder> (`cards/ICAM_Card_Objects`),
-CC0 1.0 / US public domain. Copied without the `.p12` key files; `" - "` and
+CC0 1.0 / US public domain. Copied without the `.p12` key files. `" - "` and
 spaces in card file names became `_`.
 
 * `ca/roots/`: the ICAM Test Card Root CA plus 36 deliberately faulty roots
@@ -209,7 +209,7 @@ Nimbus2026, DigiCert Wyvern2026h2 and Sphinx2026h2, Sectigo Elephant2026h2
 and Tiger2026h2, TrustAsia log2026a. For each log the first 16 entries, 16
 from the middle and 16 from the tail were kept. `entries.json` has one record
 per entry (log, index, timestamp, entry type, chain) referencing
-`certs/<sha256>.der`; a precert entry's `precert` is the full precertificate
+`certs/<sha256>.der`. A precert entry's `precert` is the full precertificate
 with the poison extension, an x509 entry's `leaf` is the certificate. Chain
 certificates are shared between entries, hence the deduplication.
 
@@ -219,7 +219,7 @@ certificates are shared between entries, hence the deduplication.
 `3f8cba420e90322223486086054401189b7b320e` (2026-09-03). The upstream
 `limbo.json` (SHA-256
 `563805f46937ad25ac9d4e41341c414070aced32a22294821b5c5fe526e2c52d`, 39 MB,
-9793 testcases) is not vendored; `tools/limbo_subset.py` splits it into:
+9793 testcases) is not vendored. `tools/limbo_subset.py` splits it into:
 
 * `limbo-core.json`: all 221 non-`bettertls::` testcases, verbatim:
   `rfc5280::` (109), `webpki::` (56), `pathological::` (11), `pathlen::`
@@ -235,12 +235,12 @@ Both keep the upstream schema (`limbo-schema.json`): `peer_certificate`,
 ### `synthetic/`
 
 Produced by `tools/generate_x509_vectors.py` (OpenSSL 3.6.3, 2026-09-06).
-Rerunning it makes a fresh PKI, so the files here are the frozen output;
+Rerunning it makes a fresh PKI, so the files here are the frozen output.
 `manifest.json` lists every file with `kind`, `expect`, `reason`, SHA-256,
 issuer chain, and what OpenSSL itself said (`openssl`, `openssl_verify`).
 `expect` is:
 
-* `parse`: well formed; where a chain is given it validates.
+* `parse`: well formed. Where a chain is given, it validates.
 * `parse-only`: well formed DER (or at worst BER a lenient parser accepts)
   but semantically wrong: expired, weak, violates a RFC 5280 MUST or a path
   rule, stale signature after a TBS edit, etc.
@@ -259,7 +259,7 @@ issuer chain, and what OpenSSL itself said (`openssl`, `openssl_verify`).
 
 Where OpenSSL is more lenient than `expect` says (it accepts BER lengths,
 trailing garbage, malformed times and several SPKI oddities), `manifest.json`
-shows `"openssl": "parsed"` next to `"expect": "reject"`; where it is
+shows `"openssl": "parsed"` next to `"expect": "reject"`. Where it is
 stricter, `"openssl": "error: ..."` next to `parse-only`.
 
 ## Related corpora

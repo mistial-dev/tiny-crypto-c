@@ -1,0 +1,103 @@
+Link: contactless, short length
+TWIC application: absent (sw 6a82)
+PIV application: PIV, version 01 00, AID a000000308000010000100, label "ID-One PIV"
+  secure messaging suite 27
+  card limits: command 1016 bytes, response 32767 bytes
+SM certificate signer: valid
+Secure messaging: suite 27 established
+VCI: paired
+PIN 80: verified
+Objects (36):
+  5fc107  db00  present       29 bytes sm  Card Capability Container
+  5fc102  3000  present     1769 bytes sm  CHUID
+  5fc105  0101  present     1386 bytes sm  PIV Authentication certificate
+  5fc103  6010  present     1119 bytes sm  Fingerprints
+  5fc106  9000  present      656 bytes sm  Security Object
+  5fc108  6030  present    11770 bytes sm  Facial image
+  5fc101  0500  present     1352 bytes sm  Card Authentication certificate
+  5fc10a  0100  present     1256 bytes sm  Digital Signature certificate
+  5fc10b  0102  present     1243 bytes sm  Key Management certificate
+  5fc109  3001  present       77 bytes sm  Printed information
+  7e      6050  present       20 bytes sm  Discovery Object
+  5fc10c  6060  present       99 bytes sm  Key History
+  5fc10d  1001  present     1199 bytes sm  Retired Key Management certificate 1
+  5fc10e  1002  present     1198 bytes sm  Retired Key Management certificate 2
+  5fc10f  1003  present     1639 bytes sm  Retired Key Management certificate 3
+  5fc110  1004  present     1198 bytes sm  Retired Key Management certificate 4
+  5fc111  1005  present     1244 bytes sm  Retired Key Management certificate 5
+  5fc112  1006  present     1245 bytes sm  Retired Key Management certificate 6
+  5fc113  1007  present     1243 bytes sm  Retired Key Management certificate 7
+  5fc114  1008  empty                  sm  Retired Key Management certificate 8
+  5fc115  1009  empty                  sm  Retired Key Management certificate 9
+  5fc116  100a  empty                  sm  Retired Key Management certificate 10
+  5fc117  100b  empty                  sm  Retired Key Management certificate 11
+  5fc118  100c  empty                  sm  Retired Key Management certificate 12
+  5fc119  100d  empty                  sm  Retired Key Management certificate 13
+  5fc11a  100e  empty                  sm  Retired Key Management certificate 14
+  5fc11b  100f  empty                  sm  Retired Key Management certificate 15
+  5fc11c  1010  empty                  sm  Retired Key Management certificate 16
+  5fc11d  1011  empty                  sm  Retired Key Management certificate 17
+  5fc11e  1012  empty                  sm  Retired Key Management certificate 18
+  5fc11f  1013  empty                  sm  Retired Key Management certificate 19
+  5fc120  1014  empty                  sm  Retired Key Management certificate 20
+  5fc121  1015  empty                  sm  Iris images
+  7f61    1016  present        6 bytes sm  BIT group template
+  5fc122  1017  present     1184 bytes sm  Secure messaging certificate signer
+  5fc123  1018  skipped                    Pairing code
+Card Capability Container: data model 10
+Security Object: container=group db00=1 6010=4 6030=7 3001=6 6050=11 6060=12
+Printed information: expiration 2040DEC31
+Discovery Object: policy 68 10 (PIV PIN, Global PIN, VCI)
+Key History: 7 on card, 2 off card, http://smime2.nist.gov/86D8D563F12E91D07B7EC367F160D69BB15AB330618EAC314A4A81D28FD11F06
+BIT group template: 0 fingers
+Evaluated at 2026-09-29T18:00:00Z
+Card: FASC-N agency 3201 system 3733 credential 334894 series 1 issue 4 person 1152472674
+  card UUID urn:uuid:a4eb5a09-66c3-4f3e-83f3-b77e0ee96a25, expires 2040-12-31T08:30:00Z
+CHUID: GUID a4eb5a09-66c3-4f3e-83f3-b77e0ee96a25, expiration 20401231
+Certificates:
+  9A: serial 0191, valid 2019-08-05T08:30:00Z to 2040-12-31T08:30:00Z, EC 256, accepted
+  9C: serial 0193, valid 2019-08-05T08:30:00Z to 2040-12-31T08:30:00Z, EC 256, accepted
+  9D: serial 0194, valid 2019-08-05T08:30:00Z to 2040-12-31T08:30:00Z, EC 256, accepted
+  9E: serial 0192, valid 2019-08-05T08:30:00Z to 2040-12-31T08:30:00Z, EC 256, accepted
+Checks (39):
+  PASSED        mandatory object        db00
+  PASSED        mandatory object        3000
+  PASSED        mandatory object        0101
+  PASSED        mandatory object        6010
+  PASSED        mandatory object        9000
+  PASSED        mandatory object        6030
+  PASSED        mandatory object        0500
+  PASSED        certificate path        0500 key 9e
+  PASSED        revocation              0500 key 9e
+  PASSED        certificate identifiers 0500 key 9e
+  PASSED        CHUID                   3000
+  PASSED        revocation              3000
+  PASSED        certificate path        0101 key 9a
+  PASSED        revocation              0101 key 9a
+  PASSED        certificate identifiers 0101 key 9a
+  PASSED        certificate path        0100 key 9c
+  PASSED        revocation              0100 key 9c
+  PASSED        certificate path        0102 key 9d
+  PASSED        revocation              0102 key 9d
+  PASSED        security signature      9000
+  PASSED        revocation              9000
+  PASSED        security digest         db00
+  PASSED        security digest         6010
+  PASSED        security digest         3001
+  PASSED        security digest         6030
+  PASSED        security digest         6050
+  PASSED        security digest         6060
+  PASSED        biometric               6010
+  PASSED        biometric               6030
+  NOT_CHECKABLE biometric               1015 unsupported
+  PASSED        printed expiration      3001
+  NOT_CHECKABLE discovery consistency   6050 dependency
+  PASSED        SM signer               1017
+  PASSED        revocation              1017
+  PASSED        SM CVC                  1017
+  PASSED        copy match              1017
+  PASSED        copy match              3000
+  PASSED        key proof               0101 key 9a
+  PASSED        key proof               0500 key 9e
+Summary: 37 passed, 0 failed, 2 not checkable
+Result: accepted

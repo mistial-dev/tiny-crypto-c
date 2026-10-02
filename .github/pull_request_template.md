@@ -1,6 +1,9 @@
 <!-- SPDX-FileCopyrightText: Mistial Dev -->
+
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+
 <!-- markdownlint-disable-next-line MD041 -->
+
 ## Technical summary
 
 Brief description of the technical changes.
@@ -26,14 +29,14 @@ Describe the approach and any API or footprint impact.
 ## Sister projects
 
 - [ ] N/A for this change
-- [ ] Considered alignment with [tiny-AES-c][tiny-aes-c] and
-  [tiny-DES-c][tiny-des-c]
+- [ ] Considered alignment with [tiny-AES-c] and
+  [tiny-DES-c]
 
 ## Review focus
 
 Call out performance, security, API compatibility, or MCU constraints.
 
----
+______________________________________________________________________
 
 **Policy compliance:** This contribution follows the
 [Bounded Contribution Policy](../CODE_OF_CONDUCT.md) with focus on technical

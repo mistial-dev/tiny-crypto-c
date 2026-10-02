@@ -1,6 +1,16 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/tiny_crypto.hpp>
 
+#if defined(TC_TEST_HEADER_HKDF) &&                                                                \
+    (!defined(TINY_CRYPTO_HKDF_H_) || !defined(TINY_CRYPTO_HKDF_HPP_))
+#error "The C++ umbrella must expose the enabled HKDF wrapper"
+#endif
+
+#if defined(TC_TEST_HEADER_AES_KW) &&                                                              \
+    (!defined(TINY_CRYPTO_AES_KW_H_) || !defined(TINY_CRYPTO_AES_KW_HPP_))
+#error "The C++ umbrella must expose the enabled AES key wrap wrapper"
+#endif
+
 #if defined(TC_TEST_HEADER_RSA)
 #if !defined(TINY_CRYPTO_RSA_H_) || !defined(TINY_CRYPTO_RSA_HPP_)
 #error "The C++ umbrella must expose the enabled C and C++ RSA declarations"
@@ -22,11 +32,12 @@ static tiny_crypto::rsa_public_key tc_header_rsa_key;
 #endif
 
 #if defined(TC_TEST_HEADER_PIV_OBJECTS)
-#if !defined(TINY_CRYPTO_CMS_H_) || !defined(TINY_CRYPTO_PIV_OID_H_) || \
-    !defined(TINY_CRYPTO_PIV_CERTIFICATE_H_) || \
-    !defined(TINY_CRYPTO_PIV_CARD_H_) || !defined(TINY_CRYPTO_PIV_CMS_H_) || \
-    !defined(TINY_CRYPTO_LDS_H_) || !defined(TINY_CRYPTO_FASCN_H_) || \
-    !defined(TINY_CRYPTO_TWIC_UUID_H_) || !defined(TINY_CRYPTO_PIV_SECURITY_H)
+#if !defined(TINY_CRYPTO_CMS_H_) || !defined(TINY_CRYPTO_PIV_OID_H_) ||                            \
+    !defined(TINY_CRYPTO_PIV_CERTIFICATE_H_) || !defined(TINY_CRYPTO_PIV_CARD_H_) ||               \
+    !defined(TINY_CRYPTO_PIV_CMS_H_) || !defined(TINY_CRYPTO_LDS_H_) ||                            \
+    !defined(TINY_CRYPTO_FASCN_H_) || !defined(TINY_CRYPTO_TWIC_UUID_H_) ||                        \
+    !defined(TINY_CRYPTO_PIV_SECURITY_H) || !defined(TINY_CRYPTO_PIV_DISCOVERY_H_) ||              \
+    !defined(TINY_CRYPTO_PIV_CARD_OBJECTS_H_)
 #error "The C++ umbrella must expose the PIV object C API"
 #endif
 static TC_PIV_card_identifiers tc_header_card_identifiers;
@@ -36,6 +47,16 @@ static TC_PIV_card_identifiers tc_header_card_identifiers;
 #if !defined(TINY_CRYPTO_TLV_H_) || !defined(TINY_CRYPTO_TLV_HPP_)
 #error "The C++ umbrella must expose the TLV wrapper"
 #endif
+#endif
+
+#if defined(TC_TEST_HEADER_APDU) &&                                                                \
+    (!defined(TINY_CRYPTO_APDU_H_) || !defined(TINY_CRYPTO_APDU_HPP_))
+#error "The C++ umbrella must expose the APDU wrapper"
+#endif
+
+#if defined(TC_TEST_HEADER_PIV_COMMAND) &&                                                         \
+    (!defined(TINY_CRYPTO_PIV_COMMAND_H_) || !defined(TINY_CRYPTO_PIV_COMMAND_HPP_))
+#error "The C++ umbrella must expose the PIV command wrapper"
 #endif
 
 #if defined(TC_TEST_HEADER_AAMVA) && !defined(TINY_CRYPTO_AAMVA_H_)
@@ -50,14 +71,18 @@ static TC_PIV_card_identifiers tc_header_card_identifiers;
 #error "The C++ umbrella must expose the TWIC UUID C API"
 #endif
 
-#if defined(TC_TEST_HEADER_X509_PATH) && \
+#if defined(TC_TEST_HEADER_X509_PATH) &&                                                           \
     (!defined(TINY_CRYPTO_X509_PATH_H_) || !defined(TINY_CRYPTO_X509_STORE_H_))
 #error "The C++ umbrella must expose the X.509 path C API"
 #endif
 
-#if defined(TC_TEST_HEADER_X509_REVOCATION) && \
+#if defined(TC_TEST_HEADER_X509_REVOCATION) &&                                                     \
     (!defined(TINY_CRYPTO_X509_CRL_H_) || !defined(TINY_CRYPTO_X509_REVOCATION_H_))
 #error "The C++ umbrella must expose the X.509 revocation C API"
+#endif
+
+#if defined(TC_TEST_HEADER_X509_OCSP) && !defined(TINY_CRYPTO_X509_OCSP_H_)
+#error "The C++ umbrella must expose the X.509 OCSP header"
 #endif
 
 #if defined(TC_TEST_HEADER_CMS) && !defined(TINY_CRYPTO_CMS_H_)
@@ -66,17 +91,16 @@ static TC_PIV_card_identifiers tc_header_card_identifiers;
 #if defined(TC_TEST_HEADER_PIV_OIDS) && !defined(TINY_CRYPTO_PIV_OID_H_)
 #error "The C++ umbrella must expose the PIV/TWIC identifier C API"
 #endif
-#if defined(TC_TEST_HEADER_CMS) && \
-    (defined(TINY_CRYPTO_CMS_VALIDATION_H_) || defined(TINY_CRYPTO_X509_PATH_H_) || \
+#if defined(TC_TEST_HEADER_CMS) &&                                                                 \
+    (defined(TINY_CRYPTO_CMS_VALIDATION_H_) || defined(TINY_CRYPTO_X509_PATH_H_) ||                \
      defined(TINY_CRYPTO_X509_REVOCATION_H_))
 #error "The base CMS profile must not expose path or revocation APIs"
 #endif
-#if defined(TC_TEST_HEADER_CMS_VALIDATION) && \
-    !defined(TINY_CRYPTO_CMS_VALIDATION_H_)
+#if defined(TC_TEST_HEADER_CMS_VALIDATION) && !defined(TINY_CRYPTO_CMS_VALIDATION_H_)
 #error "The C++ umbrella must expose the CMS validation C API"
 #endif
 
-#if defined(TC_TEST_HEADER_CREDENTIAL) && \
+#if defined(TC_TEST_HEADER_CREDENTIAL) &&                                                          \
     (!defined(TINY_CRYPTO_CREDENTIAL_H_) || !defined(TINY_CRYPTO_VALIDATION_H_))
 #error "The C++ umbrella must expose credential validation C APIs"
 #endif
@@ -96,9 +120,34 @@ static TC_TWIC_tpk tc_header_tpk;
 #error "The C++ umbrella must expose the enabled PIV CHUID C API"
 #endif
 
-#if defined(TC_TEST_HEADER_PIV_SM) && \
+#if defined(TC_TEST_HEADER_PIV_SM) &&                                                              \
     (!defined(TINY_CRYPTO_PIV_SM_H_) || !defined(TINY_CRYPTO_PIV_SM_HPP_))
 #error "The C++ umbrella must expose the standalone PIV secure messaging wrapper"
+#endif
+
+#if defined(TC_TEST_HEADER_PIV_SM_APDU) &&                                                         \
+    (!defined(TINY_CRYPTO_PIV_SM_APDU_H_) || !defined(TINY_CRYPTO_PIV_SM_APDU_HPP_))
+#error "The C++ umbrella must expose the PIV secure messaging framing wrapper"
+#endif
+
+#if defined(TC_TEST_HEADER_PIV_VCI) &&                                                             \
+    (!defined(TINY_CRYPTO_PIV_VCI_H_) || !defined(TINY_CRYPTO_PIV_VCI_HPP_))
+#error "The C++ umbrella must expose the PIV virtual contact interface wrapper"
+#endif
+
+#if defined(TC_TEST_HEADER_PIV_CATALOG) &&                                                         \
+    (!defined(TINY_CRYPTO_PIV_CATALOG_H_) || !defined(TINY_CRYPTO_PIV_CATALOG_HPP_))
+#error "The C++ umbrella must expose the PIV catalog wrapper"
+#endif
+
+#if defined(TC_TEST_HEADER_PIV_KEY_PROOF) &&                                                       \
+    (!defined(TINY_CRYPTO_PIV_KEY_PROOF_H_) || !defined(TINY_CRYPTO_PIV_KEY_PROOF_HPP_))
+#error "The C++ umbrella must expose the PIV key proof wrapper"
+#endif
+
+#if defined(TC_TEST_HEADER_PIV_CARD_CHECK) &&                                                      \
+    (!defined(TINY_CRYPTO_PIV_CARD_CHECK_H_) || !defined(TINY_CRYPTO_PIV_CARD_CHECK_HPP_))
+#error "The C++ umbrella must expose the PIV card check wrapper"
 #endif
 
 #if defined(TC_TEST_HEADER_TWIC_CCL) && !defined(TINY_CRYPTO_TWIC_CCL_H_)
@@ -108,7 +157,7 @@ static TC_TWIC_tpk tc_header_tpk;
 void tiny_crypto_cpp_umbrella_compile()
 {
 #if defined(TC_TEST_HEADER_RSA)
-    (void)tc_header_rsa_key;
+  (void)tc_header_rsa_key;
 #endif
 #if defined(TC_TEST_HEADER_PIV_OBJECTS)
   (void)tc_header_card_identifiers;

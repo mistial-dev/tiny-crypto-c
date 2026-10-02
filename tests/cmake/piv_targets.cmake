@@ -1,6 +1,11 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
+if(NOT SOURCE_DIR OR NOT BINARY_DIR OR NOT C_COMPILER)
+  message(FATAL_ERROR "SOURCE_DIR, BINARY_DIR and C_COMPILER are required")
+endif()
+# Start from a fresh tree so cache entries from earlier runs cannot apply.
+file(REMOVE_RECURSE "${BINARY_DIR}")
 set(required_options TINY_CRYPTO_ENABLE_KMAC256 TINY_CRYPTO_ENABLE_GZIP
-  TINY_CRYPTO_ENABLE_RSA TINY_CRYPTO_ENABLE_EC TINY_CRYPTO_ENABLE_SHA1 TINY_CRYPTO_TLV_BER)
+  TINY_CRYPTO_ENABLE_RSA TINY_CRYPTO_ENABLE_EC TINY_CRYPTO_ENABLE_SHA1 TINY_CRYPTO_TLV_ENABLE_BER)
 set(auto_options)
 foreach(required IN LISTS required_options)
   list(APPEND auto_options "-D${required}=AUTO")

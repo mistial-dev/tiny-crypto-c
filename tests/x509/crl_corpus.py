@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Mistial Dev
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Check frozen CRL structure and extension encodings, not revocation status."""
+"""Check frozen CRL structure and extension encodings."""
 import argparse
 import base64
 import hashlib

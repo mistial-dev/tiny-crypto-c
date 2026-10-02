@@ -1,12 +1,9 @@
----
-name: Feature request
-about: Propose a technical improvement for tiny-crypto-c
-title: ''
-labels: enhancement
-assignees: ''
----
+______________________________________________________________________
+
+## name: Feature request about: Propose a technical improvement for tiny-crypto-c title: '' labels: enhancement assignees: ''
 
 <!-- SPDX-FileCopyrightText: Mistial Dev -->
+
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
 ## Objective
@@ -31,7 +28,7 @@ How the change would be verified (unit tests, CAVP, Wycheproof, size).
 
 Links to standards, vectors, or prior discussion.
 
----
+______________________________________________________________________
 
 **Policy:** This project follows the [Bounded Contribution Policy](../../CODE_OF_CONDUCT.md).
 Requests must support the library’s technical goals.

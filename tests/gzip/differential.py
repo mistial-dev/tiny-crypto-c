@@ -26,12 +26,12 @@ class Bits:
                      for i in range(0, len(self.values), 8))
 
 
-def dynamic_header(code_lengths):
+def dynamic_header(code_lengths, distance_codes=1):
     bits = Bits()
     bits.put(1, 1)  # Final block.
     bits.put(2, 2)  # Dynamic Huffman codes.
     bits.put(0, 5)  # 257 literal/length codes.
-    bits.put(0, 5)  # One distance code.
+    bits.put(distance_codes - 1, 5)  # HDIST.
     bits.put(15, 4)  # All 19 code-length symbols.
     order = (16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15)
     for symbol in order:
@@ -60,6 +60,14 @@ def tree_cases():
         bits.put(int(symbol == 256), 1)
     bits.put(0, 1)  # The sole literal code is end-of-block; distance is unused.
     yield "empty distance alphabet", bits, True
+    # Distance codes 30 and 31 never occur (RFC 1951 section 3.2.6). zlib
+    # rejects a header declaring more than 30 of them; so does this decoder.
+    for distance_codes in (30, 31, 32):
+        bits = dynamic_header({0: 1, 1: 1}, distance_codes)
+        for symbol in range(257 + distance_codes):
+            bits.put(int(symbol == 256), 1)
+        bits.put(0, 1)  # End of block.
+        yield f"{distance_codes} distance codes", bits, distance_codes <= 30
 
 
 def main():
