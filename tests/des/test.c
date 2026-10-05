@@ -717,6 +717,14 @@ TC_TEST(test_des_cmac_tag_policy)
                                          (TC_buffer){tag, below}));
   munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
 
+  /* A NULL tag with an accepted length is rejected before the MAC runs. */
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC((TC_bytes){tdes2_key, 16}, (TC_bytes){cmac_kat_msg, msglen},
+                               (TC_buffer){NULL, TC_MIN_TAG_LEN}));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC_short_tag((TC_bytes){tdes2_key, 16},
+                                         (TC_bytes){cmac_kat_msg, msglen}, (TC_buffer){NULL, 1}));
+
   /* Short-tag entry: 1 and min - 1 give the leading bytes of the full tag. */
   munit_assert_int(TC_OK, ==,
                    TC_DES_CMAC_short_tag((TC_bytes){tdes2_key, 16},

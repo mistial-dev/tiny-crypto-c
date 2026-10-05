@@ -103,7 +103,8 @@ static TC_status tc_des_cmac_oneshot(TC_bytes key, TC_bytes msg, TC_buffer tag, 
   uint8_t full[TC_DES_CMAC_TAG_MAX];
   TC_status status;
 
-  if (!tc_internal_tag_length_allowed(tag.capacity, TC_DES_CMAC_TAG_MAX, short_tag) ||
+  if (tag.data == NULL ||
+      !tc_internal_tag_length_allowed(tag.capacity, TC_DES_CMAC_TAG_MAX, short_tag) ||
       !tc_internal_span_valid(msg.data, msg.length))
     return TC_ERROR;
   status = TC_DES_CMAC_init(&ctx, key);
