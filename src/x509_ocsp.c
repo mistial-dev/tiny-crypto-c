@@ -6,6 +6,8 @@
 #if TC_ENABLE_X509_OCSP
 #include <tiny_crypto/x509_ocsp.h>
 #include "pki_internal.h"
+#include "pki_hash_internal.h"
+#include "pki_hash_parts_internal.h"
 #include "pki_tree_internal.h"
 #include "pki_source_internal.h"
 #include "pki_extensions_internal.h"
@@ -61,29 +63,21 @@ static TC_TLV_result time_value(const TC_TLV_element* element, TC_X509_time* out
   return tc_tlv_tag_is(element, 0x18) ? tc_x509_time_value(element, out) : TC_TLV_INVALID;
 }
 
-static TC_hash_algorithm hash_algorithm(TC_bytes oid)
+/* CertID hashes this library builds and checks: SHA-1 (RFC 6960 and the
+ * RFC 5019 profile) and SHA-256. */
+static int cert_id_hash(TC_hash_algorithm hash)
 {
-  const TC_hash_algorithm supported[] = {TC_HASH_SHA1, TC_HASH_SHA256};
-  for (size_t i = 0; i < sizeof supported / sizeof *supported; ++i) {
-    tc_hash_info info;
-    if (tc_hash_info_get(supported[i], &info) && tc_pki_equal(oid, info.oid))
-      return supported[i];
-  }
-  return TC_HASH_UNKNOWN;
+  return (hash == TC_HASH_SHA1 || hash == TC_HASH_SHA256) && tc_hash_available(hash);
 }
 
-static TC_TLV_result digest(TC_hash_algorithm algorithm, TC_bytes bytes, uint8_t out[64],
-                            size_t* work)
+/* Hash one borrowed span under the parsing limits, charging work as every
+ * PKI digest does. */
+static TC_TLV_result digest(TC_hash_algorithm algorithm, TC_bytes bytes,
+                            const TC_TLV_limits* limits, uint8_t out[64], size_t* work)
 {
-  tc_hash_info info;
   TC_hash_context context;
-  if (!tc_hash_info_get(algorithm, &info) || !tc_hash_available(algorithm))
-    return TC_TLV_UNSUPPORTED;
-  if (bytes.length > *work)
-    return TC_TLV_LIMIT;
-  *work -= bytes.length;
-  return tc_hash_digest_parts(algorithm, &bytes, 1, out, &context) == TC_OK ? TC_TLV_OK
-                                                                            : TC_TLV_ARGUMENT;
+  const tc_pki_tree_workspace tree = {NULL, 0, work};
+  return tc_pki_hash_parts(&bytes, 1, algorithm, limits, &tree, &context, out);
 }
 
 static TC_TLV_result cert_id_matches(TC_bytes encoded, const TC_X509_certificate* certificate,
@@ -103,11 +97,11 @@ static TC_TLV_result cert_id_matches(TC_bytes encoded, const TC_X509_certificate
   if (status != TC_TLV_OK || tc_pki_field(&reader, 0x30, &field) != TC_TLV_OK ||
       TC_DER_algorithm_identifier(field.encoded, &algorithm) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  hash = hash_algorithm(algorithm.oid);
-  if (hash == TC_HASH_UNKNOWN || !tc_hash_available(hash))
+  status = tc_pki_hash_algorithm(&algorithm, &hash);
+  if (status != TC_TLV_OK)
+    return status;
+  if (!cert_id_hash(hash))
     return TC_TLV_UNSUPPORTED;
-  if (algorithm.parameters.length && TC_DER_null(algorithm.parameters) != TC_TLV_OK)
-    return TC_TLV_INVALID;
   if (tc_pki_field(&reader, 4, &field) != TC_TLV_OK)
     return TC_TLV_INVALID;
   name_hash = field.value;
@@ -124,12 +118,12 @@ static TC_TLV_result cert_id_matches(TC_bytes encoded, const TC_X509_certificate
     return TC_TLV_OK;
   /* RFC 6960 section 4.1.1: issuerNameHash covers the DER of the issuer
    * field in the certificate being checked. */
-  status = digest(hash, certificate->issuer, computed, work);
+  status = digest(hash, certificate->issuer, request->parsing, computed, work);
   if (status != TC_TLV_OK)
     return status;
   if (memcmp(name_hash.data, computed, info.digest_length))
     return TC_TLV_OK;
-  status = digest(hash, issuer->public_key.key, computed, work);
+  status = digest(hash, issuer->public_key.key, request->parsing, computed, work);
   if (status == TC_TLV_OK)
     *matched = !memcmp(key_hash.data, computed, info.digest_length);
   return status;
@@ -475,7 +469,7 @@ static TC_TLV_result responder_matches(const ocsp_response* response, TC_bytes n
   if (!response->responder_by_key)
     return name_matches(response->responder, name, request, workspace, work, matched);
   uint8_t computed[64];
-  TC_TLV_result status = digest(TC_HASH_SHA1, key, computed, work);
+  TC_TLV_result status = digest(TC_HASH_SHA1, key, request->parsing, computed, work);
   if (status == TC_TLV_OK)
     *matched = !memcmp(response->responder.data, computed, 20);
   return status;
@@ -802,24 +796,26 @@ TC_TLV_result TC_X509_ocsp_request_encode(const TC_X509_ocsp_encode_request* req
   tc_hash_info info;
   if (!certificate.data || !trust_anchor_present(issuer) || !parsing || !workspace ||
       !workspace->frames.data || !workspace->oids || !work || !length ||
-      (encoded.capacity && !encoded.data) ||
       (nonce.length && (!nonce.data || nonce.length < 32 || nonce.length > 128)))
     return TC_TLV_ARGUMENT;
-  if (!tc_internal_ranges_disjoint(encoded.data, encoded.capacity, certificate.data,
-                                   certificate.length) ||
-      !tc_internal_ranges_disjoint(encoded.data, encoded.capacity, issuer->name.data,
-                                   issuer->name.length) ||
-      !tc_internal_ranges_disjoint(encoded.data, encoded.capacity, issuer->public_key.key.data,
-                                   issuer->public_key.key.length) ||
-      !tc_internal_ranges_disjoint(encoded.data, encoded.capacity, nonce.data, nonce.length) ||
-      !tc_internal_ranges_disjoint(encoded.data, encoded.capacity, request, sizeof *request) ||
-      !tc_internal_ranges_disjoint(encoded.data, encoded.capacity, length, sizeof *length) ||
-      !tc_internal_ranges_disjoint(encoded.data, encoded.capacity, work, sizeof *work))
+  /* encoded, length and work are written. Every borrowed input stays clear
+   * of them. */
+  TC_bytes writes[3];
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan, writes, 3, SIZE_MAX);
+  tc_pki_storage_plan_write_span(&plan, (TC_bytes){encoded.data, encoded.capacity});
+  TC_PKI_PLAN_WRITE(&plan, length, 1);
+  TC_PKI_PLAN_WRITE(&plan, work, 1);
+  tc_pki_storage_plan_seal(&plan);
+  TC_PKI_PLAN_INPUT(&plan, request, 1);
+  TC_PKI_PLAN_INPUT(&plan, issuer, 1);
+  const TC_bytes inputs[] = {certificate, issuer->name, issuer->public_key.key, nonce};
+  tc_pki_storage_plan_input_spans(&plan, inputs, sizeof inputs / sizeof *inputs);
+  if (tc_pki_storage_plan_finish(&plan, NULL) != TC_TLV_OK)
     return TC_TLV_ARGUMENT;
   /* Every later failure reports no encoding, except a short buffer. */
   *length = 0;
-  if ((hash != TC_HASH_SHA1 && hash != TC_HASH_SHA256) || !tc_hash_info_get(hash, &info) ||
-      !tc_hash_available(hash))
+  if (!cert_id_hash(hash) || !tc_hash_info_get(hash, &info))
     return TC_TLV_UNSUPPORTED;
   TC_X509_workspace parser = {workspace->frames, workspace->oids, workspace->oid_capacity};
   TC_X509_certificate target;
@@ -846,9 +842,9 @@ TC_TLV_result TC_X509_ocsp_request_encode(const TC_X509_ocsp_encode_request* req
     return TC_TLV_UNSUPPORTED;
   /* RFC 6960 section 4.1.1: hash the certificate's issuer encoding. The
    * DN check above only ties that issuer to the anchor. */
-  status = digest(hash, target.issuer, name_hash, work);
+  status = digest(hash, target.issuer, parsing, name_hash, work);
   if (status == TC_TLV_OK)
-    status = digest(hash, issuer->public_key.key, key_hash, work);
+    status = digest(hash, issuer->public_key.key, parsing, key_hash, work);
   if (status != TC_TLV_OK)
     return status;
   uint8_t* cursor = der_header(encoded.data, 0x30, layout.tbs);

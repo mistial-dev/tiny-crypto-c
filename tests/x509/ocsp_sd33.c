@@ -157,6 +157,12 @@ TC_TEST(request_sizing)
                                                (TC_buffer){NULL, 0}, &length),
                    ==, TC_TLV_LIMIT);
   munit_assert_size(length, ==, expected.length);
+  /* length and work are both written, so they must not share storage. */
+  size_t shared = 20000000;
+  munit_assert_int(TC_X509_ocsp_request_encode(&request, &fixture.workspace, &shared,
+                                               (TC_buffer){NULL, 0}, &shared),
+                   ==, TC_TLV_ARGUMENT);
+  munit_assert_size(shared, ==, 20000000);
   memset(encoded, 0xa5, sizeof encoded);
   length = 0;
   munit_assert_int(TC_X509_ocsp_request_encode(&request, &fixture.workspace, &work,
