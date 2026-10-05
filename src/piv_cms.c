@@ -181,14 +181,15 @@ TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind,
   TC_TLV_element element;
   TC_TLV_result result;
   if (!cms_kind_valid(kind) || !policy || !tc_cms_verification_policy_valid(*policy) ||
-      (policy->attribute_oids != TC_CMS_ATTRIBUTE_OIDS_PIV &&
-       policy->attribute_oids != TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC))
+      policy->attribute_oids == TC_CMS_ATTRIBUTE_OIDS_CMS)
     return TC_TLV_ARGUMENT;
   const TC_CMS_verification_policy selected = *policy;
+  TC_PIV_oid_profile oids = TC_PIV_OIDS_ONLY;
+#if TC_ENABLE_TWIC
   /* TWIC Part 2 v5 section 6: TWIC readers accept either identifier of a pair. */
-  const TC_PIV_oid_profile oids = selected.attribute_oids == TC_CMS_ATTRIBUTE_OIDS_PIV
-                                      ? TC_PIV_OIDS_ONLY
-                                      : TC_PIV_OIDS_TWIC_COMPATIBLE;
+  if (selected.attribute_oids == TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC)
+    oids = TC_PIV_OIDS_TWIC_COMPATIBLE;
+#endif
   result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;

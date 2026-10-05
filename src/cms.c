@@ -4,6 +4,7 @@
 #include <tiny_crypto/x509.h>
 #include <tiny_crypto/piv_oid.h>
 #if TC_ENABLE_CMS
+#include "twic_oid_internal.h"
 #include "cms_base_internal.h"
 #include "pki_internal.h"
 #include "x509_time_internal.h"
@@ -944,15 +945,16 @@ static cms_attribute_kind cms_attribute_classify(TC_bytes oid, TC_CMS_attribute_
   };
   /* config.h makes CMS require TC_ENABLE_PIV_OIDS. */
   if (oids != TC_CMS_ATTRIBUTE_OIDS_CMS) {
-    /* TWIC Part 2 v5 section 6 pairs twicFASC-N with pivFASC-N. */
-    const TC_PIV_oid identity = TC_PIV_oid_identify(oid, TC_PIV_OIDS_TWIC_COMPATIBLE);
+    const TC_PIV_oid identity = TC_PIV_oid_identify(oid, TC_PIV_OIDS_ONLY);
     if (identity == TC_PIV_OID_SIGNER_NAME)
       return CMS_ATTRIBUTE_SIGNER_NAME;
     if (identity == TC_PIV_OID_FASCN)
-      return oids == TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC ||
-                     TC_PIV_oid_identify(oid, TC_PIV_OIDS_ONLY) == TC_PIV_OID_FASCN
-                 ? CMS_ATTRIBUTE_FASCN
-                 : CMS_ATTRIBUTE_EXCLUDED;
+      return CMS_ATTRIBUTE_FASCN;
+#if TC_ENABLE_TWIC
+    /* TWIC Part 2 v5 section 6 pairs twicFASC-N with pivFASC-N. */
+    if (tc_twic_oid_identify(oid) == TC_PIV_OID_FASCN)
+      return oids == TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC ? CMS_ATTRIBUTE_FASCN : CMS_ATTRIBUTE_EXCLUDED;
+#endif
   }
   if (tc_pki_equal(oid, (TC_bytes){entry_uuid, sizeof entry_uuid}))
     return CMS_ATTRIBUTE_ENTRY_UUID;

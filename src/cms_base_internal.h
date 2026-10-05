@@ -11,15 +11,22 @@ static inline int tc_cms_rsa_parameters_valid(TC_CMS_rsa_parameters policy)
   return policy == TC_CMS_RSA_PARAMETERS_NULL || policy == TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT;
 }
 
+static inline int tc_cms_attribute_oids_valid(TC_CMS_attribute_oids oids)
+{
+#if TC_ENABLE_TWIC
+  if (oids == TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC)
+    return 1;
+#endif
+  return oids == TC_CMS_ATTRIBUTE_OIDS_CMS || oids == TC_CMS_ATTRIBUTE_OIDS_PIV;
+}
+
 static inline int tc_cms_verification_policy_valid(TC_CMS_verification_policy policy)
 {
   return (policy.envelope == TC_CMS_ENVELOPE_BER || policy.envelope == TC_CMS_ENVELOPE_DER) &&
          (policy.attributes == TC_CMS_ATTRIBUTES_DER ||
           policy.attributes == TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER) &&
          tc_cms_rsa_parameters_valid(policy.rsa_parameters) &&
-         (policy.attribute_oids == TC_CMS_ATTRIBUTE_OIDS_CMS ||
-          policy.attribute_oids == TC_CMS_ATTRIBUTE_OIDS_PIV ||
-          policy.attribute_oids == TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC) &&
+         tc_cms_attribute_oids_valid(policy.attribute_oids) &&
          (policy.other_attributes == TC_CMS_OTHER_ATTRIBUTES_SKIP_LISTED ||
           policy.other_attributes == TC_CMS_OTHER_ATTRIBUTES_REJECT ||
           policy.other_attributes == TC_CMS_OTHER_ATTRIBUTES_SKIP_ALL);

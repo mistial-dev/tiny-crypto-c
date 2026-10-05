@@ -96,7 +96,7 @@
     {"macro": "TC_ENABLE_AAMVA", "description": "Build ANSI AAMVA payload readers", "sources": ["src/aamva.c"]},
     {"macro": "TC_ENABLE_FASCN", "description": "Build FASC-N readers and writers", "sources": ["src/fascn.c"]},
     {"macro": "TC_ENABLE_TWIC", "description": "Build TWIC Legacy and NEXGEN card support in the PIV modules",
-     "sources": ["src/twic_aid.c", "src/twic_command.c", "src/twic_card_objects.c"]},
+     "sources": ["src/twic_aid.c", "src/twic_command.c", "src/twic_card_objects.c", "src/twic_oid.c"]},
     {"macro": "TC_ENABLE_TWIC_UUID", "description": "Build TWIC NEXGEN UUID helpers", "sources": ["src/twic_uuid.c"]},
     {"macro": "TC_ENABLE_TWIC_TPK", "description": "Build TWIC Privacy Key container readers", "sources": ["src/twic_tpk.c"]},
     {"macro": "TC_ENABLE_TWIC_CCL", "description": "Build TWIC canceled card list reader", "sources": ["src/twic_ccl.c"]},

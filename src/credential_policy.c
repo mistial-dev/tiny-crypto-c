@@ -113,7 +113,7 @@ TC_TLV_result tc_credential_signer_policy(const TC_X509_certificate* signer, int
   /* id-fpki-common-piv-contentSigning, Common Policy section 1.2. The span is
    * static, so the path options may keep it as the initial policy set. */
   const TC_bytes* required_policy =
-      piv ? tc_piv_oid_contents(TC_PIV_OID_POLICY_CONTENT_SIGNING, TC_PIV_OID_NAMESPACE_PIV) : NULL;
+      piv ? tc_piv_oid_contents(TC_PIV_OID_POLICY_CONTENT_SIGNING) : NULL;
   /* TWIC signers may carry either content-signing OID (TWIC Part 2 section 6),
    * so their own EKU selects the purpose. */
   signer_extensions scan = {required_policy,

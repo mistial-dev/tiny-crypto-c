@@ -13,8 +13,9 @@ extern "C" {
 #endif
 
 /* TC_PIV_OIDS_ONLY accepts identifiers under the PIV root 2.16.840.1.101.3.
- * TC_PIV_OIDS_TWIC_COMPATIBLE also accepts the TWIC root 1.3.6.1.4.1.29138. */
-typedef enum { TC_PIV_OIDS_ONLY, TC_PIV_OIDS_TWIC_COMPATIBLE } TC_PIV_oid_profile;
+ * With TC_ENABLE_TWIC, TC_PIV_OIDS_TWIC_COMPATIBLE also accepts the TWIC root
+ * 1.3.6.1.4.1.29138. */
+typedef enum { TC_PIV_OIDS_ONLY = 0, TC_PIV_OIDS_TWIC_COMPATIBLE = 1 } TC_PIV_oid_profile;
 
 /* Identifiers from TWIC Part 2 v5 section 6. Each value names one PIV/TWIC
  * pair. The comments give the PIV identifier, then its TWIC pair. A value with
