@@ -321,8 +321,12 @@ function in counter, feedback and double-pipeline mode. It needs at least one
 PRF: HMAC with an enabled SHA digest, `TINY_CRYPTO_AES_ENABLE_CMAC`, or
 `TINY_CRYPTO_DES_ENABLE_CMAC`. Each PRF gets its own function family
 (`TC_KBKDF_HMAC_SHA256_counter`, `TC_KBKDF_AES_CMAC_feedback`, ...), so unused
-PRFs compile out. TDEA-CMAC is kept for legacy interoperability only. `kdf.h`
-describes the SP 800-108r1 key-control mitigations for the CMAC PRFs.
+PRFs compile out. TDEA-CMAC is kept for CAVP and interoperability. By default it accepts
+only 24-byte three-key bundles. SP 800-131A Rev. 2 Table 7 disallows CMAC-based KDF with
+two-key TDEA, and with three-key TDEA after 2023, and SP 800-38B section 5.2 excludes single
+DES. `TC_KBKDF_params.approval = TC_PERMIT_DISALLOWED` accepts 16- and 8-byte keys on request
+(see [disallowed parameters](docs/api.md#disallowed-parameters)). `kdf.h` describes the
+SP 800-108r1 key-control mitigations for the CMAC PRFs.
 
 `TINY_CRYPTO_ENABLE_HKDF` needs HMAC and at least one enabled SHA family.
 The C and C++ APIs provide extract, expand, and one-shot derive operations.

@@ -22,6 +22,8 @@ struct family {
                         tiny_crypto::bytes, tiny_crypto::buffer);
   TC_status (*pipeline)(tiny_crypto::bytes, const tiny_crypto::kbkdf_params&, tiny_crypto::bytes,
                         tiny_crypto::buffer);
+  /* TC_PERMIT_DISALLOWED for the TDEA-CMAC PRF (SP 800-131A Rev. 2 Table 7). */
+  tiny_crypto::approval_policy approval;
 };
 
 #if TC_AES_KEY_BITS == 128
@@ -35,37 +37,38 @@ struct family {
 const family families[] = {
 #if TC_KBKDF_HAVE_HMAC_SHA1
     {"HMAC-SHA-1", KBKDF_PRF_HMAC_SHA1, TC_SHA1_DIGESTLEN, 32, tiny_crypto::kbkdf_hmac_sha1_counter,
-     tiny_crypto::kbkdf_hmac_sha1_feedback, tiny_crypto::kbkdf_hmac_sha1_pipeline},
+     tiny_crypto::kbkdf_hmac_sha1_feedback, tiny_crypto::kbkdf_hmac_sha1_pipeline,
+     TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA224
     {"HMAC-SHA-224", KBKDF_PRF_HMAC_SHA224, TC_SHA224_DIGESTLEN, 32,
      tiny_crypto::kbkdf_hmac_sha224_counter, tiny_crypto::kbkdf_hmac_sha224_feedback,
-     tiny_crypto::kbkdf_hmac_sha224_pipeline},
+     tiny_crypto::kbkdf_hmac_sha224_pipeline, TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA256
     {"HMAC-SHA-256", KBKDF_PRF_HMAC_SHA256, TC_SHA256_DIGESTLEN, 32,
      tiny_crypto::kbkdf_hmac_sha256_counter, tiny_crypto::kbkdf_hmac_sha256_feedback,
-     tiny_crypto::kbkdf_hmac_sha256_pipeline},
+     tiny_crypto::kbkdf_hmac_sha256_pipeline, TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA384
     {"HMAC-SHA-384", KBKDF_PRF_HMAC_SHA384, TC_SHA384_DIGESTLEN, 32,
      tiny_crypto::kbkdf_hmac_sha384_counter, tiny_crypto::kbkdf_hmac_sha384_feedback,
-     tiny_crypto::kbkdf_hmac_sha384_pipeline},
+     tiny_crypto::kbkdf_hmac_sha384_pipeline, TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA512
     {"HMAC-SHA-512", KBKDF_PRF_HMAC_SHA512, TC_SHA512_DIGESTLEN, 32,
      tiny_crypto::kbkdf_hmac_sha512_counter, tiny_crypto::kbkdf_hmac_sha512_feedback,
-     tiny_crypto::kbkdf_hmac_sha512_pipeline},
+     tiny_crypto::kbkdf_hmac_sha512_pipeline, TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_AES_CMAC
     {"AES-CMAC", KDF_AES_PRF_ID, TC_AES_CMAC_TAG_MAX, TC_AES_KEYLEN,
      tiny_crypto::kbkdf_aes_cmac_counter, tiny_crypto::kbkdf_aes_cmac_feedback,
-     tiny_crypto::kbkdf_aes_cmac_pipeline},
+     tiny_crypto::kbkdf_aes_cmac_pipeline, TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_DES_CMAC
     {"TDEA-CMAC", KBKDF_PRF_CMAC_TDES3, TC_DES_CMAC_TAG_MAX, 24,
      tiny_crypto::kbkdf_des_cmac_counter, tiny_crypto::kbkdf_des_cmac_feedback,
-     tiny_crypto::kbkdf_des_cmac_pipeline},
+     tiny_crypto::kbkdf_des_cmac_pipeline, TC_PERMIT_DISALLOWED},
 #endif
 };
 
@@ -98,7 +101,8 @@ TEST_CASE("KBKDF fixed input returns C status")
 #if TC_KBKDF_HAVE_HMAC_SHA256
 TEST_CASE("KBKDF HMAC-SHA-256 status wrapper")
 {
-  const tiny_crypto::kbkdf_params params = {TC_KBKDF_COUNTER_32, TC_KBKDF_CTR_BEFORE_ITER, 1};
+  const tiny_crypto::kbkdf_params params = {TC_KBKDF_COUNTER_32, TC_KBKDF_CTR_BEFORE_ITER, 1,
+                                            TC_APPROVED_ONLY};
   uint8_t out[32];
   CHECK(tiny_crypto::kbkdf_hmac_sha256_counter(
             {kbkdf_known_key, sizeof(kbkdf_known_key)}, params, {nullptr, 0},
@@ -119,7 +123,14 @@ TEST_CASE("KBKDF generated vectors exercise every available C++ family")
     if (f == nullptr)
       continue;
     CAPTURE(std::string(v.source));
-    const tiny_crypto::kbkdf_params params = {v.counter_bits, v.location, v.use_counter};
+    tiny_crypto::approval_policy approval = TC_APPROVED_ONLY;
+#if TC_KBKDF_HAVE_DES_CMAC
+    /* SP 800-131A Rev. 2 Table 7 disallows CMAC-based KDF with two-key TDEA,
+     * and with three-key TDEA after December 31, 2023. */
+    if (v.prf == KBKDF_PRF_CMAC_TDES2 || v.prf == KBKDF_PRF_CMAC_TDES3)
+      approval = TC_PERMIT_DISALLOWED;
+#endif
+    const tiny_crypto::kbkdf_params params = {v.counter_bits, v.location, v.use_counter, approval};
     std::vector<uint8_t> out(v.out_len);
     TC_status status;
     if (v.mode == KBKDF_MODE_COUNTER)
@@ -152,7 +163,8 @@ TEST_CASE("KBKDF families enforce bounds, truncation and aliases")
 
   for (const family& f : families) {
     CAPTURE(std::string(f.name));
-    const tiny_crypto::kbkdf_params params = {TC_KBKDF_COUNTER_16, TC_KBKDF_CTR_AFTER_ITER, 1};
+    const tiny_crypto::kbkdf_params params = {TC_KBKDF_COUNTER_16, TC_KBKDF_CTR_AFTER_ITER, 1,
+                                              f.approval};
     std::vector<uint8_t> full(3 * f.output_size);
     std::vector<uint8_t> part(f.output_size + 1);
 
@@ -181,11 +193,12 @@ TEST_CASE("KBKDF families enforce bounds, truncation and aliases")
     CHECK(f.counter({nullptr, f.key_len}, params, {nullptr, 0}, {fixed, sizeof(fixed)},
                     {part.data(), part.size()}) == TC_ERROR);
 
-    const tiny_crypto::kbkdf_params bad_bits = {12, TC_KBKDF_CTR_AFTER_ITER, 1};
+    const tiny_crypto::kbkdf_params bad_bits = {12, TC_KBKDF_CTR_AFTER_ITER, 1, f.approval};
     CHECK(f.counter({key, f.key_len}, bad_bits, {nullptr, 0}, {fixed, sizeof(fixed)},
                     {part.data(), part.size()}) == TC_ERROR);
 
-    const tiny_crypto::kbkdf_params r8 = {TC_KBKDF_COUNTER_8, TC_KBKDF_CTR_BEFORE_ITER, 1};
+    const tiny_crypto::kbkdf_params r8 = {TC_KBKDF_COUNTER_8, TC_KBKDF_CTR_BEFORE_ITER, 1,
+                                          f.approval};
     std::vector<uint8_t> big(256 * f.output_size);
     CHECK(f.counter({key, f.key_len}, r8, {nullptr, 0}, {fixed, sizeof(fixed)},
                     {big.data(), 255 * f.output_size}) == TC_OK);
@@ -200,7 +213,8 @@ TEST_CASE("KBKDF families enforce bounds, truncation and aliases")
 #if TC_KBKDF_HAVE_AES_CMAC
 TEST_CASE("KBKDF AES-CMAC rejects the wrong key size")
 {
-  const tiny_crypto::kbkdf_params params = {TC_KBKDF_COUNTER_32, TC_KBKDF_CTR_BEFORE_ITER, 1};
+  const tiny_crypto::kbkdf_params params = {TC_KBKDF_COUNTER_32, TC_KBKDF_CTR_BEFORE_ITER, 1,
+                                            TC_APPROVED_ONLY};
   uint8_t key[TC_AES_KEYLEN] = {0};
   uint8_t fixed[4] = {1, 2, 3, 4};
   uint8_t out[16];
@@ -209,5 +223,21 @@ TEST_CASE("KBKDF AES-CMAC rejects the wrong key size")
   CHECK(tiny_crypto::kbkdf_aes_cmac_counter({key, sizeof(key) - 1}, params, {nullptr, 0},
                                             {fixed, sizeof(fixed)},
                                             {out, sizeof(out)}) == TC_ERROR);
+}
+#endif
+
+#if TC_KBKDF_HAVE_DES_CMAC
+TEST_CASE("KBKDF TDEA-CMAC refuses every key by default")
+{
+  const uint8_t key[24] = {1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
+                           13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24};
+  const uint8_t fixed[8] = {};
+  uint8_t out[8];
+  tiny_crypto::kbkdf_params params = {TC_KBKDF_COUNTER_32, 0, 0, TC_APPROVED_ONLY};
+  CHECK(tiny_crypto::kbkdf_des_cmac_counter({key, sizeof key}, params, {nullptr, 0},
+                                            {fixed, sizeof fixed}, {out, sizeof out}) == TC_ERROR);
+  params.approval = TC_PERMIT_DISALLOWED;
+  CHECK(tiny_crypto::kbkdf_des_cmac_counter({key, sizeof key}, params, {nullptr, 0},
+                                            {fixed, sizeof fixed}, {out, sizeof out}) == TC_OK);
 }
 #endif

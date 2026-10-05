@@ -24,7 +24,7 @@
 
 #if TC_KDF_HAVE_CMAC
 struct tc_kdf_cmac {
-  int (*key_ok)(size_t key_len);
+  int (*key_ok)(size_t key_len, TC_approval_policy approval);
   TC_status (*init)(void* ctx, const uint8_t* key, size_t key_len);
   TC_status (*update)(void* ctx, const uint8_t* data, size_t len);
   TC_status (*final)(void* ctx, uint8_t* out);
@@ -67,11 +67,14 @@ static inline struct tc_kdf_prf tc_kdf_hmac_prf(const tc_hash_algorithm_info* ha
  * tests for CMAC first, so an HMAC-only build compiles the HMAC arm alone. In
  * a CMAC-only build every PRF is CMAC, so the trailing HMAC fallback is
  * unreachable. */
-static inline int tc_kdf_key_ok(const struct tc_kdf_prf* prf, size_t key_len)
+static inline int tc_kdf_key_ok(const struct tc_kdf_prf* prf, size_t key_len,
+                                TC_approval_policy approval)
 {
 #if TC_KDF_HAVE_CMAC
   if (prf->kind == TC_KDF_PRF_CMAC)
-    return prf->mac.cmac->key_ok(key_len);
+    return prf->mac.cmac->key_ok(key_len, approval);
+#else
+  (void)approval;
 #endif
   /* HMAC accepts any nonzero key length (RFC 2104 section 2). */
   return prf->kind == TC_KDF_PRF_HMAC && key_len != 0;
@@ -158,8 +161,9 @@ static inline TC_status tc_kdf_prf_run(const struct tc_kdf_prf* prf, const void*
 
 #if TC_KBKDF_HAVE_AES_CMAC
 /* The AES key size is fixed per build, so the KDK must match it exactly. */
-static int tc_kdf_aes_key_ok(size_t key_len)
+static int tc_kdf_aes_key_ok(size_t key_len, TC_approval_policy approval)
 {
+  (void)approval;
   return key_len == TC_AES_KEYLEN;
 }
 static TC_status tc_kdf_aes_cmac_init(void* ctx, const uint8_t* key, size_t key_len)
@@ -190,9 +194,15 @@ static const struct tc_kdf_prf tc_kdf_prf_aes_cmac = {TC_KDF_PRF_CMAC,
 #endif /* TC_KBKDF_HAVE_AES_CMAC */
 
 #if TC_KBKDF_HAVE_DES_CMAC
-static int tc_kdf_des_key_ok(size_t key_len)
+/* SP 800-108r1-upd1 section 4 takes CMAC from SP 800-38B, whose section 5.2
+ * names AES and TDEA. SP 800-131A Rev. 2 Table 7 disallows CMAC-based KDF
+ * with two-key TDEA, and with three-key TDEA after December 31, 2023. Every
+ * key length therefore needs TC_PERMIT_DISALLOWED: a three-key bundle (24
+ * bytes), a two-key bundle (16 bytes, K1 || K2) or a single DES key (8
+ * bytes, outside SP 800-38B). */
+static int tc_kdf_des_key_ok(size_t key_len, TC_approval_policy approval)
 {
-  return key_len == 8 || key_len == 16 || key_len == 24;
+  return approval == TC_PERMIT_DISALLOWED && (key_len == 8 || key_len == 16 || key_len == 24);
 }
 static TC_status tc_kdf_des_cmac_init(void* ctx, const uint8_t* key, size_t key_len)
 {
@@ -275,9 +285,9 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, TC_bytes 
   int use_ctr;
   uint32_t i;
 
-  if (key == NULL || key_len == 0 || !tc_kdf_key_ok(prf, key_len) || params == NULL ||
-      out == NULL || out_len == 0 || !tc_internal_span_valid(in1, in1_len) ||
-      !tc_internal_span_valid(in2, in2_len))
+  if (params == NULL || key == NULL || key_len == 0 ||
+      !tc_kdf_key_ok(prf, key_len, params->approval) || out == NULL || out_len == 0 ||
+      !tc_internal_span_valid(in1, in1_len) || !tc_internal_span_valid(in2, in2_len))
     return TC_ERROR;
   /* A later PRF block rereads each input after output bytes are written. */
   if (!tc_internal_ranges_disjoint(out, out_len, key, key_len) ||

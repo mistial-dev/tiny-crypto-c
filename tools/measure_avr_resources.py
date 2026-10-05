@@ -51,7 +51,7 @@ PROFILES = {
       return TC_AES_KWP_unwrap(kek, (TC_bytes){out, 16}, (TC_buffer){iv, 8}, &length) != TC_OK;
     """, "TC_AES_KWP_unwrap"),
     "kdf_sha256": (["TC_ENABLE_HMAC=1", "TC_ENABLE_KDF=1"], """
-      struct TC_KBKDF_params p = {32, 1, 0};
+      struct TC_KBKDF_params p = {32, 1, 0, TC_APPROVED_ONLY};
       return TC_KBKDF_HMAC_SHA256_counter((TC_bytes){key, sizeof(key)}, &p, (TC_bytes){NULL, 0}, (TC_bytes){iv, sizeof(iv)}, (TC_buffer){out, sizeof(out)}) != TC_OK;
     """, "TC_KBKDF_HMAC_SHA256_counter"),
     "kdf_mixed": ([
@@ -59,7 +59,7 @@ PROFILES = {
         "TC_ENABLE_SHA224=1", "TC_ENABLE_SHA384=1", "TC_ENABLE_SHA512=1",
         "TC_ENABLE_DES=1", "TC_DES_ENABLE_CMAC=1", "TC_AES_ENABLE_CMAC=1",
     ], """
-      struct TC_KBKDF_params p = {32, 1, 0};
+      struct TC_KBKDF_params p = {32, 1, 0, TC_APPROVED_ONLY};
       return TC_KBKDF_HMAC_SHA256_counter((TC_bytes){key, sizeof(key)}, &p, (TC_bytes){NULL, 0}, (TC_bytes){iv, sizeof(iv)}, (TC_buffer){out, sizeof(out)}) != TC_OK;
     """, "TC_KBKDF_HMAC_SHA256_counter"),
     "drbg_hmac_sha256": ([

@@ -40,44 +40,48 @@ struct kdf_cavp_prf {
   kdf_feedback_fn feedback;
   kdf_pipeline_fn pipeline;
   int aes_bits; /* 0 for non-AES PRFs */
+  /* SP 800-131A Rev. 2 Table 7 disallows CMAC-based KDF with two-key TDEA,
+   * and with three-key TDEA after December 31, 2023, so the TDEA rows run
+   * with TC_PERMIT_DISALLOWED. */
+  TC_approval_policy approval;
 };
 
 static const struct kdf_cavp_prf kdf_cavp_prfs[] = {
 #if TC_KBKDF_HAVE_HMAC_SHA1
     {"HMAC_SHA1", TC_SHA1_DIGESTLEN, TC_KBKDF_HMAC_SHA1_counter, TC_KBKDF_HMAC_SHA1_feedback,
-     TC_KBKDF_HMAC_SHA1_pipeline, 0},
+     TC_KBKDF_HMAC_SHA1_pipeline, 0, TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA224
     {"HMAC_SHA224", TC_SHA224_DIGESTLEN, TC_KBKDF_HMAC_SHA224_counter,
-     TC_KBKDF_HMAC_SHA224_feedback, TC_KBKDF_HMAC_SHA224_pipeline, 0},
+     TC_KBKDF_HMAC_SHA224_feedback, TC_KBKDF_HMAC_SHA224_pipeline, 0, TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA256
     {"HMAC_SHA256", TC_SHA256_DIGESTLEN, TC_KBKDF_HMAC_SHA256_counter,
-     TC_KBKDF_HMAC_SHA256_feedback, TC_KBKDF_HMAC_SHA256_pipeline, 0},
+     TC_KBKDF_HMAC_SHA256_feedback, TC_KBKDF_HMAC_SHA256_pipeline, 0, TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA384
     {"HMAC_SHA384", TC_SHA384_DIGESTLEN, TC_KBKDF_HMAC_SHA384_counter,
-     TC_KBKDF_HMAC_SHA384_feedback, TC_KBKDF_HMAC_SHA384_pipeline, 0},
+     TC_KBKDF_HMAC_SHA384_feedback, TC_KBKDF_HMAC_SHA384_pipeline, 0, TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA512
     {"HMAC_SHA512", TC_SHA512_DIGESTLEN, TC_KBKDF_HMAC_SHA512_counter,
-     TC_KBKDF_HMAC_SHA512_feedback, TC_KBKDF_HMAC_SHA512_pipeline, 0},
+     TC_KBKDF_HMAC_SHA512_feedback, TC_KBKDF_HMAC_SHA512_pipeline, 0, TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_AES_CMAC
     {"CMAC_AES128", TC_AES_CMAC_TAG_MAX, TC_KBKDF_AES_CMAC_counter, TC_KBKDF_AES_CMAC_feedback,
-     TC_KBKDF_AES_CMAC_pipeline, 128},
+     TC_KBKDF_AES_CMAC_pipeline, 128, TC_APPROVED_ONLY},
     {"CMAC_AES192", TC_AES_CMAC_TAG_MAX, TC_KBKDF_AES_CMAC_counter, TC_KBKDF_AES_CMAC_feedback,
-     TC_KBKDF_AES_CMAC_pipeline, 192},
+     TC_KBKDF_AES_CMAC_pipeline, 192, TC_APPROVED_ONLY},
     {"CMAC_AES256", TC_AES_CMAC_TAG_MAX, TC_KBKDF_AES_CMAC_counter, TC_KBKDF_AES_CMAC_feedback,
-     TC_KBKDF_AES_CMAC_pipeline, 256},
+     TC_KBKDF_AES_CMAC_pipeline, 256, TC_APPROVED_ONLY},
 #endif
 #if TC_KBKDF_HAVE_DES_CMAC
     {"CMAC_TDES2", TC_DES_CMAC_TAG_MAX, TC_KBKDF_DES_CMAC_counter, TC_KBKDF_DES_CMAC_feedback,
-     TC_KBKDF_DES_CMAC_pipeline, 0},
+     TC_KBKDF_DES_CMAC_pipeline, 0, TC_PERMIT_DISALLOWED},
     {"CMAC_TDES3", TC_DES_CMAC_TAG_MAX, TC_KBKDF_DES_CMAC_counter, TC_KBKDF_DES_CMAC_feedback,
-     TC_KBKDF_DES_CMAC_pipeline, 0},
+     TC_KBKDF_DES_CMAC_pipeline, 0, TC_PERMIT_DISALLOWED},
 #endif
-    {NULL, 0, NULL, NULL, NULL, 0}};
+    {NULL, 0, NULL, NULL, NULL, 0, TC_APPROVED_ONLY}};
 
 /* PRF sections this binary runs: 480 (or 40) vectors each. */
 #define KDF_CAVP_NON_AES_PRFS                                                                      \
@@ -238,6 +242,7 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
       p.counter_bits = (uint8_t)rlen;
       p.counter_location = 0;
       p.use_counter = (uint8_t)has_counter;
+      p.approval = prf->approval;
 
       if (mode == KDF_CAVP_MODE_COUNTER) {
         const uint8_t* before = NULL;

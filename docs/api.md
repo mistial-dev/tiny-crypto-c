@@ -272,17 +272,21 @@ protected data, such as signature verification, accept every compiled parameter.
 Each gated operation takes a `TC_approval_policy` value from `common.h`.
 `TC_APPROVED_ONLY`, the zero value, refuses the parameter. `TC_PERMIT_DISALLOWED`
 performs that one call on request. Any other value behaves as `TC_APPROVED_ONLY`.
-A refused call returns the module's UNSUPPORTED result
+A refused call returns the module's UNSUPPORTED result, or `TC_ERROR` for KBKDF,
 before any output, workspace, work or random-source change. A C function with an
 options or parameters structure reads its `approval` field. Other C functions take
 an `approval` parameter after the size or curve it qualifies. C++ wrappers take the
 parameter as a trailing `tiny_crypto::approval_policy` argument that defaults to
 `TC_APPROVED_ONLY`.
 
-| Operation                                                                                                                                                                | Parameter | Requirement                                                                                                               |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `TC_RSA_keygen_init`, `TC_RSA_validate_private_key` (`approval`)                                                                                                         | RSA-1024  | FIPS 186-5 section 5.1 and appendix A.1.3 step 1 require `nlen >= 2048`                                                   |
-| `TC_EC_public_key`, `TC_EC_generate_key_pair`, `TC_ECDH`, `TC_ECDSA_sign_digest_external_random` (`approval`), `TC_ECDSA_sign_digest` (`TC_ECDSA_sign_options.approval`) | P-192     | SP 800-186 section 3.2.1.1 restricts P-192 to legacy use, which section 3.1.2 limits to processing already protected data |
+| Operation                                                                                                                                                                | Parameter                     | Requirement                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TC_RSA_keygen_init`, `TC_RSA_validate_private_key` (`approval`)                                                                                                         | RSA-1024                      | FIPS 186-5 section 5.1 and appendix A.1.3 step 1 require `nlen >= 2048`                                                                                            |
+| `TC_EC_public_key`, `TC_EC_generate_key_pair`, `TC_ECDH`, `TC_ECDSA_sign_digest_external_random` (`approval`), `TC_ECDSA_sign_digest` (`TC_ECDSA_sign_options.approval`) | P-192                         | SP 800-186 section 3.2.1.1 restricts P-192 to legacy use, which section 3.1.2 limits to processing already protected data                                          |
+| `TC_KBKDF_DES_CMAC_*` (`TC_KBKDF_params.approval`)                                                                                                                       | Every TDEA and single DES key | SP 800-131A Rev. 2 Table 7 disallows CMAC-based KDF with two-key TDEA, and with three-key TDEA after December 31, 2023. SP 800-38B section 5.2 excludes single DES |
+
+`TC_KBKDF_DES_CMAC_*` stays available for CAVP vectors and existing protocols
+through `TC_PERMIT_DISALLOWED`. New designs use an HMAC or AES-CMAC PRF.
 
 ```c
 /* RSA-1024 key generation on request. */
