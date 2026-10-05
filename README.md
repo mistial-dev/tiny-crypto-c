@@ -381,7 +381,7 @@ The public API comprises the installed headers, documented behavior and status v
 options and the installed CMake target. Rebuild the library with the application toolchain when
 upgrading. Binary compatibility across toolchains is outside this policy. Callers upgrading from
 1.x follow [Migrating to 2.0](docs/migration-2.0.md). The [changelog](CHANGELOG.md) lists each
-release, including the interfaces renamed and removed in 2.1.0.
+release, including the interfaces renamed and removed in 2.0.0.
 
 ## License
 

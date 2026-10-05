@@ -41,6 +41,20 @@ Enable each required modulus size with `TINY_CRYPTO_RSA_ENABLE_1024`, `_2048`, `
 `_4096`. RSA-1024 is an interoperability option and defaults off. PIV and TWIC key policy rejects
 it, except TWIC Legacy key proofs that set `allow_rsa1024`.
 
+## Targets and TWIC
+
+`TINY_CRYPTO_TARGET` takes `full`, `piv`, `twic` or `desfire` in place of `piv-acu` and
+`piv-pd`. A reader of TWIC cards selects `twic` or sets `TINY_CRYPTO_ENABLE_TWIC=ON`, which the
+TWIC profiles, the TWIC application and the `TC_TWIC_*` functions need. See
+[application targets](targets.md).
+
+## Renamed identifiers
+
+- `TC_PIV_CMS_BIOMETRIC_LEGACY` is `TC_PIV_CMS_BIOMETRIC_FIPS201_1`.
+- `TC_CHUID_PROFILE_LEGACY_KEY_MAP` is `TC_CHUID_PROFILE_PIV_SP800_73_4`.
+- The `twic_authenticate` option `--legacy-biometric-signature` is
+  `--fips201-1-biometric-signature`.
+
 ## Removed switches
 
 2.0 removes `TC_ZEROIZE` and `TC_STRICT`. Public argument checks and secret-state wiping are
