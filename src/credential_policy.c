@@ -23,6 +23,7 @@
 #include "cms_internal.h"
 #include "credential_status_internal.h"
 #include "credential_policy_internal.h"
+#include "twic_profile_internal.h"
 #include "credential_text_internal.h"
 
 /* What one pass over the signer's extensions looks for and found. */
@@ -106,7 +107,8 @@ TC_TLV_result tc_credential_signer_read(TC_bytes certificate, const TC_TLV_limit
 }
 
 TC_TLV_result tc_credential_signer_policy(const TC_X509_certificate* signer, int piv,
-                                          int twic_compatible, const TC_X509_time* card_expiration,
+                                          TC_PIV_oid_profile purpose_oids,
+                                          const TC_X509_time* card_expiration,
                                           TC_X509_path_options* policy,
                                           const TC_X509_path_workspace* storage, size_t* work)
 {
@@ -116,11 +118,8 @@ TC_TLV_result tc_credential_signer_policy(const TC_X509_certificate* signer, int
       piv ? tc_piv_oid_contents(TC_PIV_OID_POLICY_CONTENT_SIGNING) : NULL;
   /* TWIC signers may carry either content-signing OID (TWIC Part 2 section 6),
    * so their own EKU selects the purpose. */
-  signer_extensions scan = {required_policy,
-                            0,
-                            !piv || !policy->purpose.length,
-                            twic_compatible ? TC_PIV_OIDS_TWIC_COMPATIBLE : TC_PIV_OIDS_ONLY,
-                            {NULL, 0}};
+  signer_extensions scan = {
+      required_policy, 0, !piv || !policy->purpose.length, purpose_oids, {NULL, 0}};
   TC_TLV_result status = signer_extensions_scan(signer, &scan, &policy->parsing, storage, work);
   if (status != TC_TLV_OK)
     return status;
@@ -167,11 +166,20 @@ TC_TLV_result tc_credential_chuid_expiration_check(TC_bytes expiration, const TC
 int tc_credential_profile(TC_PIV_card_profile profile, const TC_validation_options* options,
                           int* piv, TC_PIV_oid_profile* oids)
 {
-  if (!options || !piv || !oids ||
-      (profile != TC_PIV_CARD && profile != TC_TWIC_LEGACY_CARD && profile != TC_TWIC_NEXGEN_CARD))
+  if (!options || !piv || !oids)
     return 0;
-  *piv = profile == TC_PIV_CARD;
-  *oids = *piv ? TC_PIV_OIDS_ONLY : TC_PIV_OIDS_TWIC_COMPATIBLE;
+  if (profile == TC_PIV_CARD) {
+    *piv = 1;
+    *oids = TC_PIV_OIDS_ONLY;
+  }
+#if TC_ENABLE_TWIC
+  else if (tc_twic_card_profile(profile)) {
+    *piv = 0;
+    *oids = TC_PIV_OIDS_TWIC_COMPATIBLE;
+  }
+#endif
+  else
+    return 0;
   return (!options->certificate.purpose.data && !options->certificate.purpose.length) ||
          TC_PIV_oid_identify(options->certificate.purpose, *oids) == TC_PIV_OID_CONTENT_SIGNING;
 }

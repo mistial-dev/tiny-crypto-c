@@ -81,7 +81,7 @@ static TC_credential_status security_authenticate(
     parsed = tc_credential_signer_read(signer_bytes, limits, scratch, work, &signer);
   if (parsed == TC_TLV_OK)
     parsed =
-        tc_credential_signer_policy(&signer, session->piv, !session->piv, request->card_expiration,
+        tc_credential_signer_policy(&signer, session->piv, session->oids, request->card_expiration,
                                     &session->policy.path, scratch, work);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);

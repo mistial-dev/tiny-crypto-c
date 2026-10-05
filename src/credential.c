@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * PIV and TWIC credential validators: CHUID, biometric and unsigned TWIC
- * CHUID. Each validator checks request storage,
+ * PIV and TWIC credential validators: CHUID and biometric. twic_chuid.c
+ * holds the unsigned TWIC CHUID validator. Each validator checks request storage,
  * verifies the signed object, builds and validates the signer path and maps
  * the outcome to TC_credential_status. The Security Object validators are in
  * credential_security.c, the content signer and CVC validators in
@@ -58,6 +58,33 @@ static TC_TLV_result biometric_signer_distinct(const TC_X509_public_key* embedde
   return TC_TLV_INVALID;
 }
 
+/* The CHUID profile of a card profile: the PIV form, or the signed TWIC
+ * form (TWIC Part 2 v5 4.6.1). */
+static TC_PIV_CHUID_profile card_chuid_profile(TC_PIV_card_profile profile)
+{
+#if TC_ENABLE_TWIC
+  if (profile != TC_PIV_CARD)
+    return TC_CHUID_PROFILE_TWIC_SIGNED;
+#endif
+  (void)profile;
+  return TC_CHUID_PROFILE_PIV;
+}
+
+/* A TWIC reader binds the CHUID to the certificate identifiers under its
+ * own policy (TWIC Part 3 v4 4.4.4). */
+static TC_TLV_result chuid_identifiers_match(int reader_policy,
+                                             const TC_PIV_card_identifiers* identifiers,
+                                             const TC_PIV_CHUID* chuid, size_t* work, int* matched)
+{
+#if TC_ENABLE_TWIC
+  if (reader_policy)
+    return TC_TWIC_card_identifiers_match(identifiers, chuid->fascn, chuid->card_uuid, work,
+                                          matched);
+#endif
+  (void)reader_policy;
+  return TC_PIV_card_identifiers_match(identifiers, chuid->fascn, chuid->card_uuid, work, matched);
+}
+
 TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request* request,
                                            const TC_validation_context* context, size_t* work,
                                            TC_PIV_CHUID_report* out)
@@ -65,17 +92,21 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
   tc_credential_session session;
   if (!request || !request->encoded.data || !request->encoded.length || !request->card ||
       !request->card_expiration || !context || !work || !out ||
-      (request->twic_reader_policy != 0 && request->twic_reader_policy != 1) ||
+      /* twic_reader_policy is 0, or 1 in builds with TWIC support. */
+      (request->twic_reader_policy != 0 && request->twic_reader_policy != TC_ENABLE_TWIC) ||
       (request->profile != TC_PIV_CARD && request->twic_reader_policy) ||
       (request->chuid_profile != TC_CHUID_PROFILE_PIV_SP800_73_4 &&
-       request->chuid_profile != (request->profile == TC_PIV_CARD
-                                      ? TC_CHUID_PROFILE_PIV
-                                      : TC_CHUID_PROFILE_TWIC_SIGNED)) ||
+       request->chuid_profile != card_chuid_profile(request->profile)) ||
       !tc_credential_session_open(&session, context, request->profile))
     return TC_CREDENTIAL_ERROR;
-  const int strict_piv = session.piv && !request->twic_reader_policy;
-  const TC_PIV_oid_profile oids =
-      request->twic_reader_policy ? TC_PIV_OIDS_TWIC_COMPATIBLE : session.oids;
+  /* The TWIC reader policy reads the PIV application of a TWIC card with the
+   * TWIC identifiers (TWIC Part 2 v5 section 6). */
+  const int reader_policy = !session.piv || request->twic_reader_policy;
+  TC_PIV_oid_profile oids = session.oids;
+#if TC_ENABLE_TWIC
+  if (request->twic_reader_policy)
+    oids = TC_PIV_OIDS_TWIC_COMPATIBLE;
+#endif
 
   const TC_bytes inputs[] = {
       request->encoded,
@@ -106,10 +137,7 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
     return tc_validation_status(parsed);
   if (!current)
     return TC_CREDENTIAL_INVALID;
-  parsed = strict_piv ? TC_PIV_card_identifiers_match(request->card, chuid.fascn, chuid.card_uuid,
-                                                      work, &matched)
-                      : TC_TWIC_card_identifiers_match(request->card, chuid.fascn, chuid.card_uuid,
-                                                       work, &matched);
+  parsed = chuid_identifiers_match(reader_policy, request->card, &chuid, work, &matched);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   if (!matched)
@@ -131,9 +159,9 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
   parsed = tc_credential_signer_read(object.certificate, limits, tc_credential_scratch(context),
                                      work, &signer);
   if (parsed == TC_TLV_OK)
-    parsed = tc_credential_signer_policy(
-        &signer, session.piv, request->twic_reader_policy || !session.piv, request->card_expiration,
-        &session.policy.path, tc_credential_scratch(context), work);
+    parsed =
+        tc_credential_signer_policy(&signer, session.piv, oids, request->card_expiration,
+                                    &session.policy.path, tc_credential_scratch(context), work);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
 
@@ -175,8 +203,11 @@ biometric_contents_check(const TC_PIV_biometric_validation_request* request,
     parsed = TC_PIV_fingerprint_read(cbeff->record, &fingerprint);
   } else {
     TC_PIV_face_record face;
-    const TC_PIV_face_profile face_profile =
-        request->profile == TC_PIV_CARD ? TC_PIV_FACE_PROFILE_PIV : TC_PIV_FACE_PROFILE_TWIC;
+    TC_PIV_face_profile face_profile = TC_PIV_FACE_PROFILE_PIV;
+#if TC_ENABLE_TWIC
+    if (request->profile != TC_PIV_CARD)
+      face_profile = TC_PIV_FACE_PROFILE_TWIC;
+#endif
     parsed = TC_PIV_face_read(cbeff->record, face_profile, &face);
   }
   if (parsed != TC_TLV_OK)
@@ -255,7 +286,7 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
   }
   if (parsed == TC_TLV_OK)
     parsed =
-        tc_credential_signer_policy(signer, session.piv, !session.piv, request->card_expiration,
+        tc_credential_signer_policy(signer, session.piv, session.oids, request->card_expiration,
                                     &session.policy.path, scratch, work);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
@@ -270,110 +301,6 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
     *out = result;
   }
   return status;
-}
-
-static TC_TLV_result security_object_equals(const TC_PIV_security_report* security,
-                                            uint16_t container, TC_bytes expected, size_t* work,
-                                            int* matched)
-{
-  const TC_PIV_security_data* selected = NULL;
-  for (size_t i = 0; i < security->count; ++i)
-    if (security->objects[i].container == container)
-      selected = &security->objects[i];
-  if (!selected) {
-    *matched = 0;
-    return TC_TLV_OK;
-  }
-  if (selected->count && !selected->parts)
-    return TC_TLV_ARGUMENT;
-  size_t offset = 0;
-  for (size_t i = 0; i < selected->count; ++i) {
-    const TC_bytes part = selected->parts[i];
-    if ((!part.data && part.length) || part.length > expected.length - offset) {
-      *matched = 0;
-      return TC_TLV_OK;
-    }
-    if (tc_pki_work_charge(work, part.length) != TC_TLV_OK)
-      return TC_TLV_LIMIT;
-    if (part.length && memcmp(part.data, expected.data + offset, part.length)) {
-      *matched = 0;
-      return TC_TLV_OK;
-    }
-    offset += part.length;
-  }
-  *matched = offset == expected.length;
-  return TC_TLV_OK;
-}
-
-/* Validate borrowed inventory ranges before charging the caller's counter. */
-static TC_TLV_result
-unsigned_chuid_storage(const TC_TWIC_unsigned_CHUID_validation_request* request,
-                       const TC_validation_context* context, size_t* work)
-{
-  const TC_PIV_security_report* security = request->security;
-  /* The only write is the caller's work counter. */
-  TC_bytes counter;
-  tc_pki_storage_plan plan;
-  tc_pki_storage_plan_begin(&plan, &counter, 1, *work);
-  TC_PKI_PLAN_WRITE(&plan, work, 1);
-  tc_pki_storage_plan_seal(&plan);
-  const TC_bytes fields[] = {request->encoded, request->card->fascn, request->card->fascn_oid,
-                             request->card->uuid_urn, security->signer};
-  TC_PKI_PLAN_INPUT(&plan, request, 1);
-  TC_PKI_PLAN_INPUT(&plan, request->card, 1);
-  TC_PKI_PLAN_INPUT(&plan, security, 1);
-  TC_PKI_PLAN_INPUT(&plan, context, 1);
-  TC_PKI_PLAN_INPUT(&plan, context->options, 1);
-  tc_pki_storage_plan_input_spans(&plan, fields, sizeof fields / sizeof *fields);
-  TC_PKI_PLAN_INPUT(&plan, security->objects, security->count);
-  for (size_t i = 0; plan.status == TC_TLV_OK && i < security->count; ++i) {
-    const TC_PIV_security_data* object = &security->objects[i];
-    TC_PKI_PLAN_INPUT(&plan, object->parts, object->count);
-    tc_pki_storage_plan_input_spans(&plan, object->parts, object->count);
-  }
-  return tc_pki_storage_plan_finish(&plan, work);
-}
-
-TC_credential_status
-TC_TWIC_unsigned_CHUID_validate(const TC_TWIC_unsigned_CHUID_validation_request* request,
-                                const TC_validation_context* context, size_t* work)
-{
-  if (!request || !request->encoded.data || !request->encoded.length || !request->card ||
-      !request->security ||
-      (request->profile != TC_TWIC_LEGACY_CARD && request->profile != TC_TWIC_NEXGEN_CARD) ||
-      !context || !context->options || !work || !request->security->objects ||
-      !request->security->count || request->security->count > TC_LDS_MAX_GROUPS ||
-      !tc_credential_result_current(request->security->profile, &request->security->at,
-                                    request->profile, context))
-    return TC_CREDENTIAL_ERROR;
-  TC_TLV_result parsed = unsigned_chuid_storage(request, context, work);
-  if (parsed != TC_TLV_OK)
-    return tc_validation_status(parsed);
-  if (request->encoded.length > context->options->parsing.max_input)
-    return TC_CREDENTIAL_LIMIT;
-  int matched;
-  parsed = security_object_equals(request->security, TC_TWIC_UNSIGNED_CHUID_CONTAINER,
-                                  request->encoded, work, &matched);
-  if (parsed != TC_TLV_OK)
-    return tc_validation_status(parsed);
-  if (!matched)
-    return TC_CREDENTIAL_INVALID;
-  TC_PIV_CHUID chuid;
-  parsed = TC_PIV_CHUID_read(request->encoded, request->encoding, TC_CHUID_PROFILE_TWIC_UNSIGNED,
-                             &chuid);
-  if (parsed != TC_TLV_OK)
-    return tc_validation_status(parsed);
-  int current;
-  parsed = tc_credential_chuid_expiration_check(chuid.expiration, &context->options->at, &current);
-  if (parsed != TC_TLV_OK)
-    return tc_validation_status(parsed);
-  if (!current)
-    return TC_CREDENTIAL_INVALID;
-  parsed =
-      TC_TWIC_card_identifiers_match(request->card, chuid.fascn, chuid.card_uuid, work, &matched);
-  if (parsed != TC_TLV_OK)
-    return tc_validation_status(parsed);
-  return matched ? TC_CREDENTIAL_VALID : TC_CREDENTIAL_INVALID;
 }
 
 #endif

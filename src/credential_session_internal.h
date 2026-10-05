@@ -79,7 +79,12 @@ int tc_credential_chuid_bound(const TC_PIV_CHUID_report* chuid, TC_PIV_card_prof
 /* The CMS identifier set that matches a card's PIV OID profile. */
 static inline TC_CMS_attribute_oids tc_credential_attribute_oids(TC_PIV_oid_profile oids)
 {
-  return oids == TC_PIV_OIDS_ONLY ? TC_CMS_ATTRIBUTE_OIDS_PIV : TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC;
+#if TC_ENABLE_TWIC
+  if (oids == TC_PIV_OIDS_TWIC_COMPATIBLE)
+    return TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC;
+#endif
+  (void)oids;
+  return TC_CMS_ATTRIBUTE_OIDS_PIV;
 }
 
 static inline const TC_X509_path_workspace*
