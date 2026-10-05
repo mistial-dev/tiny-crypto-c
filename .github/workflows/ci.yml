@@ -28,7 +28,7 @@ jobs:
         run: pre-commit run --all-files --hook-stage manual
 
   esp32p4:
-    name: ESP32-P4 ${{ matrix.role }} ${{ matrix.config }}
+    name: ESP32-P4 ${{ matrix.target }} ${{ matrix.config }}
     runs-on: ubuntu-latest
     container: espressif/idf:v5.5.1
     timeout-minutes: 20
@@ -36,10 +36,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {role: piv-acu, config: default, defaults: sdkconfig.defaults}
-          - {role: piv-pd, config: default, defaults: sdkconfig.defaults}
-          - {role: piv-acu, config: signed-rsa, defaults: 'sdkconfig.defaults;sdkconfig.signed-rsa'}
-          - {role: piv-acu, config: signed-ecdsa, defaults: 'sdkconfig.defaults;sdkconfig.signed-ecdsa'}
+          - {target: piv, config: default, defaults: sdkconfig.defaults}
+          - {target: twic, config: default, defaults: sdkconfig.defaults}
+          - {target: piv, config: signed-rsa, defaults: 'sdkconfig.defaults;sdkconfig.signed-rsa'}
+          - {target: piv, config: signed-ecdsa, defaults: 'sdkconfig.defaults;sdkconfig.signed-ecdsa'}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Build ESP-IDF target
@@ -47,7 +47,7 @@ jobs:
         run: |
           . "$IDF_PATH/export.sh"
           idf.py -C examples/esp32-p4 -B /tmp/tiny-crypto-esp32p4 \
-            -DTINY_CRYPTO_TARGET=${{ matrix.role }} \
+            -DTINY_CRYPTO_TARGET=${{ matrix.target }} \
             '-DSDKCONFIG_DEFAULTS=${{ matrix.defaults }}' build size-components
 
   host:

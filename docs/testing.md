@@ -34,8 +34,8 @@ cmake --build build-full --parallel
 ctest --test-dir build-full --output-on-failure
 ```
 
-`test_piv_targets` configures the `piv-acu` and `piv-pd` roles under each
-resource profile. RSA
+`test_application_targets` configures, builds and runs every
+[application target](targets.md) under each resource profile. RSA
 tests exercise each enabled modulus-size gate independently. C++ header tests
 compile with features both enabled and disabled so wrappers cannot expose
 missing C operations.

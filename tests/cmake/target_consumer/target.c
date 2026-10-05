@@ -1,31 +1,133 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
+/* Behaviour and contents of each TINY_CRYPTO_TARGET. */
 #include <tiny_crypto/tiny_crypto.h>
 #include <tiny_crypto/x509_crypto.h>
 #include "munit.h"
 #include "test_util.h"
 #include "cavp.h"
-#include "rsa_vectors.h"
 #include <string.h>
 
-#if !TC_ENABLE_AES || !TC_AES_ENABLE_CBC || !TC_AES_ENABLE_ECB || !TC_ENABLE_SHA1 ||               \
-    !TC_ENABLE_SHA256 || !TC_ENABLE_SHA384 || !TC_ENABLE_KMAC256 || !TC_ENABLE_TLV ||              \
-    !TC_ENABLE_DER || !TC_ENABLE_X509 || !TC_ENABLE_PIV_CHUID || !TC_ENABLE_GZIP ||                \
-    !TC_TLV_ENABLE_BER || !TC_ENABLE_RSA || !TC_ENABLE_EC || !TC_EC_ENABLE_P256 ||                 \
-    !TC_EC_ENABLE_P384
-#error "Missing shared PIV capability"
-#endif
-#if TC_ENABLE_PIV_SM != EXPECT_PD || TC_ENABLE_SSKDF != EXPECT_PD ||                               \
-    TC_ENABLE_PIV_CVC != EXPECT_PD || TC_AES_ENABLE_DYNAMIC != EXPECT_PD ||                        \
-    TC_PIV_SM_ENABLE_CS2 != EXPECT_PD || TC_PIV_SM_ENABLE_CS7 != EXPECT_PD
-#error "Card Secure Messaging must follow the PD role"
-#endif
-#if TC_ENABLE_DES || TC_ENABLE_SHA224 || TC_ENABLE_SHA512 || TC_ENABLE_HMAC || TC_ENABLE_KDF ||    \
-    TC_ENABLE_HKDF || TC_ENABLE_EAC_CVC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_GCM ||               \
-    TC_AES_ENABLE_CCM || TC_AES_ENABLE_CMAC || TC_AES_ENABLE_OFB || TC_AES_ENABLE_EAX ||           \
-    TC_AES_ENABLE_EAX_PRIME || TC_AES_ENABLE_SIV || TC_AES_ENABLE_KW || TC_TLV_ENABLE_STREAM
-#error "Unrelated algorithm enabled in a PIV role"
+/* EXPECT_<TARGET> is 1 for the configured TINY_CRYPTO_TARGET. full, piv and
+ * twic share the PIV checks. */
+#define EXPECT_PIV_FAMILY (EXPECT_FULL || EXPECT_PIV || EXPECT_TWIC)
+
+#if EXPECT_PIV_FAMILY
+#include "rsa_vectors.h"
 #endif
 
+#if EXPECT_PIV_FAMILY
+#if !TC_ENABLE_SHA256 || !TC_ENABLE_SHA384 || !TC_ENABLE_AES || !TC_AES_ENABLE_DYNAMIC ||          \
+    !TC_AES_ENABLE_ECB || !TC_AES_ENABLE_CBC || !TC_AES_ENABLE_CMAC || !TC_ENABLE_SSKDF ||         \
+    !TC_ENABLE_EC || !TC_EC_ENABLE_P256 || !TC_EC_ENABLE_P384 || !TC_ENABLE_RSA ||                 \
+    !TC_RSA_ENABLE_2048 || !TC_RSA_ENABLE_3072 || !TC_RSA_ENABLE_4096 || !TC_ENABLE_GZIP ||        \
+    !TC_TLV_ENABLE_BER || !TC_ENABLE_X509_PATH || !TC_ENABLE_X509_REVOCATION ||                    \
+    !TC_ENABLE_CMS_VALIDATION || !TC_ENABLE_PIV_SM || !TC_PIV_SM_ENABLE_CS2 ||                     \
+    !TC_PIV_SM_ENABLE_CS7 || !TC_ENABLE_PIV_VCI || !TC_ENABLE_PIV_KEY_PROOF ||                     \
+    !TC_ENABLE_PIV_CARD_CHECK
+#error "Missing SP 800-73-5 capability"
+#endif
+#endif
+
+#if EXPECT_TWIC || EXPECT_FULL
+#if !TC_ENABLE_SHA1 || !TC_RSA_ENABLE_1024 || !TC_ENABLE_AAMVA || !TC_ENABLE_TWIC_TPK ||           \
+    !TC_ENABLE_TWIC_CCL || !TC_ENABLE_TWIC_OBJECT_CRYPTO
+#error "Missing TWIC capability"
+#endif
+#endif
+
+#if EXPECT_PIV || EXPECT_TWIC
+#if TC_ENABLE_SHA224 || TC_ENABLE_SHA512 || TC_ENABLE_MD5 || TC_ENABLE_HMAC ||                     \
+    TC_ENABLE_KMAC256 || TC_ENABLE_DES || TC_ENABLE_KDF || TC_ENABLE_HKDF || TC_ENABLE_DRBG ||     \
+    TC_EC_ENABLE_P192 || TC_ENABLE_X509_OCSP || TC_ENABLE_EAC_CVC ||                               \
+    TC_ENABLE_TRUST_ANCHOR_FORMAT || TC_AES_ENABLE_CTR || TC_AES_ENABLE_OFB ||                     \
+    TC_AES_ENABLE_GCM || TC_AES_ENABLE_CCM || TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME ||      \
+    TC_AES_ENABLE_SIV || TC_AES_ENABLE_KW || TC_TLV_ENABLE_STREAM
+#error "Algorithm outside the PIV or TWIC target enabled"
+#endif
+#endif
+#if EXPECT_PIV && (TC_ENABLE_SHA1 || TC_RSA_ENABLE_1024 || TC_ENABLE_AAMVA ||                      \
+                   TC_ENABLE_TWIC_TPK || TC_ENABLE_TWIC_CCL || TC_ENABLE_TWIC_OBJECT_CRYPTO)
+#error "TWIC capability enabled in the PIV target"
+#endif
+
+#if EXPECT_DESFIRE || EXPECT_FULL
+#if !TC_ENABLE_AES || !TC_AES_ENABLE_CBC || !TC_ENABLE_DES || !TC_DES_ENABLE_ECB ||                \
+    !TC_DES_ENABLE_CBC || !TC_DES_ENABLE_TDES
+#error "Missing DESFire primitive"
+#endif
+#endif
+#if EXPECT_DESFIRE &&                                                                              \
+    (TC_ENABLE_SHA1 || TC_ENABLE_SHA256 || TC_ENABLE_SHA384 || TC_ENABLE_SHA512 ||                 \
+     TC_ENABLE_HMAC || TC_ENABLE_KDF || TC_ENABLE_TLV || TC_ENABLE_RSA || TC_ENABLE_EC ||          \
+     TC_AES_ENABLE_DYNAMIC || TC_AES_ENABLE_ECB || TC_AES_ENABLE_CTR || TC_AES_ENABLE_CMAC ||      \
+     TC_DES_ENABLE_CTR || TC_DES_ENABLE_CMAC || TC_DES_ENABLE_ISO9797)
+#error "Primitive outside the DESFire target enabled"
+#endif
+
+#if EXPECT_FULL &&                                                                                 \
+    (!TC_ENABLE_MD5 || !TC_ENABLE_SHA512 || !TC_ENABLE_HMAC || !TC_ENABLE_KMAC256 ||               \
+     !TC_ENABLE_KDF || !TC_ENABLE_HKDF || !TC_ENABLE_DRBG || !TC_EC_ENABLE_P192 ||                 \
+     !TC_DES_ENABLE_CMAC || !TC_ENABLE_X509_OCSP || !TC_ENABLE_EAC_CVC ||                          \
+     !TC_ENABLE_TRUST_ANCHOR_FORMAT || !TC_AES_ENABLE_GCM || !TC_AES_ENABLE_KW)
+#error "The full target omits a capability"
+#endif
+
+#if TC_ENABLE_AES && TC_AES_ENABLE_CBC
+/* SP 800-38A F.2.1 CBC-AES128.Encrypt, first block, called as dfc-core does. */
+TC_TEST(aes128_cbc)
+{
+  uint8_t key[16], iv[16], block[16], plain[16], cipher[16];
+  munit_assert_size(tc_test_hex("2b7e151628aed2a6abf7158809cf4f3c", key, sizeof key), ==, 16);
+  munit_assert_size(tc_test_hex("000102030405060708090a0b0c0d0e0f", iv, sizeof iv), ==, 16);
+  munit_assert_size(tc_test_hex("6bc1bee22e409f96e93d7e117393172a", plain, sizeof plain), ==, 16);
+  munit_assert_size(tc_test_hex("7649abac8119b246cee98e9b12e9197d", cipher, sizeof cipher), ==, 16);
+  struct TC_AES_ctx ctx;
+  memcpy(block, plain, sizeof block);
+  munit_assert_int(TC_AES_init(&ctx, (TC_bytes){key, sizeof key}), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){iv, sizeof iv}), ==, TC_OK);
+  munit_assert_int(TC_AES_CBC_encrypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_OK);
+  munit_assert_memory_equal(sizeof block, block, cipher);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){iv, sizeof iv}), ==, TC_OK);
+  munit_assert_int(TC_AES_CBC_decrypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_OK);
+  munit_assert_memory_equal(sizeof block, block, plain);
+  TC_AES_ctx_clear(&ctx);
+  return MUNIT_OK;
+}
+#endif
+
+#if TC_ENABLE_DES && TC_DES_ENABLE_ECB && TC_DES_ENABLE_CBC && TC_DES_ENABLE_TDES
+/* DES with 8-, 16- and 24-byte keys, as DESFire uses it. A TDEA bundle whose
+ * components all equal K1 matches single DES under K1. The single-DES answer
+ * is the FIPS 81 example: "Now is t" under 0123456789ABCDEF. */
+TC_TEST(des_key_lengths)
+{
+  uint8_t keys[24], expected[8], block[8], iv[8] = {0};
+  static const uint8_t plain[8] = {'N', 'o', 'w', ' ', 'i', 's', ' ', 't'};
+  munit_assert_size(
+      tc_test_hex("0123456789abcdef0123456789abcdef0123456789abcdef", keys, sizeof keys), ==, 24);
+  munit_assert_size(tc_test_hex("3fa40e8a984d4815", expected, sizeof expected), ==, 8);
+  struct TC_DES_ctx ctx;
+  for (size_t length = 8; length <= 24; length += 8) {
+    memcpy(block, plain, sizeof block);
+    munit_assert_int(TC_DES_init(&ctx, (TC_bytes){keys, length}), ==, TC_OK);
+    munit_assert_int(TC_DES_ECB_encrypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_OK);
+    munit_assert_memory_equal(sizeof block, block, expected);
+    munit_assert_int(TC_DES_ECB_decrypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_OK);
+    munit_assert_memory_equal(sizeof block, block, plain);
+    /* One CBC block under a zero IV matches ECB. */
+    munit_assert_int(TC_DES_set_iv(&ctx, (TC_bytes){iv, sizeof iv}), ==, TC_OK);
+    munit_assert_int(TC_DES_CBC_encrypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_OK);
+    munit_assert_memory_equal(sizeof block, block, expected);
+    munit_assert_int(TC_DES_set_iv(&ctx, (TC_bytes){iv, sizeof iv}), ==, TC_OK);
+    munit_assert_int(TC_DES_CBC_decrypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_OK);
+    munit_assert_memory_equal(sizeof block, block, plain);
+    TC_DES_ctx_clear(&ctx);
+  }
+  return MUNIT_OK;
+}
+#endif
+
+#if TC_ENABLE_SHA1
 TC_TEST(sha1_hash)
 {
   const uint8_t message[] = {'a', 'b', 'c'};
@@ -36,7 +138,9 @@ TC_TEST(sha1_hash)
   munit_assert_memory_equal(sizeof digest, digest, expected);
   return MUNIT_OK;
 }
+#endif
 
+#if EXPECT_PIV_FAMILY
 TC_TEST(gzip_member)
 {
   uint8_t encoded[] = {0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 2, 0xff, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -157,19 +261,32 @@ static MunitResult rsa_signature(const MunitParameter params[], void* context)
   (void)context;
   return MUNIT_OK;
 }
+#endif
 
 int main(int argc, char** argv)
 {
+#if EXPECT_PIV_FAMILY
   static char* curves[] = {"p256", "p384", NULL};
   static MunitParameterEnum curve_params[] = {{"curve", curves}, {NULL, NULL}};
   static char* schemes[] = {"v15", "pss", NULL};
   static MunitParameterEnum rsa_params[] = {{"scheme", schemes}, {NULL, NULL}};
+#endif
   MunitTest tests[] = {
+#if TC_ENABLE_AES && TC_AES_ENABLE_CBC
+      {"/aes128-cbc", aes128_cbc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#endif
+#if TC_ENABLE_DES && TC_DES_ENABLE_ECB && TC_DES_ENABLE_CBC && TC_DES_ENABLE_TDES
+      {"/des-key-lengths", des_key_lengths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#endif
+#if TC_ENABLE_SHA1
       {"/sha1-hash", sha1_hash, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#endif
+#if EXPECT_PIV_FAMILY
       {"/gzip", gzip_member, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/native-signature", native_signature, NULL, NULL, MUNIT_TEST_OPTION_NONE, curve_params},
       {"/rsa-signature", rsa_signature, NULL, NULL, MUNIT_TEST_OPTION_NONE, rsa_params},
+#endif
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
-  MunitSuite suite = {"/role", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
+  MunitSuite suite = {"/target", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
 }

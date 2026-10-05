@@ -101,14 +101,22 @@ and pointers before processing input.
 `TINY_CRYPTO_RESOURCE_PROFILE=micro` favors small code and byte-limb EC and
 RSA arithmetic. `mini` uses native arithmetic while keeping optional algorithms
 off. `desktop` enables the supported capabilities, including SHA-1, DES,
-MD5 and both PIV secure-messaging suites. Use this profile when broad
-compatibility is required, and set application policy to restrict those algorithms.
+MD5 and both PIV secure-messaging suites.
 
-`TINY_CRYPTO_TARGET=piv-acu` or `piv-pd` selects a fixed role-specific algorithm
-set independently of resource tuning. A role default overrides the profile
-column below, and an explicit setting that contradicts the role stops the
-configuration. See [PIV targets and ESP32-P4](docs/esp32-p4.md) for the role
-requirements and ESP-IDF builds.
+`TINY_CRYPTO_TARGET` selects a predefined algorithm set for an application,
+independently of resource tuning:
+
+| Target    | Contents                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------- |
+| `full`    | Every algorithm and format                                                                  |
+| `piv`     | SP 800-73-5 with the SP 800-78-5 algorithms                                                 |
+| `twic`    | `piv` plus SHA-1, RSA-1024, TWIC privacy keys, object encryption and the canceled card list |
+| `desfire` | AES-128 CBC and DES ECB and CBC with single DES, two-key and three-key TDEA keys            |
+
+The target overrides the profile column below. Every switch outside its set is
+off, and an explicit setting that contradicts the target stops the
+configuration. Leave the target empty to choose each switch. See
+[application targets](docs/targets.md) for each set and its sources.
 
 Feature options accept `AUTO`, `ON`, or `OFF`. `AUTO` follows the selected
 profile. Explicit settings survive a profile change. Configuration compiles
@@ -264,7 +272,7 @@ requests, response verification and responder authorization.
 | Option                           | Values                                                         | Default         |
 | -------------------------------- | -------------------------------------------------------------- | --------------- |
 | `TINY_CRYPTO_RESOURCE_PROFILE`   | empty, `micro`, `mini`, `desktop`                              | empty           |
-| `TINY_CRYPTO_TARGET`             | empty, `piv-acu`, `piv-pd`                                     | empty           |
+| `TINY_CRYPTO_TARGET`             | empty, `full`, `piv`, `twic`, `desfire`                        | empty           |
 | `TINY_CRYPTO_AES_KEY_BITS`       | `128`, `192`, `256`                                            | `128`           |
 | `TINY_CRYPTO_AES_SBOX_MODE`      | `constant-time`, `runtime`, `fast`                             | `constant-time` |
 | `TINY_CRYPTO_AES_GCM_GHASH_MODE` | `profile`, `auto`, `bitwise`, `wide`, `fast-table`, `hardware` | `profile`       |

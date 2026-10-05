@@ -14,26 +14,24 @@ static volatile uint8_t sink;
 /* Fixed public inputs keep repeated measurements comparable. */
 static int measure(void)
 {
-  /* KMAC256 with a zero key and 64 zero input bytes, checked with OpenSSL. */
-  static const uint8_t expected[48] = {0x48, 0x73, 0x94, 0xc2, 0xd0, 0x21, 0xa6, 0xb4, 0x9d, 0x22,
-                                       0x1f, 0x0e, 0x9c, 0xb6, 0x9d, 0x42, 0xcf, 0x52, 0xbe, 0xbd,
-                                       0xef, 0x7f, 0x20, 0x20, 0x18, 0xbb, 0x38, 0xb4, 0x53, 0xb9,
-                                       0x73, 0x65, 0x4e, 0xdf, 0x41, 0x14, 0xba, 0x6d, 0x24, 0x42,
-                                       0xd2, 0x16, 0x19, 0x86, 0x2d, 0xa1, 0x87, 0x73};
-  uint8_t key[32] = {0}, data[64] = {0}, digest[48];
-  const TC_bytes kmac_key = {key, sizeof key}, message = {data, sizeof data};
-  const TC_bytes no_customization = {NULL, 0};
-  const TC_buffer output = {digest, sizeof digest};
+  /* SHA-384 of 64 zero bytes, checked with Python hashlib. */
+  static const uint8_t expected[48] = {0xc5, 0x16, 0xaa, 0x8d, 0x3b, 0x45, 0x7c, 0x63, 0x6c, 0x68,
+                                       0x26, 0x93, 0x70, 0x99, 0xc0, 0xd2, 0x3a, 0x13, 0xf2, 0xc3,
+                                       0x70, 0x1a, 0x38, 0x8b, 0x3c, 0x8f, 0xe4, 0xbc, 0x20, 0x73,
+                                       0x28, 0x1b, 0x0c, 0x44, 0x62, 0x61, 0x03, 0x69, 0x88, 0x4c,
+                                       0x4a, 0xba, 0xba, 0x8e, 0x97, 0xb6, 0xde, 0xbe};
+  uint8_t data[64] = {0}, digest[TC_SHA384_DIGESTLEN];
+  const TC_bytes message = {data, sizeof data};
   int64_t start = esp_timer_get_time();
   for (unsigned i = 0; i < 100; ++i) {
-    if (TC_KMAC256_digest(kmac_key, message, no_customization, output) != TC_OK)
+    if (TC_SHA384_digest(message, digest) != TC_OK)
       return 1;
     sink ^= digest[0];
   }
   int64_t elapsed = esp_timer_get_time() - start;
   if (memcmp(digest, expected, sizeof expected) != 0)
     return 1;
-  printf("KMAC256 64-byte input, 48-byte output: %" PRId64 " us / 100 operations\n", elapsed);
+  printf("SHA-384 64-byte input: %" PRId64 " us / 100 operations\n", elapsed);
 #if TC_ENABLE_EC
   static TC_EC_workspace workspace;
   uint8_t scalar[48] = {0}, point[97];
@@ -53,7 +51,6 @@ static int measure(void)
     vTaskDelay(1);
   }
 #endif
-  TC_secure_zero(key, sizeof key);
   return 0;
 }
 

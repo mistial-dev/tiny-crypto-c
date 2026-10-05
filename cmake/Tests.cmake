@@ -41,9 +41,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_warnings(test_direct_${feature})
     tc_use_test_sanitizers(test_direct_${feature})
   endforeach()
-  add_test(NAME test_piv_targets COMMAND ${CMAKE_COMMAND}
-    -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/piv-targets
-    -DC_COMPILER=${CMAKE_C_COMPILER} -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/piv_targets.cmake)
+  add_test(NAME test_application_targets COMMAND ${CMAKE_COMMAND}
+    -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/application-targets
+    -DC_COMPILER=${CMAKE_C_COMPILER} -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/application_targets.cmake)
   add_test(NAME test_resource_profiles COMMAND ${CMAKE_COMMAND}
     -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/resource-profiles
     -DC_COMPILER=${CMAKE_C_COMPILER} -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/resource_profiles.cmake)
@@ -2104,7 +2104,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     test_installed_consumer
     test_installed_consumer_debug_environment
     test_resource_profiles
-    test_piv_targets
+    test_application_targets
     test_benchmark_fast
     test_benchmark_runtime
     test_drbg_cavp
