@@ -2129,4 +2129,5 @@ if(TINY_CRYPTO_BUILD_TESTS)
       PROPERTIES LABELS extended)
   endif()
 
+  tc_null_guard_tests()
 endif()

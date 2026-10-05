@@ -119,6 +119,42 @@ act workflow_dispatch --bind -W .github/act/cms-sanitizer.yml -j msan
 Run one sanitizer configuration at a time when builds share a directory.
 Preserve the complete failing command and seed before reducing a failure.
 
+## Null-guard instrumentation
+
+`TINY_CRYPTO_TEST_NULL_GUARD=ON` checks every public C function for missing
+argument checks. `make test-sanitize` turns it on. The build generates
+`null_guard_wrappers.h` from Clang's AST of the public headers and
+force-includes it into the C test sources. Each public call made by a test
+first runs once per pointer argument with that argument NULL, and once per
+span argument with NULL data and the caller's nonzero length. The other
+arguments keep the test's real values, so the call reaches the code after the
+library's argument checks. AddressSanitizer or UndefinedBehaviorSanitizer then
+reports a missing guard where the library dereferences it. A call with a NULL
+argument that returns `TC_RESULT_OK` aborts the test with the function and
+parameter name.
+
+Clang must be available, also for GCC builds, to generate the wrappers. C++
+tests call the library directly.
+
+- A pointer followed by an integer count is set to NULL only when the count is
+  nonzero.
+- `void*` callback contexts named `context` or `user` pass through unchanged.
+- [`tests/null_guard/nullable.txt`](../tests/null_guard/nullable.txt) lists
+  parameters that accept NULL by contract, each with its reason. Add an entry
+  only when the public header documents the NULL behavior.
+- Writable objects passed by pointer are restored after each repeated call.
+  Span contents are left alone, because an argument error must leave outputs
+  unchanged.
+- `tc_skip_null_guard` keeps one test executable on direct calls when the
+  repeated calls would change library state the test counts, such as a fault
+  injection counter.
+
+`test_null_guard_coverage` runs after the other tests. It lists the cases no
+test reached that are missing from
+[`tests/null_guard/uncovered.txt`](../tests/null_guard/uncovered.txt). Cover a
+new public function with a C test, which also brings it under the
+instrumentation.
+
 ## Fuzzing
 
 Configure the Clang fuzz build, build the desired targets, then run their

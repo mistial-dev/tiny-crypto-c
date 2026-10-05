@@ -105,6 +105,25 @@ TC_TEST(test_profile)
   munit_assert(TC_KMAC256_digest_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4},
                                            (TC_bytes){NULL, 0},
                                            (TC_buffer){out, TC_MIN_TAG_LEN}) == TC_ERROR);
+  /* A customization string is part of the MAC input for every entry point,
+   * and the streaming short-tag final agrees with the one-shot call. */
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                 (TC_bytes){custom, sizeof(custom) - 1},
+                                 (TC_buffer){want, TC_MIN_TAG_LEN}) == TC_OK);
+  munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                 (TC_bytes){custom, sizeof(custom) - 1},
+                                 (TC_bytes){want, TC_MIN_TAG_LEN}) == TC_OK);
+  munit_assert(TC_KMAC256_digest_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                           (TC_bytes){custom, sizeof(custom) - 1},
+                                           (TC_buffer){want, TC_MIN_TAG_LEN - 1}) == TC_OK);
+  munit_assert(TC_KMAC256_verify_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                           (TC_bytes){custom, sizeof(custom) - 1},
+                                           (TC_bytes){want, TC_MIN_TAG_LEN - 1}) == TC_OK);
+  munit_assert(TC_KMAC256_init(&ctx, (TC_bytes){key, 32}, (TC_bytes){custom, sizeof(custom) - 1}) ==
+               TC_OK);
+  munit_assert(TC_KMAC256_update(&ctx, (TC_bytes){data, 4}) == TC_OK);
+  munit_assert(TC_KMAC256_final_short_tag(&ctx, (TC_buffer){stream, TC_MIN_TAG_LEN - 1}) == TC_OK);
+  munit_assert(memcmp(stream, want, TC_MIN_TAG_LEN - 1) == 0);
   /* SP 800-185 section 8.4.2: a KMAC tag holds at least 32 bits. */
   munit_assert(
       TC_KMAC256_digest_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},

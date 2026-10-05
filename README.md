@@ -293,6 +293,7 @@ configuration time. `hardware` needs a platform GHASH hook, declared in
 | `TINY_CRYPTO_BUILD_FUZZERS`    | OFF                                  | libFuzzer targets, Clang only                |
 | `TINY_CRYPTO_SANITIZE`         | empty                                | Test sanitizers, such as `address,undefined` |
 | `TINY_CRYPTO_TEST_FULL`        | OFF                                  | Run the checked-in CAVP corpora              |
+| `TINY_CRYPTO_TEST_NULL_GUARD`  | OFF                                  | Repeat C test calls with NULL arguments      |
 | `TINY_CRYPTO_TEST_OPENSSL`     | OFF                                  | OpenSSL 3 cross-checks                       |
 | `TINY_CRYPTO_TEST_PIV_CARD`    | OFF                                  | PIV card hardware tests over PC/SC           |
 

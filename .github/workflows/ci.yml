@@ -99,8 +99,9 @@ jobs:
       - name: Install AVR compiler and emulator
         if: matrix.compiler == 'gcc'
         run: sudo apt-get update && sudo apt-get install -y gcc-avr avr-libc qemu-system-misc
-      - name: Install OpenSSL development files
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+      - name: Install OpenSSL development files and Clang
+        # Clang generates the null-guard wrappers for both compilers.
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev clang
       - name: Fetch Unicode reference data
         run: |
           mkdir -p "$RUNNER_TEMP/unicode"

@@ -119,6 +119,10 @@ static void key_answer_set(const struct tc_sm_fixture* fixture)
   card.key_answer = (TC_bytes){key_bytes, fixture->response.length + 2};
 }
 
+/* Copy of the card CVC bound by the last link_secure. */
+static uint8_t bound_cvc[RESPONSE_BYTES];
+static size_t bound_cvc_length;
+
 static void link_secure(TC_PIV_link* link, const struct tc_sm_fixture* fixture)
 {
   TC_PIV_SM_peer peer;
@@ -127,6 +131,9 @@ static void link_secure(TC_PIV_link* link, const struct tc_sm_fixture* fixture)
                                          (TC_random_source){scalar_one, NULL},
                                          response_buffer(RESPONSE_BYTES), &peer, &workspace),
                    ==, TC_PIV_OK);
+  munit_assert_size(peer.certificate.length, <=, sizeof bound_cvc);
+  memcpy(bound_cvc, peer.certificate.data, peer.certificate.length);
+  bound_cvc_length = peer.certificate.length;
   munit_assert_false(card.broken);
   munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_ESTABLISHING);
   munit_assert_int(TC_PIV_SM_finish(&session, &peer, fixture->public_key, &workspace), ==, TC_OK);
@@ -627,6 +634,22 @@ TC_TEST(unbind)
         TC_PIV_get_data(&link, (TC_bytes){tag, sizeof tag}, response_buffer(RESPONSE_BYTES), &out),
         ==, TC_PIV_CARD_STATUS);
     munit_assert_size(card.plain_commands, ==, 1);
+    TC_PIV_link_clear(&link);
+
+    /* The secured link is bound to the exact card CVC of the handshake, and
+     * an unsecured link is bound to none. */
+    secured_link(&link, suites[s], TC_PIV_CONTACT);
+    munit_assert_int(TC_PIV_link_sm_peer_matches(&link, (TC_bytes){bound_cvc, bound_cvc_length}),
+                     ==, 1);
+    bound_cvc[bound_cvc_length - 1] ^= 1;
+    munit_assert_int(TC_PIV_link_sm_peer_matches(&link, (TC_bytes){bound_cvc, bound_cvc_length}),
+                     ==, 0);
+    bound_cvc[bound_cvc_length - 1] ^= 1;
+    munit_assert_int(TC_PIV_link_sm_peer_matches(NULL, (TC_bytes){bound_cvc, bound_cvc_length}), ==,
+                     0);
+    TC_PIV_link_unsecure(&link);
+    munit_assert_int(TC_PIV_link_sm_peer_matches(&link, (TC_bytes){bound_cvc, bound_cvc_length}),
+                     ==, 0);
     TC_PIV_link_clear(&link);
 
     secured_link(&link, suites[s], TC_PIV_CONTACT);

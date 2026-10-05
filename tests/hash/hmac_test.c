@@ -629,6 +629,49 @@ TC_TEST_SHARED(test_hmac_truncation)
                                        (TC_bytes){full, TC_SHA1_DIGESTLEN + 1}),
                    ==, TC_ERROR);
 #endif
+
+  /* Every digest: the longest short tag is the leading bytes of the full tag
+   * and verifies, a changed byte mismatches, and the default minimum belongs
+   * to the default entry point. */
+#define HMAC_SHORT_TAG_CHECK(N)                                                                    \
+  do {                                                                                             \
+    const size_t below = TC_HMAC_MIN_TAG_LEN_FOR(TC_SHA##N##_DIGESTLEN) - 1;                       \
+    full_tag(TC_SHA##N##_DIGESTLEN, key, sizeof(key), msg, sizeof(msg), full);                     \
+    munit_assert_int(TC_HMAC_SHA##N##_digest_short_tag((TC_bytes){key, sizeof(key)},               \
+                                                       (TC_bytes){msg, sizeof(msg)},               \
+                                                       (TC_buffer){tag, below}),                   \
+                     ==, TC_OK);                                                                   \
+    munit_assert_memory_equal(below, tag, full);                                                   \
+    munit_assert_int(TC_HMAC_SHA##N##_verify_short_tag((TC_bytes){key, sizeof(key)},               \
+                                                       (TC_bytes){msg, sizeof(msg)},               \
+                                                       (TC_bytes){tag, below}),                    \
+                     ==, TC_OK);                                                                   \
+    tag[below - 1] ^= 1;                                                                           \
+    munit_assert_int(TC_HMAC_SHA##N##_verify_short_tag((TC_bytes){key, sizeof(key)},               \
+                                                       (TC_bytes){msg, sizeof(msg)},               \
+                                                       (TC_bytes){tag, below}),                    \
+                     ==, TC_MISMATCH);                                                             \
+    munit_assert_int(TC_HMAC_SHA##N##_digest_short_tag((TC_bytes){key, sizeof(key)},               \
+                                                       (TC_bytes){msg, sizeof(msg)},               \
+                                                       (TC_buffer){tag, below + 1}),               \
+                     ==, TC_ERROR);                                                                \
+  } while (0)
+#if TC_ENABLE_SHA1
+  HMAC_SHORT_TAG_CHECK(1);
+#endif
+#if TC_ENABLE_SHA224
+  HMAC_SHORT_TAG_CHECK(224);
+#endif
+#if TC_ENABLE_SHA256
+  HMAC_SHORT_TAG_CHECK(256);
+#endif
+#if TC_ENABLE_SHA384
+  HMAC_SHORT_TAG_CHECK(384);
+#endif
+#if TC_ENABLE_SHA512
+  HMAC_SHORT_TAG_CHECK(512);
+#endif
+#undef HMAC_SHORT_TAG_CHECK
   return MUNIT_OK;
 }
 
