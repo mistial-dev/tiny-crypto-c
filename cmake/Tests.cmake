@@ -748,7 +748,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_c_test(test_twic_cipher_${profile}
       tiny-crypto-c-test-twic-cipher-${profile} tests/twic/cipher.c)
   endforeach()
-  set(tc_pki_sources src/common.c src/tlv.c src/tlv_walk.c src/der.c src/x509_crl.c src/x509_crl_extensions.c src/x509_crl_selected.c src/x509_crl_evidence.c src/x509_crl_entries.c src/pki_storage.c src/piv_oid.c src/twic_oid.c src/piv_container_internal.c src/credential_text_internal.c src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/piv_card.c src/twic_card_identifiers.c src/piv_printed.c src/twic_printed.c src/key_challenge.c src/lds.c src/piv_security.c src/fascn.c src/twic_uuid.c
+  set(tc_pki_sources src/common.c src/tlv.c src/tlv_walk.c src/der.c src/x509_crl.c src/x509_crl_extensions.c src/x509_crl_selected.c src/x509_crl_evidence.c src/x509_crl_entries.c src/pki_storage.c src/piv_oid.c src/twic_oid.c src/piv_container_internal.c src/credential_text_internal.c src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/twic_object_rules.c src/piv_card.c src/twic_card_identifiers.c src/piv_printed.c src/twic_printed.c src/key_challenge.c src/lds.c src/piv_security.c src/fascn.c src/twic_uuid.c
     src/piv_cvc.c src/piv_cvc_verify.c src/piv_chuid.c src/credential.c src/credential_policy.c src/credential_session.c src/credential_security.c src/credential_signer.c src/validation.c src/x509.c src/x509_crypto.c src/x509_time.c src/x509_key.c src/pki_key.c src/pki_signature_oid.c src/x509_ext.c src/x509_name.c src/x509_name_constraints.c src/x509_path.c src/x509_path_extensions.c src/x509_path_workspace.c src/x509_search.c src/x509_store.c src/x509_store_anchor.c src/snapshot.c src/cms.c src/cms_collections.c src/cms_path.c src/x509_revocation.c src/x509_crl_scope.c src/x509_crl_scope_storage.c src/x509_crl_delta.c src/x509_policy.c src/asn1_string.c src/unicode.c src/eac_cvc.c)
   list(APPEND tc_pki_sources src/source.c src/source_der.c src/x509_crl_source.c src/x509_crl_prepare.c)
   tc_add_test_library(tiny-crypto-c-test-pki ${tc_pki_sources})
@@ -814,7 +814,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_test_library(tiny-crypto-c-test-piv-objects
     src/common.c src/tlv.c src/tlv_walk.c src/piv_container_internal.c src/piv_aid.c
     src/twic_aid.c src/twic_discovery.c src/piv_discovery.c src/piv_ccc.c src/piv_key_history.c src/piv_bit_group.c
-    src/piv_pairing_code.c src/piv_certificate.c src/piv_certificate_decode.c
+    src/piv_pairing_code.c src/piv_certificate.c src/twic_object_rules.c src/piv_certificate_decode.c
     src/piv_card_objects_internal.c src/credential_text_internal.c)
   target_compile_definitions(tiny-crypto-c-test-piv-objects PUBLIC
     TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1
