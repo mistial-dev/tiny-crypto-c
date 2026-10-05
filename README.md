@@ -44,7 +44,8 @@ values, build options, and the installed CMake target. Applications should
 rebuild the library with their toolchain when upgrading. Binary compatibility
 across different toolchains is outside this versioning policy. Version
 **2.0.0** includes public API changes that require callers upgrading from 1.x
-to review and update their code.
+to review and update their code. The [changelog](CHANGELOG.md) lists each release, including
+the interfaces renamed and removed in 2.1.0.
 
 ## Build
 
