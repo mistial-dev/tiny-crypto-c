@@ -34,6 +34,22 @@ TC_TEST(representative)
                                     (TC_bytes){digest, sizeof digest},
                                     (tc_rsa_hash_scratch){block, &workspace}, &work),
                    ==, TC_RSA_INVALID);
+  /* Trailer and unused-bit failures take the full MGF1, hash and compare
+   * path, so they charge the same work as a valid encoding. */
+  for (size_t i = 0; i < 2; ++i) {
+    memcpy(encoded, fixture, sizeof encoded);
+    if (i)
+      encoded[sizeof encoded - 1] ^= 1;
+    else
+      encoded[0] |= 0x80;
+    work = 10000;
+    munit_assert_int(tc_rsa_pss_check(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, 32},
+                                      (TC_buffer){encoded, sizeof encoded}, 1023,
+                                      (TC_bytes){digest, sizeof digest},
+                                      (tc_rsa_hash_scratch){block, &workspace}, &work),
+                     ==, TC_RSA_INVALID);
+    munit_assert_uint32(10000 - work, ==, required);
+  }
   memcpy(encoded, fixture, sizeof encoded);
   work = 10000;
   munit_assert_int(tc_rsa_pss_check(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, SIZE_MAX},
