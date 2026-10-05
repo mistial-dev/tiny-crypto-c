@@ -1107,7 +1107,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
   result = TC_PIV_CVC_read((TC_bytes){data, length}, &cvc);
   if (result != TC_TLV_OK && memcmp(&cvc, &old_cvc, sizeof cvc))
     abort();
-  for (profile = TC_CHUID_PROFILE_PIV; profile <= TC_CHUID_PROFILE_LEGACY_KEY_MAP; ++profile)
+  for (profile = TC_CHUID_PROFILE_PIV; profile <= TC_CHUID_PROFILE_PIV_SP800_73_4; ++profile)
     for (encoding = TC_PIV_CHUID_CONTENTS; encoding <= TC_PIV_CHUID_CONTAINER; ++encoding) {
       memset(&chuid, 0xa5, sizeof chuid);
       old_chuid = chuid;

@@ -3,6 +3,7 @@
 /* Key History object reader. */
 #include <tiny_crypto/piv_card_objects.h>
 #if TC_ENABLE_PIV_OBJECTS
+#include "credential_text_internal.h"
 #include "internal.h"
 #include "piv_card_objects_internal.h"
 #include "pki_internal.h"
@@ -22,11 +23,6 @@ static const char url_scheme[] = "http://";
 static int ldh(uint8_t c)
 {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-';
-}
-
-static int hex_digit(uint8_t c)
-{
-  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
 /* Dot-separated LDH labels of 1 to 63 bytes, each without a leading or
@@ -58,7 +54,7 @@ static int url_valid(TC_bytes url)
   if (!dns_name(host, host_length) || host[host_length] != '/')
     return 0;
   for (size_t i = 0; i < HASH_DIGITS; ++i)
-    if (!hex_digit(hash[i]))
+    if (tc_credential_hex_digit(hash[i]) < 0)
       return 0;
   return 1;
 }

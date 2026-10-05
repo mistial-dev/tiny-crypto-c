@@ -382,7 +382,8 @@ static TC_TLV_result crl_scalar(TC_bytes encoded, unsigned tag, TC_TLV_element* 
   TC_TLV_result result = TC_TLV_read(encoded, TC_TLV_DER, &limits, out);
   if (result != TC_TLV_OK)
     return result;
-  return tc_pki_tag(out, tag) && out->encoded.length == encoded.length ? TC_TLV_OK : TC_TLV_INVALID;
+  return tc_tlv_tag_is(out, tag) && out->encoded.length == encoded.length ? TC_TLV_OK
+                                                                          : TC_TLV_INVALID;
 }
 
 TC_TLV_result tc_x509_crl_number_read(TC_bytes encoded, TC_bytes* out)

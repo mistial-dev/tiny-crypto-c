@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-/* MD5 for legacy download checksums.
+/* MD5 checksums for downloads that publish them.
  * Standards: RFC 1321.
  * Configuration: TC_ENABLE_MD5.
  * Limitations: MD5 has broken collision resistance. Establish authenticity

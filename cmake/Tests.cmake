@@ -41,9 +41,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_warnings(test_direct_${feature})
     tc_use_test_sanitizers(test_direct_${feature})
   endforeach()
-  add_test(NAME test_piv_targets COMMAND ${CMAKE_COMMAND}
-    -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/piv-targets
-    -DC_COMPILER=${CMAKE_C_COMPILER} -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/piv_targets.cmake)
+  add_test(NAME test_application_targets COMMAND ${CMAKE_COMMAND}
+    -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/application-targets
+    -DC_COMPILER=${CMAKE_C_COMPILER} -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/application_targets.cmake)
   add_test(NAME test_resource_profiles COMMAND ${CMAKE_COMMAND}
     -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/resource-profiles
     -DC_COMPILER=${CMAKE_C_COMPILER} -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/resource_profiles.cmake)
@@ -203,7 +203,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     src/apdu_encode.c src/apdu_response.c src/apdu_channel.c
     src/tlv.c src/tlv_walk.c src/tlv_write.c src/piv_container_internal.c src/piv_aid.c
     src/piv_link.c src/piv_select.c src/piv_get_data.c src/piv_verify.c src/piv_status.c
-    src/piv_template_internal.c)
+    src/piv_template_internal.c src/twic_aid.c src/twic_command.c)
   # Secure messaging on the card link: the session, CVC reader and commands.
   set(tc_piv_sm_link_sources src/common.c ${tc_aes_sources}
     ${tc_hash_sources} src/sskdf.c src/ec.c src/der.c src/piv_cvc.c
@@ -225,7 +225,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_EC_ENABLE_P256=$<NOT:$<STREQUAL:${sm_profile},cs7>>
     TC_EC_ENABLE_P384=$<NOT:$<STREQUAL:${sm_profile},cs2>>
     TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1
-    TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1)
+    TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_SM_APDU=1)
   tc_add_c_test(test_piv_sm${sm_suffix} tiny-crypto-c-test-piv-sm${sm_suffix} tests/piv/sm.c)
   tc_add_c_test(test_piv_sm_apdu${sm_suffix} tiny-crypto-c-test-piv-sm${sm_suffix}
     tests/piv/sm_apdu.c tests/support/sm_card.c tests/support/sm_card_session.c)
@@ -250,15 +250,15 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # object-reader switches satisfy config.h, and only piv_discovery.c of that
   # module is linked.
   tc_add_test_library(tiny-crypto-c-test-piv-vci ${tc_piv_sm_link_sources}
-    src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c)
+    src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c src/twic_discovery.c)
   target_compile_definitions(tiny-crypto-c-test-piv-vci PUBLIC
     TC_ENABLE_PIV_SM=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1
     TC_ENABLE_SHA384=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1
     TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
     TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1
-    TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1
+    TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_SM_APDU=1
     TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1
-    TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1)
+    TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_VCI=1)
   tc_add_c_test(test_piv_vci tiny-crypto-c-test-piv-vci tests/piv/vci.c
     tests/support/sm_card.c tests/support/sm_card_session.c
     tests/support/scripted_transport.c)
@@ -273,16 +273,16 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures")
   # The catalog and inventory over the simulator, plain and secured.
   tc_add_test_library(tiny-crypto-c-test-piv-catalog ${tc_piv_sm_link_sources}
-    src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c src/piv_catalog.c
-    src/piv_inventory.c)
+    src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c src/piv_catalog.c src/twic_catalog.c
+    src/piv_inventory.c src/twic_discovery.c)
   target_compile_definitions(tiny-crypto-c-test-piv-catalog PUBLIC
     TC_ENABLE_PIV_SM=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1
     TC_ENABLE_SHA384=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1
     TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
     TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1
-    TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1
+    TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_SM_APDU=1
     TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1
-    TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1
+    TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_VCI=1
     TC_ENABLE_PIV_CATALOG=1)
   tc_add_c_test(test_piv_inventory tiny-crypto-c-test-piv-catalog tests/piv/inventory.c
     ${tc_card_simulator_sources} tests/support/scripted_transport.c)
@@ -698,9 +698,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # PIV card commands need the APDU channel and the TLV readers. The catalog
   # needs nothing more, so the plain inventory builds here too.
   tc_add_test_library(tiny-crypto-c-test-piv-command src/common.c ${tc_piv_command_sources}
-    src/piv_catalog.c src/piv_inventory.c)
+    src/piv_catalog.c src/twic_catalog.c src/piv_inventory.c)
   target_compile_definitions(tiny-crypto-c-test-piv-command PUBLIC
-    TC_ENABLE_APDU=1 TC_ENABLE_TLV=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_CATALOG=1
+    TC_ENABLE_APDU=1 TC_ENABLE_TLV=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_CATALOG=1
     TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
   tc_add_c_test(test_piv_command tiny-crypto-c-test-piv-command tests/piv/command.c
     tests/support/scripted_transport.c)
@@ -748,8 +748,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_c_test(test_twic_cipher_${profile}
       tiny-crypto-c-test-twic-cipher-${profile} tests/twic/cipher.c)
   endforeach()
-  set(tc_pki_sources src/common.c src/tlv.c src/tlv_walk.c src/der.c src/x509_crl.c src/x509_crl_extensions.c src/x509_crl_selected.c src/x509_crl_evidence.c src/x509_crl_entries.c src/pki_storage.c src/piv_oid.c src/piv_container_internal.c src/credential_text_internal.c src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/piv_card.c src/piv_printed.c src/key_challenge.c src/lds.c src/piv_security.c src/fascn.c src/twic_uuid.c
-    src/piv_cvc.c src/piv_cvc_verify.c src/piv_chuid.c src/credential.c src/credential_policy.c src/credential_session.c src/credential_security.c src/credential_signer.c src/validation.c src/x509.c src/x509_crypto.c src/x509_time.c src/x509_key.c src/pki_key.c src/pki_signature_oid.c src/x509_ext.c src/x509_name.c src/x509_name_constraints.c src/x509_path.c src/x509_path_extensions.c src/x509_path_workspace.c src/x509_search.c src/x509_store.c src/x509_store_anchor.c src/snapshot.c src/cms.c src/cms_collections.c src/cms_path.c src/x509_revocation.c src/x509_crl_scope.c src/x509_crl_scope_storage.c src/x509_crl_delta.c src/x509_policy.c src/asn1_string.c src/unicode.c src/eac_cvc.c)
+  set(tc_pki_sources src/common.c src/tlv.c src/tlv_walk.c src/der.c src/x509_crl.c src/x509_crl_extensions.c src/x509_crl_selected.c src/x509_crl_evidence.c src/x509_crl_entries.c src/pki_storage.c src/piv_oid.c src/twic_oid.c src/piv_container_internal.c src/credential_text_internal.c src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/twic_object_rules.c src/piv_card.c src/twic_card_identifiers.c src/piv_printed.c src/twic_printed.c src/key_challenge.c src/lds.c src/piv_security.c src/fascn.c src/twic_uuid.c
+    src/piv_cvc.c src/piv_cvc_verify.c src/piv_chuid.c src/credential.c src/twic_chuid.c src/credential_policy.c src/credential_session.c src/credential_security.c src/credential_signer.c src/validation.c src/x509.c src/x509_crypto.c src/x509_time.c src/x509_key.c src/pki_key.c src/pki_signature_oid.c src/x509_ext.c src/x509_name.c src/x509_name_constraints.c src/x509_path.c src/x509_path_extensions.c src/x509_path_workspace.c src/x509_search.c src/x509_store.c src/x509_store_anchor.c src/snapshot.c src/cms.c src/cms_collections.c src/cms_path.c src/x509_revocation.c src/x509_crl_scope.c src/x509_crl_scope_storage.c src/x509_crl_delta.c src/x509_policy.c src/asn1_string.c src/unicode.c src/eac_cvc.c)
   list(APPEND tc_pki_sources src/source.c src/source_der.c src/x509_crl_source.c src/x509_crl_prepare.c)
   tc_add_test_library(tiny-crypto-c-test-pki ${tc_pki_sources})
   target_compile_definitions(tiny-crypto-c-test-pki PUBLIC
@@ -757,7 +757,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_PIV_CVC=1 TC_ENABLE_PIV_CHUID=1 TC_ENABLE_X509=1
     TC_ENABLE_KEY_CHALLENGE=1 TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OIDS=1
     TC_ENABLE_X509_PATH=1 TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_CMS=1
-    TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_CREDENTIAL=1
+    TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1 TC_ENABLE_CREDENTIAL=1
     TC_ENABLE_AES=0 TC_ENABLE_SHA256=0 TC_ENABLE_EAC_CVC=1)
   tc_add_c_test(test_cms_external_collections tiny-crypto-c-test-pki
     tests/cms/external.c tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c)
@@ -813,12 +813,12 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # and GZIP for compressed certificates.
   tc_add_test_library(tiny-crypto-c-test-piv-objects
     src/common.c src/tlv.c src/tlv_walk.c src/piv_container_internal.c src/piv_aid.c
-    src/piv_discovery.c src/piv_ccc.c src/piv_key_history.c src/piv_bit_group.c
-    src/piv_pairing_code.c src/piv_certificate.c src/piv_certificate_decode.c
-    src/piv_card_objects_internal.c)
+    src/twic_aid.c src/twic_discovery.c src/piv_discovery.c src/piv_ccc.c src/piv_key_history.c src/piv_bit_group.c
+    src/piv_pairing_code.c src/piv_certificate.c src/twic_object_rules.c src/piv_certificate_decode.c
+    src/piv_card_objects_internal.c src/credential_text_internal.c)
   target_compile_definitions(tiny-crypto-c-test-piv-objects PUBLIC
     TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1
-    TC_ENABLE_CMS=1 TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1
+    TC_ENABLE_CMS=1 TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1
     TC_ENABLE_GZIP=1
     TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
   target_link_libraries(tiny-crypto-c-test-piv-objects PUBLIC tiny-crypto-c-test-gzip)
@@ -906,8 +906,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # so card tests can verify with the native signature provider.
   set(tc_native_card_sources ${tc_piv_command_sources} src/piv_sm_apdu.c
     src/piv_sm_key_request.c src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c
-    src/piv_catalog.c src/piv_inventory.c src/piv_key_policy.c src/piv_key_proof.c
-    src/piv_card_check.c src/piv_card_check_certificates.c src/piv_card_check_signed.c
+    src/twic_discovery.c src/piv_catalog.c src/twic_catalog.c src/piv_inventory.c src/piv_key_policy.c src/twic_key_policy.c src/piv_key_proof.c
+    src/piv_card_check.c src/twic_card_check.c src/piv_card_check_certificates.c src/piv_card_check_signed.c
     src/piv_card_check_keys.c src/piv_card_check_report.c src/piv_card_crl_targets.c src/inflate_tree.c src/inflate_bits.c src/inflate_tables.c src/inflate.c src/gzip.c
     src/gzip_api.c src/piv_certificate_decode.c src/piv_bit_group.c src/piv_ccc.c
     src/piv_key_history.c src/piv_pairing_code.c src/piv_card_objects_internal.c)
@@ -925,8 +925,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_TWIC_OBJECT_CRYPTO=1 TC_ENABLE_X509_PATH=1
     TC_ENABLE_TRUST_ANCHOR_FORMAT=1
     TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_X509_OCSP=1 TC_ENABLE_CMS=1
-    TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1
-    TC_ENABLE_CREDENTIAL=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1
+    TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1
+    TC_ENABLE_CREDENTIAL=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_SM_APDU=1
     TC_ENABLE_PIV_VCI=1 TC_ENABLE_PIV_CATALOG=1 TC_ENABLE_PIV_KEY_PROOF=1 TC_ENABLE_GZIP=1
     TC_ENABLE_PIV_CARD_CHECK=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_PIV_SM=1
     TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1 TC_EC_ENABLE_P192=1 TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
@@ -1118,7 +1118,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_KEY_CHALLENGE=1
     TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_X509_PATH=1
     TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_CMS=1
-    TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1
+    TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1
     TC_ENABLE_CREDENTIAL=1 TC_ENABLE_PIV_CHUID=1
     TC_ENABLE_SHA1=1 TC_ENABLE_SHA224=1 TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1 TC_ENABLE_SHA512=1)
   tc_add_c_test(test_cms_content tiny-crypto-c-test-cms-crypto tests/cms/content.c)
@@ -1685,20 +1685,20 @@ if(TINY_CRYPTO_BUILD_TESTS)
       list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_TEST_HEADER_APDU=1)
     elseif(header_profile STREQUAL "piv_command")
       list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_ENABLE_TLV=1
-        TC_ENABLE_PIV_COMMAND=1 TC_TEST_HEADER_PIV_COMMAND=1)
+        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1 TC_TEST_HEADER_PIV_COMMAND=1)
     elseif(header_profile STREQUAL "piv_catalog")
       list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_ENABLE_TLV=1
-        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_CATALOG=1 TC_TEST_HEADER_PIV_CATALOG=1)
+        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_CATALOG=1 TC_TEST_HEADER_PIV_CATALOG=1)
     elseif(header_profile STREQUAL "piv_key_proof")
       list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1
-        TC_ENABLE_X509=1 TC_ENABLE_KEY_CHALLENGE=1 TC_ENABLE_PIV_COMMAND=1
+        TC_ENABLE_X509=1 TC_ENABLE_KEY_CHALLENGE=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1
         TC_ENABLE_PIV_KEY_PROOF=1 TC_TEST_HEADER_PIV_KEY_PROOF=1)
     elseif(header_profile STREQUAL "piv_card_check")
       list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1
         TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_X509_PATH=1
         TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_CMS=1 TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_FASCN=1
-        TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_CHUID=1 TC_ENABLE_CREDENTIAL=1
-        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_CATALOG=1 TC_ENABLE_GZIP=1
+        TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_CHUID=1 TC_ENABLE_CREDENTIAL=1
+        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_CATALOG=1 TC_ENABLE_GZIP=1
         TC_ENABLE_PIV_CARD_CHECK=1 TC_TEST_HEADER_PIV_CARD_CHECK=1)
     elseif(header_profile STREQUAL "aamva")
       list(APPEND header_profile_definitions TC_ENABLE_AAMVA=1 TC_TEST_HEADER_AAMVA=1)
@@ -1751,12 +1751,12 @@ if(TINY_CRYPTO_BUILD_TESTS)
       list(APPEND header_profile_definitions
         TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1
         TC_ENABLE_CMS=1 TC_ENABLE_FASCN=1
-        TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_TEST_HEADER_PIV_OBJECTS=1)
+        TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1 TC_TEST_HEADER_PIV_OBJECTS=1)
     elseif(header_profile STREQUAL "credential")
       list(APPEND header_profile_definitions
         TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_X509_PATH=1
         TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_CMS=1 TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_FASCN=1
-        TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_CHUID=1
+        TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_CHUID=1
         TC_ENABLE_CREDENTIAL=1 TC_TEST_HEADER_CREDENTIAL=1)
     elseif(header_profile STREQUAL "piv_cvc")
       list(APPEND header_profile_definitions
@@ -1778,7 +1778,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
         TC_ENABLE_SSKDF=1 TC_ENABLE_EC=1 TC_EC_ENABLE_P256=1
         TC_ENABLE_PIV_SM=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=0
         TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_APDU=1
-        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1 TC_TEST_HEADER_PIV_SM_APDU=1)
+        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_SM_APDU=1 TC_TEST_HEADER_PIV_SM_APDU=1)
     elseif(header_profile STREQUAL "piv_vci")
       list(REMOVE_ITEM header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
       list(APPEND header_profile_definitions
@@ -1786,9 +1786,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
         TC_ENABLE_SSKDF=1 TC_ENABLE_EC=1 TC_EC_ENABLE_P256=1
         TC_ENABLE_PIV_SM=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=0
         TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_APDU=1
-        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1
+        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_SM_APDU=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1
         TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1 TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1
-        TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1 TC_TEST_HEADER_PIV_VCI=1)
+        TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_VCI=1 TC_TEST_HEADER_PIV_VCI=1)
     elseif(header_profile STREQUAL "twic_ccl")
       list(APPEND header_profile_definitions TC_ENABLE_TWIC_CCL=1 TC_TEST_HEADER_TWIC_CCL=1)
     endif()
@@ -1833,9 +1833,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_AES_ENABLE_EAX_PRIME=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_MD5=1 TC_ENABLE_GZIP=1
     TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HMAC=1 TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1
     TC_ENABLE_PIV_CHUID=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_EAC_CVC=1 TC_ENABLE_PIV_SM=1
-    TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1
+    TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1
     TC_ENABLE_PIV_SM_APDU=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1
-    TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1
+    TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_VCI=1
     TC_ENABLE_PIV_CATALOG=1 TC_ENABLE_KEY_CHALLENGE=1 TC_ENABLE_PIV_KEY_PROOF=1)
   add_library(test_cpp_headers_cxx17 OBJECT tests/cpp/header_compile.cpp)
   target_include_directories(test_cpp_headers_cxx17 PRIVATE src)
@@ -1932,7 +1932,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
           -DTC_RESOURCE_PROFILE=1 -DTC_ENABLE_PIV_SM=1 -DTC_ENABLE_EC=1
           -DTC_ENABLE_SSKDF=1 -DTC_ENABLE_SHA384=1 -DTC_AES_ENABLE_DYNAMIC=1
           -DTC_ENABLE_TLV=1 -DTC_ENABLE_DER=1 -DTC_ENABLE_PIV_CVC=1
-          -DTC_ENABLE_APDU=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_PIV_SM_APDU=1
+          -DTC_ENABLE_APDU=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_TWIC=1 -DTC_ENABLE_PIV_SM_APDU=1
           -I${CMAKE_CURRENT_SOURCE_DIR}/src
           -c ${CMAKE_CURRENT_SOURCE_DIR}/src/${sm_source}.c
           -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${sm_source}-compile.o)
@@ -1943,9 +1943,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
           -DTC_RESOURCE_PROFILE=1 -DTC_ENABLE_PIV_SM=1 -DTC_ENABLE_EC=1
           -DTC_ENABLE_SSKDF=1 -DTC_ENABLE_SHA384=1 -DTC_AES_ENABLE_DYNAMIC=1
           -DTC_ENABLE_TLV=1 -DTC_ENABLE_DER=1 -DTC_ENABLE_PIV_CVC=1
-          -DTC_ENABLE_APDU=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_PIV_SM_APDU=1
+          -DTC_ENABLE_APDU=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_TWIC=1 -DTC_ENABLE_PIV_SM_APDU=1
           -DTC_TLV_ENABLE_BER=1 -DTC_ENABLE_X509=1 -DTC_ENABLE_PIV_OIDS=1 -DTC_ENABLE_CMS=1
-          -DTC_ENABLE_FASCN=1 -DTC_ENABLE_TWIC_UUID=1 -DTC_ENABLE_PIV_OBJECTS=1
+          -DTC_ENABLE_FASCN=1 -DTC_ENABLE_TWIC_UUID=1 -DTC_ENABLE_PIV_OBJECTS=1 -DTC_ENABLE_TWIC=1
           -DTC_ENABLE_PIV_VCI=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
           -c ${CMAKE_CURRENT_SOURCE_DIR}/src/${vci_source}.c
           -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${vci_source}-compile.o)
@@ -2038,18 +2038,19 @@ if(TINY_CRYPTO_BUILD_TESTS)
     file(MAKE_DIRECTORY ${tc_avr_piv_command_dir})
     add_test(NAME test_piv_command_compile_avr
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
-        -DTC_ENABLE_APDU=1 -DTC_ENABLE_TLV=1 -DTC_ENABLE_PIV_COMMAND=1
+        -DTC_ENABLE_APDU=1 -DTC_ENABLE_TLV=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_TWIC=1
         -I${CMAKE_CURRENT_SOURCE_DIR}/src
         -c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_aid.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_link.c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_select.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_get_data.c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_verify.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_status.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_template_internal.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/twic_aid.c ${CMAKE_CURRENT_SOURCE_DIR}/src/twic_command.c
       WORKING_DIRECTORY ${tc_avr_piv_command_dir})
     # The catalog tables and the inventory need only the card commands.
     add_test(NAME test_piv_catalog_compile_avr
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
-        -DTC_ENABLE_APDU=1 -DTC_ENABLE_TLV=1 -DTC_ENABLE_PIV_COMMAND=1
+        -DTC_ENABLE_APDU=1 -DTC_ENABLE_TLV=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_TWIC=1
         -DTC_ENABLE_PIV_CATALOG=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
         -c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_catalog.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_inventory.c
@@ -2059,7 +2060,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     add_test(NAME test_piv_key_proof_compile_avr
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
         -DTC_ENABLE_APDU=1 -DTC_ENABLE_TLV=1 -DTC_ENABLE_DER=1 -DTC_ENABLE_X509=1
-        -DTC_ENABLE_KEY_CHALLENGE=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_PIV_KEY_PROOF=1
+        -DTC_ENABLE_KEY_CHALLENGE=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_TWIC=1 -DTC_ENABLE_PIV_KEY_PROOF=1
         -I${CMAKE_CURRENT_SOURCE_DIR}/src
         -c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_key_policy.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_key_proof.c
@@ -2104,7 +2105,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     test_installed_consumer
     test_installed_consumer_debug_environment
     test_resource_profiles
-    test_piv_targets
+    test_application_targets
     test_benchmark_fast
     test_benchmark_runtime
     test_drbg_cavp
@@ -2129,4 +2130,5 @@ if(TINY_CRYPTO_BUILD_TESTS)
       PROPERTIES LABELS extended)
   endif()
 
+  tc_null_guard_tests()
 endif()

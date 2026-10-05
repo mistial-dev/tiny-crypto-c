@@ -7,6 +7,14 @@
 #include "munit.h"
 #include "test_util.h"
 
+/* Set the RFC 4122 variant (section 4.1.1) and version (section 4.1.3) of a
+ * 16-byte UUID. */
+static void uuid_mark(uint8_t* uuid, unsigned version)
+{
+  uuid[6] = (uint8_t)((version << 4) | (uuid[6] & 15));
+  uuid[8] = (uint8_t)(0x80 | (uuid[8] & 63));
+}
+
 TC_TEST(test_profiles)
 {
   static const char* invalid_dates[] = {"19000229", "20240230", "20241301",
@@ -27,6 +35,8 @@ TC_TEST(test_profiles)
   data[58] = 16;
   for (i = 0; i < 16; ++i)
     data[59 + i] = (uint8_t)(i + 64);
+  uuid_mark(data + 31, 4);
+  uuid_mark(data + 59, 4);
   /* Nonempty signature placeholder. CMS decoding is outside this test. */
   data[75] = 0x3e;
   data[76] = 2;
@@ -47,6 +57,46 @@ TC_TEST(test_profiles)
   munit_assert(TC_PIV_CHUID_read((TC_bytes){data + 2, sizeof data - 2}, TC_PIV_CHUID_CONTENTS,
                                  TC_CHUID_PROFILE_PIV, &chuid) == TC_TLV_OK);
   saved = chuid;
+  /* SP 800-73-5 Part 1 3.4.1 and 3.4.2: the GUID is an RFC 4122 UUID of
+   * version 1, 4 or 5 and the Cardholder UUID one of version 4. The other
+   * profiles keep their own rules, such as the zero GUID of Legacy TWIC. */
+  for (unsigned version = 0; version < 16; ++version) {
+    uuid_mark(data + 31, version);
+    munit_assert_int(TC_PIV_CHUID_read((TC_bytes){data, sizeof data}, TC_PIV_CHUID_CONTAINER,
+                                       TC_CHUID_PROFILE_PIV, &chuid),
+                     ==, version == 1 || version == 4 || version == 5 ? TC_TLV_OK : TC_TLV_INVALID);
+    munit_assert_int(TC_PIV_CHUID_read((TC_bytes){data, sizeof data}, TC_PIV_CHUID_CONTAINER,
+                                       TC_CHUID_PROFILE_PIV_SP800_73_4, &chuid),
+                     ==, TC_TLV_OK);
+    uuid_mark(data + 31, 4);
+    uuid_mark(data + 59, version);
+    munit_assert_int(TC_PIV_CHUID_read((TC_bytes){data, sizeof data}, TC_PIV_CHUID_CONTAINER,
+                                       TC_CHUID_PROFILE_PIV, &chuid),
+                     ==, version == 4 ? TC_TLV_OK : TC_TLV_INVALID);
+    uuid_mark(data + 59, 4);
+  }
+  /* Variants other than 10xx: NCS (0xxx), Microsoft (110x) and reserved. */
+  static const uint8_t variants[] = {0x00, 0x40, 0xc0, 0xe0};
+  for (i = 0; i < sizeof variants; ++i) {
+    data[31 + 8] = variants[i];
+    munit_assert(TC_PIV_CHUID_read((TC_bytes){data, sizeof data}, TC_PIV_CHUID_CONTAINER,
+                                   TC_CHUID_PROFILE_PIV, &chuid) == TC_TLV_INVALID);
+    data[31 + 8] = 0x80;
+    data[59 + 8] = variants[i];
+    munit_assert(TC_PIV_CHUID_read((TC_bytes){data, sizeof data}, TC_PIV_CHUID_CONTAINER,
+                                   TC_CHUID_PROFILE_PIV, &chuid) == TC_TLV_INVALID);
+    data[59 + 8] = 0x80;
+  }
+  memset(data + 31, 0, 16);
+  munit_assert(TC_PIV_CHUID_read((TC_bytes){data, sizeof data}, TC_PIV_CHUID_CONTAINER,
+                                 TC_CHUID_PROFILE_PIV, &chuid) == TC_TLV_INVALID);
+  munit_assert(TC_PIV_CHUID_read((TC_bytes){data, sizeof data}, TC_PIV_CHUID_CONTAINER,
+                                 TC_CHUID_PROFILE_PIV_SP800_73_4, &chuid) == TC_TLV_OK);
+  for (i = 0; i < 16; ++i)
+    data[31 + i] = (uint8_t)(i + 32);
+  uuid_mark(data + 31, 4);
+  munit_assert(TC_PIV_CHUID_read((TC_bytes){data, sizeof data}, TC_PIV_CHUID_CONTAINER,
+                                 TC_CHUID_PROFILE_PIV, &chuid) == TC_TLV_OK);
   for (i = 0; i < sizeof data; ++i) {
     munit_assert(TC_PIV_CHUID_read((TC_bytes){data, i}, TC_PIV_CHUID_CONTAINER,
                                    TC_CHUID_PROFILE_PIV, &chuid) != TC_TLV_OK);
@@ -72,6 +122,9 @@ TC_TEST(test_profiles)
   munit_assert(TC_PIV_CHUID_read((TC_bytes){data, 63}, TC_PIV_CHUID_CONTAINER, TC_CHUID_PROFILE_PIV,
                                  &chuid) == TC_TLV_OK);
   munit_assert(!chuid.cardholder_uuid.data && !chuid.cardholder_uuid.length);
+  munit_assert(TC_PIV_CHUID_read((TC_bytes){data, 63}, TC_PIV_CHUID_CONTAINER,
+                                 TC_CHUID_PROFILE_TWIC_SIGNED, &chuid) == TC_TLV_OK);
+  memset(data + 31, 0, 16);
   munit_assert(TC_PIV_CHUID_read((TC_bytes){data, 63}, TC_PIV_CHUID_CONTAINER,
                                  TC_CHUID_PROFILE_TWIC_SIGNED, &chuid) == TC_TLV_OK);
   munit_assert(TC_PIV_CHUID_read((TC_bytes){data, 63}, TC_PIV_CHUID_CONTAINER,
@@ -137,6 +190,7 @@ TC_TEST(test_boundaries)
   size_t length, cut;
   data[29] = 0x34;
   data[30] = 16;
+  uuid_mark(data + 31, 4);
   data[47] = 0x35;
   data[48] = 8;
   memcpy(data + 49, "20301231", 8);
@@ -188,6 +242,7 @@ TC_TEST(test_signed_content)
   TC_PIV_CHUID chuid;
   fields[27] = 0x34;
   fields[28] = 16;
+  uuid_mark(fields + 29, 5);
   fields[45] = 0x35;
   fields[46] = 8;
   memcpy(fields + 47, "20301231", 8);
@@ -230,7 +285,7 @@ TC_TEST(test_signed_content)
   return MUNIT_OK;
 }
 
-TC_TEST(test_legacy_key_map)
+TC_TEST(test_sp800_73_4_key_map)
 {
   enum { PREFIX_BYTES = 55, MAP_HEADER_BYTES = 4, MAX_MAP_BYTES = 512 };
   uint8_t fields[PREFIX_BYTES + MAP_HEADER_BYTES + MAX_MAP_BYTES + 1 + 8] = {0x30, 25};
@@ -259,7 +314,7 @@ TC_TEST(test_legacy_key_map)
     preserved = parsed;
     const TC_TLV_result result =
         TC_PIV_CHUID_read((TC_bytes){fields, signature + 6}, TC_PIV_CHUID_CONTENTS,
-                          TC_CHUID_PROFILE_LEGACY_KEY_MAP, &parsed);
+                          TC_CHUID_PROFILE_PIV_SP800_73_4, &parsed);
     munit_assert_int(result, ==, size <= MAX_MAP_BYTES ? TC_TLV_OK : TC_TLV_INVALID);
     if (result == TC_TLV_OK) {
       munit_assert_ptr_equal(parsed.authentication_key_map.data, fields + map + MAP_HEADER_BYTES);
@@ -278,7 +333,7 @@ TC_TEST(test_legacy_key_map)
     /* A second map cannot occupy the signature field. */
     fields[signature] = 0x3d;
     munit_assert_int(TC_PIV_CHUID_read((TC_bytes){fields, signature + 6}, TC_PIV_CHUID_CONTENTS,
-                                       TC_CHUID_PROFILE_LEGACY_KEY_MAP, &parsed),
+                                       TC_CHUID_PROFILE_PIV_SP800_73_4, &parsed),
                      ==, TC_TLV_INVALID);
   }
   return MUNIT_OK;
@@ -293,7 +348,17 @@ static size_t field_append(uint8_t* out, size_t offset, uint8_t tag, size_t leng
   return offset + 2 + length;
 }
 
-/* SP 800-73-4 Part 1 Table 9 optional fields: EE (2), 32 (4) and 33 (9). */
+/* Append a 16-byte UUID field of the given RFC 4122 version. */
+static size_t uuid_append(uint8_t* out, size_t offset, uint8_t tag, unsigned version)
+{
+  const size_t end = field_append(out, offset, tag, 16, 0x55);
+  uuid_mark(out + offset + 2, version);
+  return end;
+}
+
+/* SP 800-73-4 Part 1 Table 9 optional fields: EE (2), 32 (4) and 33 (9).
+ * SP 800-73-5 Part 1 Table 10 eliminated them, so only the SP 800-73-4
+ * profile accepts them. */
 TC_TEST(test_deprecated_fields)
 {
   enum { BUFFER_LENGTH = 1, ORGANIZATION = 2, DUNS = 4, CARDHOLDER = 8 };
@@ -309,25 +374,24 @@ TC_TEST(test_deprecated_fields)
       length = field_append(fields, length, 0x32, 4, 0x33);
     if (mask & DUNS)
       length = field_append(fields, length, 0x33, 9, 0x44);
-    length = field_append(fields, length, 0x34, 16, 0x55);
+    length = uuid_append(fields, length, 0x34, 1);
     fields[length] = 0x35;
     fields[length + 1] = 8;
     memcpy(fields + length + 2, "20301231", 8);
     length += 10;
     if (mask & CARDHOLDER)
-      length = field_append(fields, length, 0x36, 16, 0x66);
+      length = uuid_append(fields, length, 0x36, 4);
     signature = length;
     length = field_append(fields, length, 0x3e, 2, 0x30);
     length = field_append(fields, length, 0xfe, 0, 0);
-    for (unsigned profile = TC_CHUID_PROFILE_PIV; profile <= TC_CHUID_PROFILE_LEGACY_KEY_MAP;
+    for (unsigned profile = TC_CHUID_PROFILE_PIV; profile <= TC_CHUID_PROFILE_PIV_SP800_73_4;
          ++profile) {
       memset(&chuid, 0xa5, sizeof chuid);
       preserved = chuid;
-      const int piv_shaped =
-          profile == TC_CHUID_PROFILE_PIV || profile == TC_CHUID_PROFILE_LEGACY_KEY_MAP;
-      const int expect_ok =
-          piv_shaped || (profile == TC_CHUID_PROFILE_TWIC_SIGNED &&
-                         !(mask & (BUFFER_LENGTH | ORGANIZATION | DUNS | CARDHOLDER)));
+      const int deprecated = (mask & (BUFFER_LENGTH | ORGANIZATION | DUNS)) != 0;
+      const int expect_ok = profile == TC_CHUID_PROFILE_PIV_SP800_73_4 ||
+                            (profile == TC_CHUID_PROFILE_PIV && !deprecated) ||
+                            (profile == TC_CHUID_PROFILE_TWIC_SIGNED && !mask);
       const TC_TLV_result result = TC_PIV_CHUID_read(
           (TC_bytes){fields, length}, TC_PIV_CHUID_CONTENTS, (TC_PIV_CHUID_profile)profile, &chuid);
       munit_assert_int(result, ==, expect_ok ? TC_TLV_OK : TC_TLV_INVALID);
@@ -371,7 +435,7 @@ TC_TEST(test_deprecated_fields)
     if (mask)
       munit_assert_memory_equal(sizeof chuid, &chuid, &preserved);
   }
-  /* Each deprecated field has a fixed length. */
+  /* Each deprecated field has a fixed length in the SP 800-73-4 profile. */
   static const struct {
     uint8_t tag;
     size_t length;
@@ -393,7 +457,7 @@ TC_TEST(test_deprecated_fields)
       length = field_append(fields, length, 0x3e, 2, 0x30);
       length = field_append(fields, length, 0xfe, 0, 0);
       munit_assert_int(TC_PIV_CHUID_read((TC_bytes){fields, length}, TC_PIV_CHUID_CONTENTS,
-                                         TC_CHUID_PROFILE_PIV, &chuid),
+                                         TC_CHUID_PROFILE_PIV_SP800_73_4, &chuid),
                        ==, delta == 1 ? TC_TLV_OK : TC_TLV_INVALID);
     }
   /* Table 9 order is fixed. Each sequence moves or repeats one deprecated field. */
@@ -422,7 +486,7 @@ TC_TEST(test_deprecated_fields)
                                                 : 0;
       length = field_append(fields, length, tag, value_length, 0x30);
     }
-    for (unsigned profile = TC_CHUID_PROFILE_PIV; profile <= TC_CHUID_PROFILE_LEGACY_KEY_MAP;
+    for (unsigned profile = TC_CHUID_PROFILE_PIV; profile <= TC_CHUID_PROFILE_PIV_SP800_73_4;
          ++profile)
       munit_assert_int(TC_PIV_CHUID_read((TC_bytes){fields, length}, TC_PIV_CHUID_CONTENTS,
                                          (TC_PIV_CHUID_profile)profile, &chuid),
@@ -464,7 +528,7 @@ static MunitTest tests[] = {
     {"/boundaries", test_boundaries, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/profiles", test_profiles, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/signed-content", test_signed_content, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    {"/legacy-key-map", test_legacy_key_map, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/sp800-73-4-key-map", test_sp800_73_4_key_map, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/deprecated-fields", test_deprecated_fields, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/arguments", test_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};

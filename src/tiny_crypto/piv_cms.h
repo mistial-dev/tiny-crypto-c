@@ -18,7 +18,7 @@ typedef enum {
   TC_PIV_CMS_CHUID,
   TC_PIV_CMS_BIOMETRIC,
   /* FIPS 201-1 section 4.4.2: FASC-N required, entryUUID optional. */
-  TC_PIV_CMS_BIOMETRIC_LEGACY,
+  TC_PIV_CMS_BIOMETRIC_FIPS201_1,
   TC_PIV_CMS_SECURITY
 } TC_PIV_CMS_kind;
 typedef struct {
@@ -93,7 +93,7 @@ typedef struct {
  *   embedded certificate and a version 1 signer.
  * - BIOMETRIC: SP 800-76-2 section 9.3. Detached content, an optional
  *   certificate, and required FASC-N and entryUUID attributes.
- * - BIOMETRIC_LEGACY: FIPS 201-1 section 4.4.2. As BIOMETRIC with an optional
+ * - BIOMETRIC_FIPS201_1: FIPS 201-1 section 4.4.2. As BIOMETRIC with an optional
  *   entryUUID.
  * - SECURITY: SP 800-73-5 Part 1 section 3.1.7. Attached LDS content
  *   (1.3.27.1.1.1), no certificate, and an issuer/serial or subject key
@@ -128,7 +128,7 @@ TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind,
 
 /* Match the signed attributes of an object from TC_PIV_CMS_read against a
  * credential's 25-byte FASC-N and 16-byte CHUID GUID. Select the kind used
- * for reading. BIOMETRIC requires both attributes. BIOMETRIC_LEGACY requires
+ * for reading. BIOMETRIC requires both attributes. BIOMETRIC_FIPS201_1 requires
  * FASC-N and checks entryUUID when present. CHUID and SECURITY check each
  * attribute present and permit either to be absent. Comparisons scan the
  * borrowed OCTET STRING chunks. For CHUID, also bind the identifiers in its

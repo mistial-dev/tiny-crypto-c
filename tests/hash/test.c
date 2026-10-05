@@ -244,6 +244,9 @@ TC_TEST(test_secure_zero)
     munit_assert_uint8(buf[i], ==, 0);
 
   TC_secure_zero(buf, 0); /* zero length is a no-op */
+  /* NULL storage is a no-op for every length. */
+  TC_secure_zero(NULL, 0);
+  TC_secure_zero(NULL, sizeof(buf));
 
   munit_assert_int(TC_OK, ==, 0);
   munit_assert_int(TC_ERROR, ==, TC_RESULT_ERROR);

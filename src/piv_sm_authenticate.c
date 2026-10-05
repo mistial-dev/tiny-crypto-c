@@ -41,7 +41,7 @@ TC_credential_status TC_PIV_SM_authenticate_response(TC_PIV_SM* session,
         key->modulus,
         key->exponent,
         key->curve_oid};
-    if (!tc_sm_disjoint(writable, 3, input, sizeof input / sizeof *input))
+    if (!tc_internal_writes_disjoint(writable, 3, input, sizeof input / sizeof *input))
       return TC_CREDENTIAL_ERROR;
   }
 

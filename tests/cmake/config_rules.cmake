@@ -116,8 +116,12 @@ tc_reject(cms_without_ber "${cms};TINY_CRYPTO_TLV_ENABLE_BER=OFF"
   "CMS requires X.509, BER parsing, and PIV/TWIC identifier classification")
 tc_reject(cms_validation_without_revocation "${cms};TINY_CRYPTO_ENABLE_CMS_VALIDATION=ON"
   "CMS validation requires CMS and X.509 revocation support")
-tc_reject(piv_objects_without_uuid "${piv_objects};TINY_CRYPTO_ENABLE_TWIC_UUID=OFF"
-  "PIV object readers require CMS, TWIC UUID, and PIV/TWIC identifiers")
+tc_reject(piv_objects_without_fascn
+  "${piv_objects};TINY_CRYPTO_ENABLE_TWIC_UUID=OFF;TINY_CRYPTO_ENABLE_FASCN=OFF"
+  "PIV object readers require CMS, FASC-N, and PIV identifiers")
+tc_reject(twic_objects_without_uuid
+  "${piv_objects};TINY_CRYPTO_ENABLE_TWIC=ON;TINY_CRYPTO_ENABLE_TWIC_UUID=OFF"
+  "TWIC card objects require the TWIC UUID helpers")
 tc_reject(credential_without_chuid "${piv_objects};${cms_validation};TINY_CRYPTO_ENABLE_CREDENTIAL=ON"
   "Credential composition requires PIV objects, CHUID, and CMS validation")
 tc_reject(hkdf_without_hmac "TINY_CRYPTO_ENABLE_HKDF=ON"

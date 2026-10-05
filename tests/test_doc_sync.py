@@ -269,11 +269,16 @@ def readme_option_rows():
     return rows
 
 
+# 1.x identifiers that the migration guide maps to their 2.0 names.
+RETIRED_IDENTIFIERS = {"TC_PIV_CMS_BIOMETRIC_LEGACY", "TC_CHUID_PROFILE_LEGACY_KEY_MAP"}
+
+
 class DocumentationTests(unittest.TestCase):
     def test_named_identifiers_exist(self):
         defined = defined_identifiers()
         for document in DOCUMENTS:
-            for name in sorted(set(IDENTIFIER.findall(document.read_text()))):
+            retired = RETIRED_IDENTIFIERS if document.name == "migration-2.0.md" else set()
+            for name in sorted(set(IDENTIFIER.findall(document.read_text())) - retired):
                 # A trailing underscore names a family, such as TC_RSA_.
                 if name.endswith("_"):
                     found = any(known.startswith(name) for known in defined)

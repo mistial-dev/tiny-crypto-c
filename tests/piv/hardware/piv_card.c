@@ -805,7 +805,8 @@ TC_TEST(inventory_and_report)
                                              NULL,
                                              run.card_cvc,
                                              copies ? run.plain_copies : NULL,
-                                             copies};
+                                             copies,
+                                             0};
   run.check.certificates = (TC_buffer){run.certificates, sizeof run.certificates};
   run.check.lds_content = (TC_buffer){run.lds, sizeof run.lds};
   size_t work = CHECK_WORK;

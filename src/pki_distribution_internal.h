@@ -105,7 +105,7 @@ static inline TC_TLV_result tc_pki_distribution_issuer_name(TC_bytes issuer,
   result = tc_pki_tree_read(issuer, TC_TLV_DER, limits, tree, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, DIRECTORY_NAME) || element.encoded.length != issuer.length)
+  if (!tc_tlv_tag_is(&element, DIRECTORY_NAME) || element.encoded.length != issuer.length)
     return TC_TLV_INVALID;
   *out = element.value;
   return TC_TLV_OK;

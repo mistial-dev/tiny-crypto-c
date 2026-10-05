@@ -21,19 +21,15 @@ TC_RSA_result TC_RSA_encode_v15_digest(const TC_RSA_v15_options* options, TC_byt
                                        TC_buffer encoded, TC_work_budget* work)
 {
   tc_hash_info info;
-  if (!options || !work || !digest.data || !encoded.data)
+  tc_rsa_storage storage;
+  tc_rsa_storage_begin_without_workspace(&storage);
+  tc_rsa_storage_output(&storage, encoded);
+  tc_rsa_storage_write(&storage, work, sizeof *work);
+  tc_rsa_storage_seal(&storage);
+  tc_rsa_storage_input(&storage, options, sizeof *options);
+  tc_rsa_storage_required(&storage, digest);
+  if (tc_rsa_storage_finish(&storage) != TC_RSA_OK)
     return TC_RSA_ARGUMENT;
-  /* Encoded bytes and the work budget are written. Both stay separate from
-   * each other and from the options and digest. */
-  const TC_bytes inputs[] = {{(const uint8_t*)options, sizeof *options}, digest};
-  if (!tc_internal_ranges_disjoint(work, sizeof *work, encoded.data, encoded.capacity))
-    return TC_RSA_ARGUMENT;
-  for (size_t i = 0; i < sizeof inputs / sizeof *inputs; ++i) {
-    if (!tc_internal_ranges_disjoint(inputs[i].data, inputs[i].length, encoded.data,
-                                     encoded.capacity) ||
-        !tc_internal_ranges_disjoint(inputs[i].data, inputs[i].length, work, sizeof *work))
-      return TC_RSA_ARGUMENT;
-  }
   if (!tc_hash_info_get(options->hash, &info))
     return TC_RSA_UNSUPPORTED;
   if (digest.length != info.digest_length)
@@ -52,17 +48,16 @@ TC_RSA_result TC_RSA_encode_v15_digest(const TC_RSA_v15_options* options, TC_byt
 TC_RSA_result TC_RSA_encode_pss_digest(const TC_RSA_pss_options* options, TC_bytes digest,
                                        TC_bytes salt, TC_buffer encoded, TC_work_budget* work)
 {
-  if (!options || !work || !digest.data || (salt.length && !salt.data) || !encoded.data)
+  tc_rsa_storage storage;
+  tc_rsa_storage_begin_without_workspace(&storage);
+  tc_rsa_storage_output(&storage, encoded);
+  tc_rsa_storage_write(&storage, work, sizeof *work);
+  tc_rsa_storage_seal(&storage);
+  tc_rsa_storage_input(&storage, options, sizeof *options);
+  tc_rsa_storage_required(&storage, digest);
+  tc_rsa_storage_span(&storage, salt);
+  if (tc_rsa_storage_finish(&storage) != TC_RSA_OK)
     return TC_RSA_ARGUMENT;
-  const TC_bytes inputs[] = {{(const uint8_t*)options, sizeof *options}, digest, salt};
-  if (!tc_internal_ranges_disjoint(work, sizeof *work, encoded.data, encoded.capacity))
-    return TC_RSA_ARGUMENT;
-  for (size_t i = 0; i < sizeof inputs / sizeof *inputs; ++i) {
-    if (!tc_internal_ranges_disjoint(inputs[i].data, inputs[i].length, encoded.data,
-                                     encoded.capacity) ||
-        !tc_internal_ranges_disjoint(inputs[i].data, inputs[i].length, work, sizeof *work))
-      return TC_RSA_ARGUMENT;
-  }
   if (salt.length != options->salt_length)
     return TC_RSA_ARGUMENT;
   TC_RSA_result result = tc_rsa_digest_length_check(options->hash, digest.length);
@@ -186,7 +181,8 @@ TC_RSA_result TC_RSA_derive_crt(const TC_RSA_private_key* key, const TC_RSA_crt_
 
 int TC_RSA_exponent_in_fips_range(TC_bytes exponent)
 {
-  return tc_rsa_exponent_fips(exponent.data, exponent.length);
+  return tc_internal_span_valid(exponent.data, exponent.length) &&
+         tc_rsa_exponent_fips(exponent.data, exponent.length);
 }
 
 TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,

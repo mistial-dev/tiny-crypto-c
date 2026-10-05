@@ -1,0 +1,8 @@
+# Parameters that accept NULL by contract. The null-guard wrappers skip them.
+# Each line is "function parameter", where parameter is the declared name or
+# name.member for a member of a by-value struct, followed by the reason.
+TC_TLV_walk visit                     # NULL validates framing without callbacks
+TC_PIV_inventory_read plan            # NULL selects flags 0 and no pool limit
+TC_EAC_CVC_check_encoding inherited   # used only when the subject omits its domain
+TC_TLV_stream_feed visit              # NULL feeds without callbacks
+TC_CMS_validate revocation_checked   # optional result, documented in validation.h

@@ -66,29 +66,20 @@ static int prepare_storage_valid(const TC_X509_public_key* key,
                                  const TC_key_challenge_workspace* workspace,
                                  const TC_work_budget* work, const TC_bytes* out)
 {
-  const TC_bytes fields[] = {key->algorithm.oid, key->algorithm.parameters,
-                             key->key,           key->modulus,
-                             key->exponent,      key->curve_oid};
-  const TC_bytes controls[] = {{(const uint8_t*)key, sizeof *key},
-                               {(const uint8_t*)options, sizeof *options},
-                               {(const uint8_t*)work, sizeof *work},
+  const TC_bytes writable[] = {{(const uint8_t*)workspace, sizeof *workspace},
                                {(const uint8_t*)out, sizeof *out},
-                               {(const uint8_t*)random.context, random.context ? 1u : 0u}};
-  for (size_t i = 0; i < sizeof controls / sizeof *controls; ++i) {
-    if (!tc_internal_ranges_disjoint(workspace, sizeof *workspace, controls[i].data,
-                                     controls[i].length))
-      return 0;
-    if (i != 3 &&
-        !tc_internal_ranges_disjoint(out, sizeof *out, controls[i].data, controls[i].length))
-      return 0;
-  }
-  for (size_t i = 0; i < sizeof fields / sizeof *fields; ++i)
-    if (!tc_internal_ranges_disjoint(workspace, sizeof *workspace, fields[i].data,
-                                     fields[i].length) ||
-        !tc_internal_ranges_disjoint(out, sizeof *out, fields[i].data, fields[i].length) ||
-        !tc_internal_ranges_disjoint(work, sizeof *work, fields[i].data, fields[i].length))
-      return 0;
-  return 1;
+                               {(const uint8_t*)work, sizeof *work}};
+  const TC_bytes input[] = {{(const uint8_t*)key, sizeof *key},
+                            {(const uint8_t*)options, sizeof *options},
+                            {(const uint8_t*)random.context, random.context ? 1u : 0u},
+                            key->algorithm.oid,
+                            key->algorithm.parameters,
+                            key->key,
+                            key->modulus,
+                            key->exponent,
+                            key->curve_oid};
+  return tc_internal_writes_disjoint(writable, sizeof writable / sizeof *writable, input,
+                                     sizeof input / sizeof *input);
 }
 
 void TC_key_challenge_clear(TC_key_challenge_workspace* workspace)
@@ -178,11 +169,13 @@ TC_key_challenge_result TC_key_challenge_verify(const TC_X509_public_key* key, T
   TC_key_challenge_result result = TC_KEY_CHALLENGE_ARGUMENT;
   if (!workspace || workspace->state != KEY_CHALLENGE_ACTIVE)
     return result;
-  if (!key || !provider || !work || !signature.data || !signature.length ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, key, sizeof *key) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, provider, sizeof *provider) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, work, sizeof *work) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, signature.data, signature.length))
+  if (!key || !provider || !work || !signature.data || !signature.length)
+    goto cleanup;
+  const TC_bytes writable[] = {{(const uint8_t*)workspace, sizeof *workspace},
+                               {(const uint8_t*)work, sizeof *work}};
+  const TC_bytes input[] = {
+      {(const uint8_t*)key, sizeof *key}, {(const uint8_t*)provider, sizeof *provider}, signature};
+  if (!tc_internal_writes_disjoint(writable, 2, input, 3))
     goto cleanup;
   const size_t lent = tc_pki_work_lend(work);
   size_t left = lent;

@@ -13,6 +13,8 @@
 extern "C" {
 #endif
 
+/* The TWIC profiles require TC_ENABLE_TWIC. Readers built without it return
+ * ARGUMENT for them. */
 typedef enum { TC_PIV_CARD, TC_TWIC_LEGACY_CARD, TC_TWIC_NEXGEN_CARD } TC_PIV_card_profile;
 
 typedef struct {
@@ -61,6 +63,7 @@ TC_TLV_result TC_PIV_card_identifiers_match(const TC_PIV_card_identifiers* ident
                                             TC_bytes fascn, TC_bytes guid, size_t* work,
                                             int* matched);
 
+#if TC_ENABLE_TWIC
 /* TWIC Part 3 section 4.4.4 reader policy for a Card Authentication
  * certificate: require the signed FASC-N and allow an absent UUID. The
  * selected TWIC profile validates any UUID present. Ownership, work, status
@@ -69,6 +72,7 @@ TC_TLV_result TC_PIV_card_identifiers_match(const TC_PIV_card_identifiers* ident
 TC_TLV_result TC_TWIC_card_identifiers_read(TC_bytes subject_alt_name, TC_PIV_card_profile profile,
                                             const TC_TLV_limits* limits, TC_TLV_frames frames,
                                             size_t* work, TC_PIV_card_identifiers* out);
+#endif
 
 /* Read identifiers from a PIV Authentication certificate (SP 800-73-5 Part 1
  * sections 3.1.3, 3.4.1 and 3.4.2). card_guid is the 16-byte Card UUID from
@@ -84,6 +88,7 @@ TC_TLV_result TC_PIV_authentication_identifiers_read(TC_bytes subject_alt_name, 
                                                      TC_TLV_frames frames, size_t* work,
                                                      TC_PIV_card_identifiers* out);
 
+#if TC_ENABLE_TWIC
 /* Apply TWIC reader policy to a PIV Authentication certificate. Registered
  * PIV and TWIC FASC-N OIDs are accepted and the Card UUID may be absent. Any
  * UUIDs present follow the selection rules of
@@ -101,6 +106,7 @@ TC_TLV_result TC_TWIC_authentication_identifiers_read(TC_bytes subject_alt_name,
 TC_TLV_result TC_TWIC_card_identifiers_match(const TC_PIV_card_identifiers* identifiers,
                                              TC_bytes fascn, TC_bytes guid, size_t* work,
                                              int* matched);
+#endif
 #endif
 
 #ifdef __cplusplus

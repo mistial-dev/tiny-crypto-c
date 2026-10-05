@@ -25,6 +25,18 @@ int tc_credential_hex_digit(uint8_t value)
   return -1;
 }
 
+int tc_credential_hex_decode(const uint8_t* text, size_t bytes, uint8_t* out)
+{
+  for (size_t i = 0; i < bytes; ++i) {
+    const int high = tc_credential_hex_digit(text[2 * i]);
+    const int low = tc_credential_hex_digit(text[2 * i + 1]);
+    if (high < 0 || low < 0)
+      return 0;
+    out[i] = (uint8_t)(high * 16 + low);
+  }
+  return 1;
+}
+
 int tc_credential_digits(const uint8_t* value, size_t length)
 {
   if (!value || !length)

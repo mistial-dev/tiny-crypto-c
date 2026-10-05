@@ -9,7 +9,9 @@
  * - BITWISE: constant-time byte loop with the smallest code and no table.
  * - WIDE: constant-time 64-bit shift loop when uint64_t is available.
  * - FAST_TABLE: 16-entry nibble table in the context (256 bytes of RAM),
- *   rebuilt for each key. Table lookups are indexed by message nibbles.
+ *   rebuilt for each key. Each lookup index is a nibble of the running
+ *   accumulator, which depends on H, so lookup timing depends on the key.
+ *   Use it only where cache timing is unobservable.
  * - HARDWARE: TC_AES_GCM_hardware_multiply supplied by the platform.
  * - AUTO: WIDE when TC_AES_WIDE_OPS is set, otherwise BITWISE. */
 #include "aes_internal.h"
@@ -155,21 +157,6 @@ void tc_aes_gcm_ghash_block(struct TC_AES_GCM_ctx* ctx, const uint8_t* block)
   tc_aes_gcm_multiply(ctx->s, value, ctx);
   /* S xor block depends on H. Wipe it so it does not outlive the call. */
   TC_secure_zero(value, sizeof(value));
-}
-
-void tc_aes_gcm_hash_bytes(struct TC_AES_GCM_ctx* ctx, const uint8_t* data, size_t length)
-{
-  uint8_t block[TC_AES_BLOCKLEN] = {0};
-
-  while (length >= TC_AES_BLOCKLEN) {
-    tc_aes_gcm_ghash_block(ctx, data);
-    data += TC_AES_BLOCKLEN;
-    length -= TC_AES_BLOCKLEN;
-  }
-  if (length != 0) {
-    memcpy(block, data, length);
-    tc_aes_gcm_ghash_block(ctx, block);
-  }
 }
 
 #endif

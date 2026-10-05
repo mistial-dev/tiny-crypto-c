@@ -89,7 +89,7 @@ TC_TLV_result tc_pki_pss_read_profile(TC_bytes encoded, TC_TLV_profile profile,
         result = tc_pki_tree_read(field.value, profile, bounds, tree, &integer);
         if (result != TC_TLV_OK)
           return result;
-        if (!tc_pki_tag(&integer, 2) || integer.encoded.length != field.value.length)
+        if (!tc_tlv_tag_is(&integer, 2) || integer.encoded.length != field.value.length)
           return TC_TLV_INVALID;
         value = integer.value;
         result = TC_DER_integer_contents(value);

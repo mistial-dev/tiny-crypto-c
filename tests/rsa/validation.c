@@ -559,6 +559,9 @@ TC_TEST(exponent_range)
   munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){top, sizeof top}), ==, 1);
   munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){over, sizeof over}), ==, 0);
   munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){NULL, 0}), ==, 0);
+  /* A NULL span with an in-range length is not an exponent. */
+  munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){NULL, 1}), ==, 0);
+  munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){NULL, 3}), ==, 0);
   return MUNIT_OK;
 }
 

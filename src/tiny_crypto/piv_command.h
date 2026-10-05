@@ -50,7 +50,8 @@ typedef TC_result TC_PIV_result;
  * pairing-code rules depend on it (SP 800-73-5 Part 1 Table 4). */
 typedef enum { TC_PIV_CONTACT, TC_PIV_CONTACTLESS } TC_PIV_interface;
 
-/* Card application. NONE means no application is selected on the link. */
+/* Card application. NONE means no application is selected on the link. TWIC
+ * requires TC_ENABLE_TWIC. */
 typedef enum {
   TC_PIV_APPLICATION_NONE,
   TC_PIV_APPLICATION_PIV,
@@ -177,7 +178,7 @@ void TC_PIV_link_clear(TC_PIV_link* link);
 /* Accept a TWIC application version 01 with a sub-version other than 01
  * (Legacy) and 03 (NEXGEN) as TC_TWIC_LEGACY_CARD. TWIC Part 3 v4 Appendix
  * D.3 states that version 01 is backward compatible with the Legacy data
- * model and leaves the decision to the reader. */
+ * model and leaves the decision to the reader. Requires TC_ENABLE_TWIC. */
 enum { TC_PIV_SELECT_TWIC_SUBVERSION_COMPATIBLE = 1u << 0 };
 
 /* Application property template of a selected application.
@@ -229,17 +230,17 @@ TC_TLV_result TC_PIV_application_read(TC_bytes response, TC_PIV_application_id e
 
 /* SELECT the application by AID (SP 800-73-5 Part 2 3.1.1, TWIC Part 2 v5
  * 5.1): the complete PIV AID, or the 9-byte TWIC AID prefix, with Le 00. The
- * command is always plain. Selecting another application sets the card's
- * security statuses to FALSE, and reselecting the PIV application keeps them
- * (Part 2 3.1.1). The link clears its VCI and PIN status in both cases, so
- * query the PIN again with TC_PIV_verify_status. Selecting an application
- * other than the selected one also clears a bound secure messaging session.
- * On success the link records
- * the application and profile, applies the DO 7F66 limits to the channel and
- * sets TC_APDU_GET_RESPONSE_PLAIN_CLA (Part 2 4.2.6, A.4.1, TWIC Part 2 v5
+ * command is always plain. The link follows the card's selection state
+ * (Part 2 2.4.2 and 3.1.1). A 9000 for another application clears the
+ * application, the VCI and PIN status and a bound secure messaging session,
+ * even when its template is malformed. A transport failure for another
+ * application clears them too, since the card's selection is unknown. A card
+ * status other than 9000 and any reselection of the current application
+ * keep them. On success the link records the application and profile,
+ * applies the DO 7F66 limits to the channel and sets
+ * TC_APDU_GET_RESPONSE_PLAIN_CLA (Part 2 4.2.6, A.4.1, TWIC Part 2 v5
  * Appendix E). GET RESPONSE after 61 00 requests 256 bytes with Le 00 on both
- * applications (TWIC Part 2 v5 Appendix E). Any other outcome after transmit
- * leaves no application selected.
+ * applications (TWIC Part 2 v5 Appendix E).
  *
  * TC_PIV_ARGUMENT     NULL link or out, a cleared link, an unknown
  *                     application or flag, response with NULL data or below
@@ -276,7 +277,9 @@ typedef struct {
  * sends it under secure messaging and frames the decrypted answer, which
  * stays in the response buffer (piv_sm_apdu.h). The answer to 9000
  * or 6282 (ISO/IEC 7816-4 Table 7, TWIC Part 2 v5 5.2) must be exactly one
- * TLV spanning the data field.
+ * TLV spanning the data field. On the TWIC application a 6282 answer may end
+ * with padding bytes 00 or FF after the TLV (TWIC Part 2 v5 5.2, ISO/IEC
+ * 7816-4:2020 8.1.3). encoded then excludes the padding.
  *
  * PIV application: 7E and 7F61 answer with their own tag and every other tag
  * with 53 (Part 2 3.1.2). The only empty form is 53 00 (Part 1 4.1.1).
@@ -291,7 +294,8 @@ typedef struct {
  * TC_PIV_REFUSED      no application is selected, or the link lost its
  *                     secure messaging session.
  * TC_PIV_CARD_STATUS  another status, such as 6982, 6A81, 6A82 or 6A88.
- * TC_PIV_INVALID      framing other than above, or trailing bytes.
+ * TC_PIV_INVALID      framing other than above, or trailing bytes other than
+ *                     TWIC 6282 padding.
  * TC_PIV_LIMIT, TC_PIV_ERROR
  *                     channel results.
  *

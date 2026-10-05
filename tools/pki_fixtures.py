@@ -51,12 +51,22 @@ def benchmark_certificate(key_kind, bits):
         extension("551d13", seq()), extension("551d0f", tlv(3, b"\x07\x80"), 255)])
 
 
+def uuid4(first):
+    """16 bytes counting from first, with the RFC 4122 variant and version 4 bits."""
+    value = bytearray(range(first, first + 16))
+    value[6] = 0x40 | (value[6] & 0x0f)
+    value[8] = 0x80 | (value[8] & 0x3f)
+    return bytes(value)
+
+
 def chuid(unsigned=False):
     if unsigned:
         return tlv(0x53, tlv(0x30, bytes(range(25))) + tlv(0x34, bytes(range(16))) +
                    tlv(0x35, b"20301231") + tlv(0xfe, b""))
-    return tlv(0x53, tlv(0x30, bytes(range(25))) + tlv(0x34, bytes(range(16))) +
-               tlv(0x35, b"20301231") + tlv(0x36, bytes(range(16, 32))) +
+    # SP 800-73-5 Part 1 sections 3.4.1 and 3.4.2: a version 4 GUID and
+    # Cardholder UUID satisfy the PIV profile.
+    return tlv(0x53, tlv(0x30, bytes(range(25))) + tlv(0x34, uuid4(0)) +
+               tlv(0x35, b"20301231") + tlv(0x36, uuid4(16)) +
                tlv(0x3e, seq()) + tlv(0xfe, b""))
 
 

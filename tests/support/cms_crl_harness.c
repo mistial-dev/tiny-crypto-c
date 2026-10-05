@@ -70,9 +70,9 @@ TC_TLV_result tc_cms_revocations_next(tc_cms_revocations* reader, const tc_pki_t
   result = tc_cms_collection_next(&next.collection, next.external, tree, &element, &embedded);
   if (result != TC_TLV_OK)
     return result;
-  if (embedded && !tc_pki_tag(&element, 0x30)) {
+  if (embedded && !tc_tlv_tag_is(&element, 0x30)) {
     tc_cms_other_format other;
-    if (!tc_pki_tag(&element, 0xa1))
+    if (!tc_tlv_tag_is(&element, 0xa1))
       return TC_TLV_INVALID;
     result = tc_cms_other_format_read(element.encoded, TC_CMS_OTHER_REVOCATION,
                                       &next.collection.embedded.limits, tree, &other);

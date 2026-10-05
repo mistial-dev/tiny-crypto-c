@@ -5,6 +5,7 @@
 #include "internal.h"
 #include "pki_internal.h"
 #include "piv_container_internal.h"
+#include "twic_card_objects_internal.h"
 
 enum {
   CERTIFICATE_TAG = 0x70,
@@ -17,7 +18,24 @@ enum {
 };
 static const TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 4, 1};
 
-static TC_TLV_result read_container(TC_bytes input, TC_PIV_certificate_profile profile,
+const tc_piv_certificate_rules* tc_piv_certificate_rules_get(TC_PIV_certificate_profile profile)
+{
+  /* SP 800-73-5 Part 1 Table 43 adds the intermediate CVC to the SM signer
+   * container. SP 800-73-4 Part 1 Tables 10, 15-17 and 20-39 and SP 800-73-5
+   * Part 1 Tables 21-40 allow a historic MSCUID in the key slots. */
+  static const tc_piv_certificate_rules slot = {0, 1, 0}, sm_signer = {1, 0, 0};
+  if (profile == TC_PIV_CERTIFICATE_SLOT)
+    return &slot;
+  if (profile == TC_PIV_CERTIFICATE_SM_SIGNER)
+    return &sm_signer;
+#if TC_ENABLE_TWIC
+  if (profile == TC_PIV_CERTIFICATE_TWIC)
+    return &tc_twic_certificate_rules;
+#endif
+  return NULL;
+}
+
+static TC_TLV_result read_container(TC_bytes input, const tc_piv_certificate_rules* rules,
                                     size_t max_certificate_bytes, TC_PIV_certificate* out)
 {
   TC_TLV_element element;
@@ -45,16 +63,12 @@ static TC_TLV_result read_container(TC_bytes input, TC_PIV_certificate_profile p
   if (element.value.length != 1 || element.value.data[0] > 1)
     return TC_TLV_INVALID;
   out->compression = element.value.data[0] ? TC_PIV_CERTIFICATE_GZIP : TC_PIV_CERTIFICATE_PLAIN;
-  /* TWIC Part 2 v5 4.7.1 lists 70 and 71 and calls the structure similar to
-   * the PIV one without the MSCUID. NEXGEN cards end it with the empty FE of
-   * the PIV form. */
-  if (profile == TC_PIV_CERTIFICATE_TWIC && tc_pki_end(&reader))
+  if (rules->end_optional && tc_pki_end(&reader))
     return TC_TLV_OK;
   result = TC_TLV_next(&reader, &element);
   if (result != TC_TLV_OK)
     return result;
-  /* SP 800-73-5 Part 1 Table 43 places the intermediate CVC before FE. */
-  if (profile == TC_PIV_CERTIFICATE_SM_SIGNER && tc_pki_tag(&element, INTERMEDIATE_TAG)) {
+  if (rules->intermediate_cvc && tc_tlv_tag_is(&element, INTERMEDIATE_TAG)) {
     if (!element.value.length)
       return TC_TLV_INVALID;
     if (element.value.length > INTERMEDIATE_MAX)
@@ -64,9 +78,8 @@ static TC_TLV_result read_container(TC_bytes input, TC_PIV_certificate_profile p
     if (result != TC_TLV_OK)
       return result;
   }
-  /* SP 800-73-4 Part 1 Tables 10, 15-17 and 20-39 and SP 800-73-5 Part 1
-   * Tables 21-40 allow a historic MSCUID of at most 38 bytes before FE. */
-  if (profile == TC_PIV_CERTIFICATE_SLOT && tc_pki_tag(&element, MSCUID_TAG)) {
+  /* The MSCUID holds at most 38 bytes. */
+  if (rules->mscuid && tc_tlv_tag_is(&element, MSCUID_TAG)) {
     if (!element.value.length || element.value.length > MSCUID_MAX)
       return TC_TLV_INVALID;
     out->mscuid = element.value;
@@ -74,7 +87,8 @@ static TC_TLV_result read_container(TC_bytes input, TC_PIV_certificate_profile p
     if (result != TC_TLV_OK)
       return result;
   }
-  return tc_pki_tag(&element, ERROR_DETECTION_TAG) && !element.value.length && tc_pki_end(&reader)
+  return tc_tlv_tag_is(&element, ERROR_DETECTION_TAG) && !element.value.length &&
+                 tc_pki_end(&reader)
              ? TC_TLV_OK
              : TC_TLV_INVALID;
 }
@@ -83,12 +97,11 @@ TC_TLV_result TC_PIV_certificate_read(TC_bytes input, TC_PIV_certificate_profile
                                       size_t max_certificate_bytes, TC_PIV_certificate* out)
 {
   TC_PIV_certificate decoded = {{NULL, 0}, {NULL, 0}, {NULL, 0}, TC_PIV_CERTIFICATE_PLAIN};
-  if (!out || (!input.data && input.length) || !max_certificate_bytes ||
-      !tc_internal_ranges_disjoint(input.data, input.length, out, sizeof *out) ||
-      (profile != TC_PIV_CERTIFICATE_SLOT && profile != TC_PIV_CERTIFICATE_TWIC &&
-       profile != TC_PIV_CERTIFICATE_SM_SIGNER))
+  const tc_piv_certificate_rules* rules = tc_piv_certificate_rules_get(profile);
+  if (!out || (!input.data && input.length) || !max_certificate_bytes || !rules ||
+      !tc_internal_ranges_disjoint(input.data, input.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
-  TC_TLV_result result = read_container(input, profile, max_certificate_bytes, &decoded);
+  TC_TLV_result result = read_container(input, rules, max_certificate_bytes, &decoded);
   if (result == TC_TLV_OK)
     *out = decoded;
   return result == TC_TLV_MORE || result == TC_TLV_END ? TC_TLV_INVALID : result;

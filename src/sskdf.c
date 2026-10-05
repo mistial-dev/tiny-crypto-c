@@ -30,16 +30,13 @@ static TC_status derive(const tc_hash_algorithm_info* hash, const sskdf_state* s
   uint32_t round = 1;
   const size_t digest_length = tc_hash_core_digest_bytes(hash);
   TC_status status = TC_ERROR;
-  if (!z || !z_len || !output || !output_len || (!info && count) ||
-      count > SIZE_MAX / sizeof *info || z_len > SIZE_MAX - 4 ||
+  if (!z || !z_len || !output || !output_len || z_len > SIZE_MAX - 4 ||
       !tc_internal_ranges_disjoint(z, z_len, output, output_len) ||
-      !tc_internal_ranges_disjoint(info, count * sizeof *info, output, output_len))
+      !tc_internal_parts_valid(info, count, output, output_len))
     return TC_ERROR;
   total = 4 + z_len;
   for (i = 0; i < count; ++i) {
-    if (!tc_internal_span_valid(info[i].data, info[i].length) ||
-        info[i].length > SIZE_MAX - total ||
-        !tc_internal_ranges_disjoint(info[i].data, info[i].length, output, output_len))
+    if (info[i].length > SIZE_MAX - total)
       return TC_ERROR;
     total += info[i].length;
   }

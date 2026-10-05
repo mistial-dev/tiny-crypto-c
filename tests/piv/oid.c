@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/piv_oid.h>
 #include "../../src/piv_oid_internal.h"
+#include "../../src/twic_oid_internal.h"
 #include "munit.h"
 #include "test_util.h"
 #include <string.h>
@@ -73,15 +74,15 @@ TC_TEST(contents)
   static const uint8_t common_policy[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 2, 1, 3, 6};
   static const uint8_t twic_key_management[] = {0x2b, 6, 1, 4, 1, 0x81, 0xe3, 0x52, 2, 1, 3, 6};
   static const uint8_t content_signing_policy[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 2, 1, 3, 39};
-  const TC_bytes* oid = tc_piv_oid_contents(TC_PIV_OID_POLICY_COMMON, TC_PIV_OID_NAMESPACE_PIV);
+  const TC_bytes* oid = tc_piv_oid_contents(TC_PIV_OID_POLICY_COMMON);
   munit_assert_not_null(oid);
   munit_assert_size(oid->length, ==, sizeof common_policy);
   munit_assert_memory_equal(sizeof common_policy, oid->data, common_policy);
-  oid = tc_piv_oid_contents(TC_PIV_OID_POLICY_COMMON, TC_PIV_OID_NAMESPACE_TWIC);
+  oid = tc_twic_oid_contents(TC_PIV_OID_POLICY_COMMON);
   munit_assert_not_null(oid);
   munit_assert_size(oid->length, ==, sizeof twic_key_management);
   munit_assert_memory_equal(sizeof twic_key_management, oid->data, twic_key_management);
-  oid = tc_piv_oid_contents(TC_PIV_OID_POLICY_CONTENT_SIGNING, TC_PIV_OID_NAMESPACE_PIV);
+  oid = tc_piv_oid_contents(TC_PIV_OID_POLICY_CONTENT_SIGNING);
   munit_assert_not_null(oid);
   munit_assert_size(oid->length, ==, sizeof content_signing_policy);
   munit_assert_memory_equal(sizeof content_signing_policy, oid->data, content_signing_policy);
@@ -103,8 +104,8 @@ TC_TEST(contents)
                     {TC_PIV_OID_CARD_AUTHENTICATION, 1, 1},
                     {TC_PIV_OID_BACKGROUND_CHECK, 1, 1}};
   for (size_t i = 0; i < sizeof namespaces / sizeof *namespaces; ++i) {
-    const TC_bytes* piv = tc_piv_oid_contents(namespaces[i].kind, TC_PIV_OID_NAMESPACE_PIV);
-    const TC_bytes* twic = tc_piv_oid_contents(namespaces[i].kind, TC_PIV_OID_NAMESPACE_TWIC);
+    const TC_bytes* piv = tc_piv_oid_contents(namespaces[i].kind);
+    const TC_bytes* twic = tc_twic_oid_contents(namespaces[i].kind);
     munit_assert_int(piv != NULL, ==, namespaces[i].piv);
     munit_assert_int(twic != NULL, ==, namespaces[i].twic);
     if (piv) {
@@ -118,10 +119,10 @@ TC_TEST(contents)
                        namespaces[i].kind);
     }
   }
-  munit_assert_null(tc_piv_oid_contents(TC_PIV_OID_UNKNOWN, TC_PIV_OID_NAMESPACE_PIV));
-  munit_assert_null(tc_piv_oid_contents(TC_PIV_OID_UNKNOWN, TC_PIV_OID_NAMESPACE_TWIC));
-  munit_assert_null(tc_piv_oid_contents((TC_PIV_oid)99, TC_PIV_OID_NAMESPACE_PIV));
-  munit_assert_null(tc_piv_oid_contents(TC_PIV_OID_FASCN, (tc_piv_oid_namespace)99));
+  munit_assert_null(tc_piv_oid_contents(TC_PIV_OID_UNKNOWN));
+  munit_assert_null(tc_twic_oid_contents(TC_PIV_OID_UNKNOWN));
+  munit_assert_null(tc_piv_oid_contents((TC_PIV_oid)99));
+  munit_assert_null(tc_twic_oid_contents((TC_PIV_oid)99));
   return MUNIT_OK;
 }
 

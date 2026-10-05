@@ -41,7 +41,10 @@ TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader
  * TBSCertificate or a TrustAnchorInfo, each into a TC_X509_store_anchor with
  * normalized path controls (RFC 5937 section 2). A TrustAnchorInfo without
  * certPath is returned with x509_unusable set. Its public key remains
- * available for other purposes. out borrows the list DER. out must lie
+ * available for other purposes. certificatePolicies, policyConstraints,
+ * inhibitAnyPolicy and nameConstraints in its exts are ignored (RFC 5914
+ * section 2.6), and duplicate extensions are INVALID. out borrows the list
+ * DER. out must lie
  * outside the list, the reader, the workspace struct and both workspace
  * arrays. Charges no work.
  * Returns OK with the reader advanced and out written. END when no anchor

@@ -4,18 +4,14 @@
 
 # GZIP decoding
 
-Enable `TINY_CRYPTO_ENABLE_GZIP` and include `<tiny_crypto/gzip.h>`.
-Direct-source builds use `TC_ENABLE_GZIP=1`. The desktop resource profile enables
-it by default. GZIP decoding can be built independently of the cryptographic
-algorithms and certificate parsers.
-`TINY_CRYPTO_TARGET=piv-acu` and `TINY_CRYPTO_TARGET=piv-pd` enable it in every
-resource profile to handle compressed card certificates.
+Enable `TINY_CRYPTO_ENABLE_GZIP` (direct-source builds: `TC_ENABLE_GZIP=1`) and include
+`<tiny_crypto/gzip.h>`. The desktop profile enables it, and the `full`, `piv` and `twic`
+[application targets](targets.md) enable it in every profile for compressed card certificates. The
+decoder builds independently of the cryptographic algorithms and certificate parsers.
 
-`TC_GZIP_decode` takes the complete input as `TC_bytes`, a
-`TC_GZIP_workspace`, a remaining work budget, output storage as `TC_buffer` and
-an output-length pointer. These storage regions must be separate. Workspace
-needs no initialization and can be reused after each call. Use
-`sizeof(TC_GZIP_workspace)` when sizing it.
+`TC_GZIP_decode` takes the complete input, a `TC_GZIP_workspace`, a remaining work budget, output
+storage and an output-length pointer. All storage is caller-owned and must be disjoint. The
+workspace needs no initialization and can be reused across calls.
 
 ```c
 enum { CERTIFICATE_CAPACITY = 4096, DECODE_WORK_LIMIT = 100000 };
@@ -34,29 +30,38 @@ if (result == TC_GZIP_OK) {
 TC_secure_zero(certificate, sizeof certificate);
 ```
 
-Choose capacity and budget for the application's accepted objects. Work counts
-bounded decoding operations, including input bits, Huffman table entries,
-expanded bytes and checksum bytes. The count is deterministic across processor
-speeds. Cleanup wipes the caller's output
-capacity after a processing failure.
+Choose the capacity and budget for the objects the application accepts. Work counts input bits,
+Huffman table entries, expanded bytes and checksum bytes, so the bound is the same on every
+processor. Each call consumes the budget, and on LIMIT the unspent remainder stays in `*work`.
+Refill it before an independent operation. See [work budgets](api.md#work-budgets).
 
-`TC_GZIP_LIMIT` reports exhausted output capacity or work. `TC_GZIP_INVALID`
-reports malformed framing, compressed data or checksum/size mismatches.
-`TC_GZIP_UNSUPPORTED` reports an unsupported compression method.
-`TC_GZIP_ARGUMENT` reports invalid pointers or overlapping storage and preserves
-all storage. Other failures clear the output buffer and preserve its length
-parameter. Workspace is cleared after processing. A successful call writes the
-decoded length and leaves bytes beyond that length unchanged.
+## Results
 
-The decoder supports stored, fixed-Huffman and dynamic-Huffman DEFLATE blocks,
-optional GZIP headers and concatenated members. Each member gets its own history,
-CRC32 and size checks. Output capacity and work apply to the whole input.
-Trailing non-member bytes fail. Decoded output doubles as back-reference history.
-All storage is caller-owned.
+| Result                | Meaning                                                            |
+| --------------------- | ------------------------------------------------------------------ |
+| `TC_GZIP_OK`          | Writes the decoded length. Bytes past it stay unchanged.           |
+| `TC_GZIP_LIMIT`       | Output capacity or work ran out.                                   |
+| `TC_GZIP_INVALID`     | Malformed framing or compressed data, or a checksum/size mismatch. |
+| `TC_GZIP_UNSUPPORTED` | Unsupported compression method.                                    |
+| `TC_GZIP_ARGUMENT`    | Invalid pointer or overlapping storage. All storage is preserved.  |
 
-In C++11, include `<tiny_crypto/gzip.hpp>` and use `tiny_crypto::GZIPDecoder`.
-It owns one reusable workspace. `decode` takes the same input and output spans
-as the C function, with work and output length passed by reference:
+Failures other than `TC_GZIP_ARGUMENT` clear the whole output capacity and leave the length
+parameter unchanged. The workspace is cleared after processing.
+
+## Format support
+
+The decoder handles stored, fixed-Huffman and dynamic-Huffman DEFLATE blocks, optional GZIP header
+fields and concatenated members. Each member has its own history, CRC32 and size checks, while
+output capacity and work cover the whole input. Trailing bytes outside a member fail. Decoded
+output doubles as back-reference history.
+
+GZIP checksums detect accidental corruption. Authenticate the decoded credential with signature
+and trust validation.
+
+## C++
+
+`tiny_crypto::GZIPDecoder` in `<tiny_crypto/gzip.hpp>` owns one reusable workspace. `decode` takes
+the same spans as the C function, with work and length by reference:
 
 ```cpp
 #include <tiny_crypto/gzip.hpp>
@@ -71,33 +76,24 @@ TC_GZIP_result inflate(TC_bytes compressed, uint8_t (&decoded)[4096], size_t& le
 }
 ```
 
-For C arrays, `decoder.decode(compressed, work, decoded, length)` infers both sizes.
+`decoder.decode(compressed, work, decoded, length)` infers the size of a C array.
 
-Keep input, output, decoder storage, work and length disjoint. Each call consumes
-the supplied work budget. Refill it before starting another independent operation.
+## PIV certificates
 
-For PIV certificate containers, `TC_PIV_certificate_read` identifies compressed
-certificate bytes through `TC_PIV_CERTIFICATE_GZIP`. `TC_PIV_certificate_decode`
-reads the container, decompresses a GZIP certificate and checks that the result
-is one DER SEQUENCE. Require the X.509 parser to consume the entire result.
-GZIP checksums detect accidental corruption. Credential authentication requires
-signature and trust validation.
+`TC_PIV_certificate_read` reports compressed certificate bytes as `TC_PIV_CERTIFICATE_GZIP`.
+`TC_PIV_certificate_decode` reads the container, decompresses a GZIP certificate and checks that the
+result is one DER SEQUENCE. Require the X.509 parser to consume the entire result.
 
-Run the focused tests with:
+## Tests
 
 ```sh
 ctest --test-dir build -R '^test_(inflate|gzip_decode|gzip_differential|gzip_corpus)$' --output-on-failure
 ```
 
-The differential test generates synthetic inputs with Python's zlib across
-compression levels and strategies. It checks decoded bytes, corrupted checksums,
-concatenated members and insufficient output capacity.
-
-With the default `TINY_CRYPTO_TEST_TLV_CORPUS` of `tests/vectors`, `test_gzip_corpus` also
-checks the SD33 compressed certificate objects against Python's decoder and
-rejects checksum mutations. See [Testing](testing.md#fuzzing) for the bounded
-decoder fuzz harness.
-
-`test_piv_certificate_corpus` checks the corresponding certificate containers,
-including explicit PIV/TWIC profile mismatches and extra fields. It requires the
-same corpus setting and runs independently of decompression.
+The differential test uses Python's zlib across compression levels and strategies to check decoded
+bytes, corrupted checksums, concatenated members and short output capacity. With the default
+`TINY_CRYPTO_TEST_TLV_CORPUS` of `tests/vectors`, `test_gzip_corpus` compares the SD33 compressed
+certificate objects with Python's decoder and rejects checksum mutations.
+`test_piv_certificate_corpus` uses the same corpus to check the certificate containers, including
+PIV/TWIC profile mismatches and extra fields, without decompression. See
+[Testing](testing.md#fuzzing) for the bounded decoder fuzz harness.

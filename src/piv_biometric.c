@@ -5,6 +5,7 @@
 #include "internal.h"
 #include <string.h>
 #include <tiny_crypto/piv_biometric.h>
+#include "twic_card_objects_internal.h"
 
 enum {
   FINGERPRINT_HEADER_BYTES = 26,
@@ -110,7 +111,22 @@ enum {
   FACE_MIN_WIDTH = 421
 };
 
-static TC_TLV_result face_image(TC_bytes input, TC_PIV_face_profile profile, size_t offset,
+/* SP 800-76-2 section 7.2: neutral expression, Full Frontal, at least 421
+ * pixels wide. */
+static const tc_piv_face_rules piv_face_rules = {1, FACE_FULL_FRONTAL, FACE_MIN_WIDTH};
+
+static const tc_piv_face_rules* face_rules(TC_PIV_face_profile profile)
+{
+  if (profile == TC_PIV_FACE_PROFILE_PIV)
+    return &piv_face_rules;
+#if TC_ENABLE_TWIC
+  if (profile == TC_PIV_FACE_PROFILE_TWIC)
+    return &tc_twic_face_rules;
+#endif
+  return NULL;
+}
+
+static TC_TLV_result face_image(TC_bytes input, const tc_piv_face_rules* rules, size_t offset,
                                 TC_PIV_face_image* out, size_t* next)
 {
   if (input.length - offset < FACE_INFORMATION_BYTES)
@@ -128,11 +144,9 @@ static TC_TLV_result face_image(TC_bytes input, TC_PIV_face_profile profile, siz
   const uint16_t width = read_u16(information + 2);
   const uint16_t height = read_u16(information + 4);
   const uint16_t expression = read_u16(bytes + 12);
-  if ((profile == TC_PIV_FACE_PROFILE_PIV ? expression != 1 : expression > 1) || bytes[14] ||
-      bytes[15] || bytes[16] || bytes[17] || bytes[18] || bytes[19] ||
-      (profile == TC_PIV_FACE_PROFILE_PIV
-           ? information[0] != FACE_FULL_FRONTAL || width < FACE_MIN_WIDTH
-           : information[0] > FACE_FULL_FRONTAL || !width) ||
+  if (expression < rules->expression_min || expression > 1 || bytes[14] || bytes[15] || bytes[16] ||
+      bytes[17] || bytes[18] || bytes[19] || information[0] < rules->image_type_min ||
+      information[0] > FACE_FULL_FRONTAL || width < rules->width_min ||
       information[1] > FACE_JPEG2000 || !height || information[6] != FACE_SRGB ||
       (information[7] != FACE_DIGITAL_STILL && information[7] != FACE_DIGITAL_VIDEO) ||
       read_u16(information + 10) > 100)
@@ -174,8 +188,8 @@ TC_TLV_result TC_PIV_face_read(TC_bytes input, TC_PIV_face_profile profile, TC_P
 {
   static const uint8_t format[] = {'F', 'A', 'C', 0};
   static const uint8_t version[] = {'0', '1', '0', 0};
-  if (!out || !input.data ||
-      (profile != TC_PIV_FACE_PROFILE_PIV && profile != TC_PIV_FACE_PROFILE_TWIC) ||
+  const tc_piv_face_rules* rules = face_rules(profile);
+  if (!out || !input.data || !rules ||
       !tc_internal_ranges_disjoint(input.data, input.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
   if (input.length < FACE_HEADER_BYTES || memcmp(input.data, format, sizeof format) ||
@@ -187,7 +201,7 @@ TC_TLV_result TC_PIV_face_read(TC_bytes input, TC_PIV_face_profile profile, TC_P
     return TC_TLV_INVALID;
   size_t offset = FACE_HEADER_BYTES;
   for (size_t i = 0; i < count; ++i) {
-    TC_TLV_result result = face_image(input, profile, offset, NULL, &offset);
+    TC_TLV_result result = face_image(input, rules, offset, NULL, &offset);
     if (result != TC_TLV_OK)
       return result;
   }
@@ -200,15 +214,14 @@ TC_TLV_result TC_PIV_face_read(TC_bytes input, TC_PIV_face_profile profile, TC_P
 TC_TLV_result TC_PIV_face_image_read(const TC_PIV_face_record* record, size_t index,
                                      TC_PIV_face_image* out)
 {
-  if (!record || !out || index >= record->image_count || !record->encoded.data ||
-      (record->profile != TC_PIV_FACE_PROFILE_PIV && record->profile != TC_PIV_FACE_PROFILE_TWIC) ||
+  const tc_piv_face_rules* rules = record ? face_rules((TC_PIV_face_profile)record->profile) : NULL;
+  if (!out || !rules || index >= record->image_count || !record->encoded.data ||
       !tc_internal_ranges_disjoint(record->encoded.data, record->encoded.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
   size_t offset = FACE_HEADER_BYTES;
   TC_PIV_face_image image = {0};
   for (size_t i = 0; i <= index; ++i) {
-    TC_TLV_result result =
-        face_image(record->encoded, (TC_PIV_face_profile)record->profile, offset, &image, &offset);
+    TC_TLV_result result = face_image(record->encoded, rules, offset, &image, &offset);
     if (result != TC_TLV_OK)
       return result;
   }

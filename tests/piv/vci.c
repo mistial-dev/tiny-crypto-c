@@ -526,8 +526,9 @@ TC_TEST(arguments)
   return MUNIT_OK;
 }
 
-/* The VCI ends with the session state it depends on: SELECT, unsecure, a
- * session loss and a new key request (Part 2 4.3). */
+/* The VCI ends with the session state it depends on: selecting another
+ * application, unsecure, a session loss and a new key request (Part 2 3.1.1
+ * and 4.3). Reselecting PIV keeps it. */
 TC_TEST(cleared)
 {
   for (int event = 0; event < 4; ++event) {
@@ -547,6 +548,11 @@ TC_TEST(cleared)
       munit_assert_int(
           TC_PIV_select(&link, TC_PIV_APPLICATION_PIV, 0, response_buffer(), &application), ==,
           TC_PIV_OK);
+      munit_assert_uint8(link_info(&link).vci, ==, 1);
+      /* The model answers TWIC with the PIV template after a 9000. */
+      munit_assert_int(
+          TC_PIV_select(&link, TC_PIV_APPLICATION_TWIC, 0, response_buffer(), &application), ==,
+          TC_PIV_INVALID);
       break;
     case 1:
       TC_PIV_link_unsecure(&link);
@@ -570,7 +576,7 @@ TC_TEST(cleared)
     munit_assert_uint8(link_info(&link).vci, ==, 0);
     /* Establishing again needs the session and a fresh read. */
     munit_assert_int(TC_PIV_vci_establish(&link, &discovery, (TC_bytes){NULL, 0}, &mode), ==,
-                     event == 0 ? TC_PIV_OK : TC_PIV_REFUSED);
+                     TC_PIV_REFUSED);
     TC_PIV_link_clear(&link);
   }
   return MUNIT_OK;

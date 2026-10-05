@@ -228,8 +228,10 @@ static inline TC_RSA_result tc_rsa_pss_check(const TC_RSA_pss_options* options, 
     return result;
   unused = (unsigned)((8 - bits % 8) % 8);
   allowed = (uint8_t)(0xffu >> unused);
-  if (encoded[length - 1] != 0xbc || (encoded[0] & (uint8_t)~allowed))
-    return TC_RSA_INVALID;
+  /* Steps 4 and 6: the trailer and the unused high bits join the padding
+   * and digest checks, so every malformed encoding takes the same path. */
+  difference |= encoded[length - 1] ^ 0xbcu;
+  difference |= encoded[0] & (uint8_t)~allowed;
   db_length = length - info.digest_length - 1;
   h = (TC_bytes){encoded + db_length, info.digest_length};
   result = tc_rsa_mgf1_xor(mgf_hash, h, encoded, db_length, block, workspace, work);

@@ -6,7 +6,8 @@
  * Limitations: fixed-output KMAC256 only.
  * Work: every function charges no work budget. Default output and verify
  * calls require at least TC_MIN_TAG_LEN bytes. Explicit _short_tag calls
- * accept 1..TC_MIN_TAG_LEN - 1 bytes.
+ * accept TC_HASH_MAC_MIN_TAG_LEN..TC_MIN_TAG_LEN - 1 bytes (SP 800-185
+ * section 8.4.2).
  * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_KMAC_H_
 #define TINY_CRYPTO_KMAC_H_
@@ -62,7 +63,10 @@ void TC_KMAC256_ctx_clear(struct TC_KMAC256_ctx* ctx);
  * context lives on the stack and is wiped before return. */
 TC_status TC_KMAC256_digest(TC_bytes key, TC_bytes data, TC_bytes custom, TC_buffer out);
 TC_status TC_KMAC256_digest_short_tag(TC_bytes key, TC_bytes data, TC_bytes custom, TC_buffer out);
-/* Compute KMAC with tag.length as L and compare in constant time. */
+/* Compute KMAC with tag.length as L and compare in constant time with
+ * TC_ct_equal. Returns TC_OK, TC_MISMATCH, or TC_ERROR for an invalid span or
+ * tag length. The output is squeezed in 32-byte chunks, so any tag length
+ * uses fixed stack storage. Key-dependent state is wiped before return. */
 TC_status TC_KMAC256_verify(TC_bytes key, TC_bytes data, TC_bytes custom, TC_bytes tag);
 TC_status TC_KMAC256_verify_short_tag(TC_bytes key, TC_bytes data, TC_bytes custom, TC_bytes tag);
 

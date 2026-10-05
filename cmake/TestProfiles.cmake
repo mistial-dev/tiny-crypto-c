@@ -35,6 +35,8 @@ else()
   set(tc_build_cpp_tests ON)
 endif()
 
+include(${CMAKE_CURRENT_LIST_DIR}/NullGuard.cmake)
+
 function(tc_add_test_library name)
   add_library(${name} STATIC ${ARGN})
   target_include_directories(${name} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -51,6 +53,7 @@ function(tc_add_test_executable target)
   endif()
   tc_warnings(${target})
   tc_use_test_sanitizers(${target})
+  tc_use_null_guard(${target})
 endfunction()
 
 function(tc_add_linked_test target library)
@@ -126,6 +129,8 @@ target_compile_definitions(tiny-crypto-c-test-des-fault PUBLIC
   TC_DES_ENABLE_CMAC=1 TC_DES_ENABLE_ISO9797=1 TC_DES_REJECT_WEAK_KEYS=0
   TC_TEST_DES_FAULT=1)
 tc_add_c_test(test_des_mac_failure tiny-crypto-c-test-des-fault tests/des/mac_failure.c)
+# The forward-cipher fault counter is library state that repeated calls consume.
+tc_skip_null_guard(test_des_mac_failure)
 
 tc_add_test_library(tiny-crypto-c-test-aes-runtime-sbox
   src/common.c ${tc_aes_sources})

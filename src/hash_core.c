@@ -4,6 +4,7 @@
  * Shared hash and HMAC operations (FIPS 180-4, RFC 1321, FIPS 198-1). The
  * per-algorithm files supply compression functions and descriptors. */
 #include "hash_core_internal.h"
+#include <tiny_crypto/hash.h>
 
 #if TC_HASH_CORE_ENABLED
 #include <string.h>
@@ -15,14 +16,13 @@ static inline int tc_hash_update_args(const void* ctx, size_t ctx_len, const uin
                                       size_t data_len)
 {
   return ctx != NULL && tc_internal_span_valid(data, data_len) &&
-         data_len <= UINTPTR_MAX - (uintptr_t)data &&
          tc_internal_ranges_disjoint(ctx, ctx_len, data, data_len);
 }
 
 static inline int tc_hash_final_args(const void* ctx, size_t ctx_len, const uint8_t* digest,
                                      size_t digest_len)
 {
-  return ctx != NULL && digest != NULL && digest_len <= UINTPTR_MAX - (uintptr_t)digest &&
+  return ctx != NULL && digest != NULL && tc_internal_span_valid(digest, digest_len) &&
          tc_internal_ranges_disjoint(ctx, ctx_len, digest, digest_len);
 }
 
@@ -181,11 +181,8 @@ TC_status tc_hash_core_update_parts(const tc_hash_algorithm_info* stored, void* 
                                     const TC_bytes* parts, size_t count)
 {
   TC_status status = TC_OK;
-  if (context == NULL || (count != 0 && parts == NULL))
+  if (context == NULL || !tc_internal_parts_valid(parts, count, NULL, 0))
     return TC_ERROR;
-  for (size_t i = 0; i < count; ++i)
-    if (!tc_internal_span_valid(parts[i].data, parts[i].length))
-      return TC_ERROR;
   for (size_t i = 0; status == TC_OK && i < count; ++i)
     status = tc_hash_core_update(stored, context, parts[i].data, parts[i].length);
   return status;
@@ -239,7 +236,7 @@ TC_status tc_hash_core_digest(const tc_hash_algorithm_info* stored, void* worksp
 /* HMAC (FIPS 198-1 / RFC 2104)                                              */
 /*****************************************************************************/
 
-#if TC_ENABLE_HMAC
+#if TC_HMAC_CORE_ENABLED
 
 /* Derive K0 into block. A key longer than one block is hashed with the inner
  * context, which saves a second hash context on the stack. HMAC setup
@@ -396,6 +393,9 @@ void tc_hmac_core_clear(const tc_hash_algorithm_info* stored, void* context)
   hmac = info->hmac_view(context);
   TC_secure_zero(hmac.context, hmac.size);
 }
+#endif /* TC_HMAC_CORE_ENABLED */
+
+#if TC_ENABLE_HMAC
 
 /* One-shot HMAC with the library-wide default or explicit short-tag policy. */
 TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* workspace, TC_bytes key,
@@ -406,12 +406,13 @@ TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* worksp
   uint8_t full[TC_HASH_CORE_MAX_DIGEST];
   TC_status status;
 
-  /* SP 800-107: a truncated tag keeps the leftmost bytes. The algorithm and
-   * library-wide policies jointly set the default minimum. */
-  const size_t minimum =
-      TC_HMAC_MIN_TAG_LEN > TC_MIN_TAG_LEN ? TC_HMAC_MIN_TAG_LEN : TC_MIN_TAG_LEN;
+  /* SP 800-107 Rev. 1 section 5.3.3: a truncated tag keeps the leftmost
+   * bytes and holds at least 32 bits. RFC 2104 section 5 sets the default
+   * minimum. */
+  const size_t minimum = TC_HMAC_MIN_TAG_LEN_FOR(info->digest_bytes);
   if (tag.data == NULL || tag.capacity > info->digest_bytes ||
-      (short_tag ? tag.capacity == 0 || tag.capacity >= minimum : tag.capacity < minimum) ||
+      (short_tag ? tag.capacity < TC_HASH_MAC_MIN_TAG_LEN || tag.capacity >= minimum
+                 : tag.capacity < minimum) ||
       (message.length != 0 && message.data == NULL))
     return TC_ERROR;
   status = tc_hmac_core_init(stored, workspace, key.data, key.length);

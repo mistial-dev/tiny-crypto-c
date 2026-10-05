@@ -3,6 +3,7 @@
 /* Certificate container decoding to DER. */
 #include <tiny_crypto/piv_certificate.h>
 #if TC_ENABLE_PIV_OBJECTS && TC_ENABLE_GZIP
+#include "piv_object_rules_internal.h"
 #include "internal.h"
 #include "pki_internal.h"
 
@@ -29,7 +30,7 @@ static int der_sequence(TC_bytes certificate)
   static const TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 1, 1};
   TC_TLV_element element;
   return TC_TLV_read(certificate, TC_TLV_DER, &limits, &element) == TC_TLV_OK &&
-         tc_pki_tag(&element, 0x30) && element.header.constructed &&
+         tc_tlv_tag_is(&element, 0x30) && element.header.constructed &&
          element.encoded.length == certificate.length;
 }
 
@@ -63,8 +64,7 @@ TC_TLV_result TC_PIV_certificate_decode(TC_bytes container, TC_PIV_certificate_p
 {
   if (!gzip || !work || !out || !tc_internal_span_valid(container.data, container.length) ||
       !tc_internal_span_valid(der.data, der.capacity) || !max_certificate_bytes ||
-      (profile != TC_PIV_CERTIFICATE_SLOT && profile != TC_PIV_CERTIFICATE_TWIC &&
-       profile != TC_PIV_CERTIFICATE_SM_SIGNER))
+      !tc_piv_certificate_rules_get(profile))
     return TC_TLV_ARGUMENT;
   /* container, gzip, work, der and out are pairwise disjoint. */
   const struct {

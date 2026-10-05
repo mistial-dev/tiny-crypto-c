@@ -35,13 +35,32 @@ static TC_X509_path_status crl_signer_path(const TC_X509_certificate* signer,
   return TC_X509_PATH_VALID;
 }
 
+/* Set *equal when both keys carry the same SubjectPublicKeyInfo: algorithm
+ * OID, algorithm parameters and subjectPublicKey bits. Charges the compared
+ * bytes. */
+static TC_TLV_result public_key_equal(const TC_X509_public_key* a, const TC_X509_public_key* b,
+                                      size_t* work, int* equal)
+{
+  *equal = 0;
+  TC_TLV_result result =
+      tc_pki_work_charge(work, a->algorithm.oid.length + a->algorithm.parameters.length);
+  if (result == TC_TLV_OK)
+    result = tc_pki_work_charge(work, a->key.length);
+  if (result == TC_TLV_OK)
+    *equal = tc_pki_equal(a->algorithm.oid, b->algorithm.oid) &&
+             tc_pki_equal(a->algorithm.parameters, b->algorithm.parameters) &&
+             tc_pki_equal(a->key, b->key);
+  return result;
+}
+
 /* Set *anchored when signer is the selected trust anchor itself: the same
- * subject name and public key, and a certificate that is not self-issued and
- * is valid at the policy time. A pinned issuing CA that signs its own CRLs
- * is such a signer. A self-issued anchor certificate keeps its
- * one-certificate path. tc_x509_crl_signer_check has already required
- * cRLSign (RFC 5280 section 6.3.3 (f), RFC 10007 section 4). Charges the
- * name comparisons and the key bytes. */
+ * subject name and SubjectPublicKeyInfo, and a certificate that is not
+ * self-issued and is valid at the policy time. A pinned issuing CA that signs
+ * its own CRLs is such a signer. A self-issued anchor certificate keeps its
+ * one-certificate path. The anchor key signs CRLs only with
+ * TC_X509_ANCHOR_USAGE_CRL_SIGN. tc_x509_crl_signer_check has already required
+ * cRLSign in the certificate (RFC 5280 section 6.3.3 (f), RFC 10007 section 4).
+ * Charges the key bytes and the name comparisons. */
 static TC_TLV_result crl_signer_is_anchor(const TC_X509_certificate* signer,
                                           const TC_X509_store_source* restricted,
                                           const tc_x509_crl_trust* trust, int* anchored)
@@ -53,13 +72,15 @@ static TC_TLV_result crl_signer_is_anchor(const TC_X509_certificate* signer,
   if (result != TC_TLV_OK)
     return result;
   *anchored = 0;
-  if (!anchor.trust.name.length || anchor.trust.public_key.type != signer->public_key.type)
+  result = tc_x509_crl_anchor_usage(&anchor);
+  if (result == TC_TLV_INVALID || (result == TC_TLV_OK && !anchor.trust.name.length))
     return TC_TLV_OK;
-  result = tc_pki_work_charge(work, signer->public_key.key.length);
-  if (result != TC_TLV_OK || !tc_pki_equal(anchor.trust.public_key.key, signer->public_key.key))
+  int equal = 0, self_issued = 1, current = 0;
+  if (result == TC_TLV_OK)
+    result = public_key_equal(&anchor.trust.public_key, &signer->public_key, work, &equal);
+  if (result != TC_TLV_OK || !equal)
     return result;
   const TC_X509_path_options* options = trust->options;
-  int equal = 0, self_issued = 1, current = 0;
   result = TC_X509_name_equal(signer->subject, anchor.trust.name, &options->parsing,
                               &trust->validation->names, work, &equal);
   if (result == TC_TLV_OK && equal)
@@ -167,6 +188,13 @@ TC_X509_signature_result tc_x509_crl_anchor_check(const TC_X509_crl* crl,
   if (!matched)
     return TC_X509_SIGNATURE_INVALID;
   return crl_key_signature(crl, &anchor->public_key, provider, work);
+}
+
+TC_TLV_result tc_x509_crl_anchor_usage(const TC_X509_store_anchor* anchor)
+{
+  if (!anchor || anchor->usage & ~TC_X509_ANCHOR_USAGE_CRL_SIGN)
+    return TC_TLV_ARGUMENT;
+  return anchor->usage & TC_X509_ANCHOR_USAGE_CRL_SIGN ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
 TC_TLV_result tc_x509_crl_signer_key(const TC_X509_crl* crl, const TC_X509_certificate* signer,

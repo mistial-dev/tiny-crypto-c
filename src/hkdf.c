@@ -22,22 +22,12 @@ static int hkdf_output_length_ok(size_t hash_len, size_t output_len)
   return output_len != 0 && output_len <= 255u * hash_len;
 }
 
-/* Every input span is valid and disjoint from output. The ikm array size
- * must fit in size_t before its range is compared. */
+/* Every input span is valid and disjoint from output. */
 static int hkdf_arguments(const hkdf_inputs* in, const uint8_t* output, size_t output_len)
 {
-  if (!output || !tc_internal_span_valid(in->salt.data, in->salt.length) ||
-      !tc_internal_span_valid(in->info.data, in->info.length) || (in->ikm_count && !in->ikm) ||
-      in->ikm_count > SIZE_MAX / sizeof *in->ikm ||
-      !tc_internal_ranges_disjoint(output, output_len, in->salt.data, in->salt.length) ||
-      !tc_internal_ranges_disjoint(output, output_len, in->info.data, in->info.length) ||
-      !tc_internal_ranges_disjoint(output, output_len, in->ikm, in->ikm_count * sizeof *in->ikm))
-    return 0;
-  for (size_t i = 0; i < in->ikm_count; ++i)
-    if (!tc_internal_span_valid(in->ikm[i].data, in->ikm[i].length) ||
-        !tc_internal_ranges_disjoint(output, output_len, in->ikm[i].data, in->ikm[i].length))
-      return 0;
-  return 1;
+  return output && tc_internal_parts_valid(&in->salt, 1, output, output_len) &&
+         tc_internal_parts_valid(&in->info, 1, output, output_len) &&
+         tc_internal_parts_valid(in->ikm, in->ikm_count, output, output_len);
 }
 
 /* PRK = HMAC(salt, IKM parts). A salt shorter than the block pads with

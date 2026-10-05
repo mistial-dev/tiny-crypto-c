@@ -193,8 +193,9 @@ private:
  * completed finish all leave it unkeyed, and update and finish then return
  * TC_ERROR until the next successful init. The destructor clears the context.
  * finish writes exactly tag_size bytes. mac writes out.capacity bytes and
- * verify compares tag.length bytes, each from the greater of
- * TC_HMAC_MIN_TAG_LEN and TC_MIN_TAG_LEN to tag_size. */
+ * verify compares tag.length bytes, each from
+ * TC_HMAC_MIN_TAG_LEN_FOR(tag_size) to tag_size. The _short_tag forms take
+ * TC_HASH_MAC_MIN_TAG_LEN up to that minimum - 1. */
 template <class Traits> class basic_hmac {
 public:
   static const size_t tag_size = Traits::digest_size;
@@ -246,8 +247,8 @@ public:
     return finish(buffer{out, tag_size});
   }
 
-  /* out.capacity is TC_HMAC_MIN_TAG_LEN..tag_size. A shorter capacity keeps
-   * the leading bytes of the full tag. */
+  /* out.capacity is TC_HMAC_MIN_TAG_LEN_FOR(tag_size)..tag_size. A shorter
+   * capacity keeps the leading bytes of the full tag. */
   TC_CPP_NODISCARD static TC_status mac(bytes key, bytes data, buffer out) noexcept
   {
     return Traits::digest(key, data, out);

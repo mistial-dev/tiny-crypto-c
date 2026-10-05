@@ -113,6 +113,15 @@ static int tc_kmac_input(const struct TC_KMAC256_ctx* ctx, TC_bytes input)
          tc_internal_ranges_disjoint(ctx, sizeof(*ctx), input.data, input.length);
 }
 
+/* SP 800-185 section 8.4.2: a KMAC tag holds at least 32 bits. short_tag
+ * selects TC_HASH_MAC_MIN_TAG_LEN..TC_MIN_TAG_LEN - 1, and the default calls
+ * take TC_MIN_TAG_LEN and longer. */
+static int tc_kmac_tag_length_allowed(size_t length, int short_tag)
+{
+  return length >= TC_HASH_MAC_MIN_TAG_LEN &&
+         tc_internal_tag_length_allowed(length, SIZE_MAX, short_tag);
+}
+
 static int tc_kmac_output(TC_buffer out)
 {
   return out.data != NULL && out.capacity != 0 && tc_kmac_length(out.capacity);
@@ -161,27 +170,38 @@ TC_status TC_KMAC256_update(struct TC_KMAC256_ctx* ctx, TC_bytes data)
   return TC_OK;
 }
 
-static TC_status tc_kmac_final(struct TC_KMAC256_ctx* ctx, TC_buffer out, int short_tag)
+/* Absorb X || right_encode(L) with the cSHAKE domain suffix and pad10*1
+ * (SP 800-185 section 4.3), then permute. position becomes the squeeze
+ * offset. */
+static void tc_kmac_finish_absorb(struct TC_KMAC256_ctx* ctx, size_t output_length)
 {
-  size_t i;
-  unsigned p = 0;
-  if (!ctx || !tc_kmac_output(out) ||
-      !tc_internal_tag_length_allowed(out.capacity, SIZE_MAX, short_tag) || !tc_kmac_live(ctx) ||
-      !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), out.data, out.capacity))
-    return TC_ERROR;
-  /* X || right_encode(L), then the cSHAKE domain suffix and pad10*1. */
-  tc_kmac_encode(ctx, (uint64_t)out.capacity * 8, 1);
+  tc_kmac_encode(ctx, (uint64_t)output_length * 8, 1);
   ctx->state[ctx->position / 8] ^= UINT64_C(0x04) << (8 * (ctx->position % 8));
   ctx->state[(TC_KMAC_RATE - 1) / 8] ^= UINT64_C(0x80) << 56;
   tc_kmac_permute(ctx->state);
-  for (i = 0; i < out.capacity; ++i) {
-    if (p == TC_KMAC_RATE) {
+  ctx->position = 0;
+}
+
+/* Squeeze the next length output bytes after tc_kmac_finish_absorb. */
+static void tc_kmac_squeeze(struct TC_KMAC256_ctx* ctx, uint8_t* out, size_t length)
+{
+  while (length--) {
+    if (ctx->position == TC_KMAC_RATE) {
       tc_kmac_permute(ctx->state);
-      p = 0;
+      ctx->position = 0;
     }
-    out.data[i] = (uint8_t)(ctx->state[p / 8] >> (8 * (p % 8)));
-    ++p;
+    *out++ = (uint8_t)(ctx->state[ctx->position / 8] >> (8 * (ctx->position % 8)));
+    ++ctx->position;
   }
+}
+
+static TC_status tc_kmac_final(struct TC_KMAC256_ctx* ctx, TC_buffer out, int short_tag)
+{
+  if (!ctx || !tc_kmac_output(out) || !tc_kmac_tag_length_allowed(out.capacity, short_tag) ||
+      !tc_kmac_live(ctx) || !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), out.data, out.capacity))
+    return TC_ERROR;
+  tc_kmac_finish_absorb(ctx, out.capacity);
+  tc_kmac_squeeze(ctx, out.data, out.capacity);
   TC_KMAC256_ctx_clear(ctx);
   return TC_OK;
 }
@@ -209,7 +229,7 @@ static TC_status tc_kmac_digest(TC_bytes key, TC_bytes data, TC_bytes custom, TC
   TC_status status;
   if (!tc_kmac_span(key.data, key.length) || !tc_internal_span_valid(data.data, data.length) ||
       !tc_kmac_span(custom.data, custom.length) || !tc_kmac_output(out) ||
-      !tc_internal_tag_length_allowed(out.capacity, SIZE_MAX, short_tag))
+      !tc_kmac_tag_length_allowed(out.capacity, short_tag))
     return TC_ERROR;
   /* The local context holds the keyed sponge. It is wiped on every path. */
   status = TC_KMAC256_init(&ctx, key, custom);
@@ -234,45 +254,34 @@ TC_status TC_KMAC256_digest_short_tag(TC_bytes key, TC_bytes data, TC_bytes cust
 static TC_status tc_kmac_verify(TC_bytes key, TC_bytes data, TC_bytes custom, TC_bytes tag,
                                 int short_tag)
 {
-  uint8_t computed[TC_MIN_TAG_LEN > 1 ? TC_MIN_TAG_LEN - 1 : 1];
-  uint8_t* candidate = computed;
+  struct TC_KMAC256_ctx ctx;
+  uint8_t chunk[32];
+  size_t offset, length;
   TC_status status;
+  volatile unsigned different = 0;
 
-  if (!tc_kmac_span(tag.data, tag.length) ||
-      !tc_internal_tag_length_allowed(tag.length, SIZE_MAX, short_tag))
+  if (!tc_kmac_span(tag.data, tag.length) || !tc_kmac_tag_length_allowed(tag.length, short_tag))
     return TC_ERROR;
-  /* Default tags can be arbitrarily long. Reuse the caller's comparison
-   * storage only for the bounded short-tag case; default verification uses
-   * a streaming context below to avoid a variable-length stack object. */
-  if (!short_tag) {
-    struct TC_KMAC256_ctx ctx;
-    size_t i;
-    unsigned p = 0;
-    status = TC_KMAC256_init(&ctx, key, custom);
-    if (status == TC_OK)
-      status = TC_KMAC256_update(&ctx, data);
-    if (status != TC_OK) {
-      TC_KMAC256_ctx_clear(&ctx);
-      return status;
-    }
-    tc_kmac_encode(&ctx, (uint64_t)tag.length * 8, 1);
-    ctx.state[ctx.position / 8] ^= UINT64_C(0x04) << (8 * (ctx.position % 8));
-    ctx.state[(TC_KMAC_RATE - 1) / 8] ^= UINT64_C(0x80) << 56;
-    tc_kmac_permute(ctx.state);
-    uint8_t different = 0;
-    for (i = 0; i < tag.length; ++i) {
-      if (p == TC_KMAC_RATE) {
-        tc_kmac_permute(ctx.state);
-        p = 0;
-      }
-      different |= (uint8_t)((ctx.state[p / 8] >> (8 * (p % 8))) ^ tag.data[i]);
-      ++p;
-    }
+  status = TC_KMAC256_init(&ctx, key, custom);
+  if (status == TC_OK)
+    status = TC_KMAC256_update(&ctx, data);
+  if (status != TC_OK) {
     TC_KMAC256_ctx_clear(&ctx);
-    return different == 0 ? TC_OK : TC_MISMATCH;
+    return status;
   }
-  status = tc_kmac_digest(key, data, custom, (TC_buffer){candidate, tag.length}, 1);
-  return tc_internal_verify_tag(status, candidate, sizeof computed, tag.data, tag.length);
+  /* Tags may be longer than any stack buffer. Squeeze in fixed chunks and
+   * compare every chunk with TC_ct_equal. The scan length depends only on the
+   * public tag length. */
+  tc_kmac_finish_absorb(&ctx, tag.length);
+  for (offset = 0; offset < tag.length; offset += length) {
+    length = tag.length - offset < sizeof chunk ? tag.length - offset : sizeof chunk;
+    tc_kmac_squeeze(&ctx, chunk, length);
+    different |= (unsigned)(TC_ct_equal((TC_bytes){chunk, length},
+                                        (TC_bytes){tag.data + offset, length}) != TC_OK);
+  }
+  TC_secure_zero(chunk, sizeof chunk);
+  TC_KMAC256_ctx_clear(&ctx);
+  return different == 0 ? TC_OK : TC_MISMATCH;
 }
 
 TC_status TC_KMAC256_verify(TC_bytes key, TC_bytes data, TC_bytes custom, TC_bytes tag)

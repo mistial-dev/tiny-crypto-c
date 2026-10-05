@@ -100,8 +100,11 @@ static int options_valid(const ExamplePIVInspectOptions* options, TC_APDU_transp
   return options && out && transport.transmit &&
          (options->interface == TC_PIV_CONTACT || options->interface == TC_PIV_CONTACTLESS) &&
          (options->format == TC_APDU_SHORT || options->format == TC_APDU_EXTENDED) &&
-         options->minimum_retries >= 2 && options->random.fill && options->anchors &&
-         options->anchor_count && options->anchor_count <= EXAMPLE_PIV_INSPECT_ANCHORS &&
+         options->minimum_retries >= 2 &&
+         (options->piv_card_chuid == TC_CHUID_PROFILE_PIV ||
+          options->piv_card_chuid == TC_CHUID_PROFILE_PIV_SP800_73_4) &&
+         options->random.fill && options->anchors && options->anchor_count &&
+         options->anchor_count <= EXAMPLE_PIV_INSPECT_ANCHORS &&
          (options->crls || !options->crl_count) && options->crl_count <= EXAMPLE_PIV_INSPECT_CRLS;
 }
 
@@ -259,8 +262,8 @@ static void plain_reads(Inspect* inspect)
   }
   TC_PIV_CHUID_profile chuid_profile;
   inspect->has_chuid =
-      TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, inspect->profile, &chuid_profile) ==
-          TC_TLV_OK &&
+      TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, inspect->profile,
+                                inspect->options->piv_card_chuid, &chuid_profile) == TC_TLV_OK &&
       plain_read(inspect, chuid_tag, COPY_CHUID) &&
       TC_PIV_CHUID_read(inspect->copies[COPY_CHUID].encoded, TC_PIV_CHUID_CONTAINER, chuid_profile,
                         &inspect->chuid) == TC_TLV_OK &&
@@ -390,7 +393,7 @@ static TC_PIV_result check(Inspect* inspect, TC_PIV_card_report* report)
       inspect->profile,       &storage.trust.context,
       &storage.trust.context, &ocsp,
       inspect->card_cvc,      inspect->copy_count ? inspect->copies : NULL,
-      inspect->copy_count};
+      inspect->copy_count,    options->piv_card_chuid};
   storage.check.certificates = (TC_buffer){storage.certificates, sizeof storage.certificates};
   storage.check.lds_content = (TC_buffer){storage.lds, sizeof storage.lds};
   size_t work = CHECK_WORK;

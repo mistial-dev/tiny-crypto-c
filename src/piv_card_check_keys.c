@@ -7,6 +7,7 @@
 #if TC_ENABLE_PIV_CARD_CHECK
 #include "internal.h"
 #include "piv_card_check_internal.h"
+#include "twic_card_check_internal.h"
 #include <tiny_crypto/piv_sm_apdu.h>
 #include "credential_status_internal.h"
 #if TC_ENABLE_PIV_CVC
@@ -141,7 +142,7 @@ static int proof_arguments_valid(const TC_PIV_link* link, const TC_PIV_card_proo
   if (!link || !request || !workspace || !work || !report || !request->keys ||
       (request->keys & ~(unsigned)PROVE_KEYS) || report->count > TC_PIV_CARD_CHECKS_MAX ||
       request->policy.profile != report->profile ||
-      (report->application == TC_PIV_APPLICATION_TWIC &&
+      (tc_twic_application(report->application) &&
        (request->keys & ~(unsigned)TC_PIV_CARD_PROVE_CARD_AUTHENTICATION)))
     return 0;
   const struct {

@@ -19,7 +19,7 @@ extern "C" {
 #endif
 typedef enum {
   TC_PIV_CERTIFICATE_SLOT,
-  TC_PIV_CERTIFICATE_TWIC,
+  TC_PIV_CERTIFICATE_TWIC, /* requires TC_ENABLE_TWIC */
   TC_PIV_CERTIFICATE_SM_SIGNER
 } TC_PIV_certificate_profile;
 typedef enum { TC_PIV_CERTIFICATE_PLAIN, TC_PIV_CERTIFICATE_GZIP } TC_PIV_certificate_compression;

@@ -56,6 +56,9 @@ typedef struct {
   const char* extended_key_usage;
   int nocheck;
   int unknown_critical;
+  /* OpenSSL extension values, or NULL to omit the extension. */
+  const char* subject_alt_name;
+  const char* name_constraints;
 } certificate_spec;
 
 static X509_EXTENSION* unknown_extension(int critical)
@@ -86,6 +89,10 @@ static X509* issue(const certificate_spec* spec)
     add_extension(certificate, NID_ext_key_usage, spec->extended_key_usage);
   if (spec->nocheck)
     add_extension(certificate, NID_id_pkix_OCSP_noCheck, "ignored");
+  if (spec->subject_alt_name)
+    add_extension(certificate, NID_subject_alt_name, spec->subject_alt_name);
+  if (spec->name_constraints)
+    add_extension(certificate, NID_name_constraints, spec->name_constraints);
   if (spec->unknown_critical) {
     X509_EXTENSION* extension = unknown_extension(1);
     munit_assert_int(X509_add_ext(certificate, extension, -1), ==, 1);
@@ -184,6 +191,8 @@ typedef struct {
   EVP_PKEY* key;
   unsigned long flags;
   const EVP_MD* cert_id_hash;
+  /* CertID subject and issuer, by default the target and the CA. */
+  X509* cert_id_subject;
   X509* cert_id_issuer;
   int status, reason;
   int copies, other_first, no_next_update;
@@ -284,7 +293,8 @@ static TC_bytes build_response(const response_spec* spec, uint8_t out[OCSP_FILE_
     ASN1_INTEGER_free(serial);
   }
   OCSP_CERTID* id =
-      OCSP_cert_to_id(hash, pki.target, spec->cert_id_issuer ? spec->cert_id_issuer : pki.ca);
+      OCSP_cert_to_id(hash, spec->cert_id_subject ? spec->cert_id_subject : pki.target,
+                      spec->cert_id_issuer ? spec->cert_id_issuer : pki.ca);
   munit_assert_not_null(id);
   OCSP_SINGLERESP* single = NULL;
   for (int i = 0; i < (spec->copies ? spec->copies : 1); ++i)
@@ -842,25 +852,43 @@ static TC_bytes crl_der(long serial, uint8_t out[OCSP_FILE_CAPACITY])
 static ocsp_revocation revocation;
 static uint8_t crl_bytes[OCSP_FILE_CAPACITY];
 
-/* Check the one-certificate path CA -> target with a CRL selector from the
- * enum above. delegate, when present, is a source candidate. */
-static TC_TLV_result check_path(TC_bytes response, int crl, const TC_bytes* delegate,
-                                TC_X509_revocation_report* result)
+/* Revocation inputs below anchor with a CRL selector from the enum above and
+ * one OCSP response span per path member, or none. The anchor record stays
+ * in revocation.anchor for adjustment before the check. */
+static TC_X509_revocation_options revocation_inputs(TC_bytes anchor, const TC_bytes* candidates,
+                                                    size_t candidate_count, int crl,
+                                                    const TC_bytes* responses,
+                                                    size_t response_count)
 {
   const long serial = crl == CRL_REVOKES_TARGET     ? TARGET_SERIAL
                       : crl == CRL_REVOKES_DELEGATE ? DELEGATE_SERIAL
                                                     : 0;
   const TC_bytes crls[] = {crl != NO_CRL ? crl_der(serial, crl_bytes) : (TC_bytes){NULL, 0}};
-  /* The CA signs its CRLs, so it is also a signer candidate. */
-  const TC_bytes candidates[] = {pki.ca_bytes, delegate ? *delegate : (TC_bytes){NULL, 0}};
-  ocsp_revocation_init(&revocation, &fixture, pki.ca_bytes, candidates, delegate ? 2 : 1, crls,
+  ocsp_revocation_init(&revocation, &fixture, anchor, candidates, candidate_count, crls,
                        crl != NO_CRL, pki.at);
-  const TC_X509_revocation_options options =
-      ocsp_revocation_options(&revocation, pki.at, &response, 1);
+  return ocsp_revocation_options(&revocation, pki.at, responses, response_count);
+}
+
+/* Check chain, anchor-issued first. */
+static TC_TLV_result check_revocation(const TC_bytes* chain, size_t count,
+                                      const TC_X509_revocation_options* options,
+                                      TC_X509_revocation_report* result)
+{
   size_t work = 20000000;
   memset(result, 0xa5, sizeof *result);
-  return TC_X509_path_check_revocation(&pki.target_bytes, 1, &options, &revocation.workspace, &work,
-                                       result);
+  return TC_X509_path_check_revocation(chain, count, options, &revocation.workspace, &work, result);
+}
+
+/* Check the one-certificate path CA -> target. delegate, when present, is a
+ * source candidate. */
+static TC_TLV_result check_path(TC_bytes response, int crl, const TC_bytes* delegate,
+                                TC_X509_revocation_report* result)
+{
+  /* The CA signs its CRLs, so it is also a signer candidate. */
+  const TC_bytes candidates[] = {pki.ca_bytes, delegate ? *delegate : (TC_bytes){NULL, 0}};
+  const TC_X509_revocation_options options =
+      revocation_inputs(pki.ca_bytes, candidates, delegate ? 2 : 1, crl, &response, 1);
+  return check_revocation(&pki.target_bytes, 1, &options, result);
 }
 
 /* Authenticated revocation from either source wins. An unchecked delegate may
@@ -935,6 +963,172 @@ TC_TEST(path_fallback)
   return MUNIT_OK;
 }
 
+/* A store certificate with the anchor's name and key, issued by an unrelated
+ * CA, is the anchor itself as a CRL signer with an empty path (RFC 5280
+ * section 6.3.3 (f)). It signs CRLs only when the anchor carries
+ * TC_X509_ANCHOR_USAGE_CRL_SIGN (RFC 10007 section 4) and its complete
+ * SubjectPublicKeyInfo matches the anchor key. */
+TC_TEST(anchored_crl_signer)
+{
+  static uint8_t anchor_der[OCSP_FILE_CAPACITY], signer_der[OCSP_FILE_CAPACITY];
+  /* secp384r1 namedCurve parameters (RFC 5480 section 2.1.1.1). */
+  static const uint8_t secp384r1[] = {0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22};
+  TC_X509_revocation_report result;
+  hierarchy_init();
+  const certificate_spec restricted = {.key = pki.ca_key,
+                                       .name = "tiny-crypto-c OCSP CA",
+                                       .signer = pki.ca_key,
+                                       .serial = 2,
+                                       .ca = 1,
+                                       .key_usage = "critical,keyCertSign"};
+  X509* anchor = issue(&restricted);
+  const certificate_spec pinned = {.key = pki.ca_key,
+                                   .name = "tiny-crypto-c OCSP CA",
+                                   .issuer = pki.other_ca,
+                                   .signer = pki.other_key,
+                                   .serial = 3,
+                                   .ca = 1,
+                                   .key_usage = "critical,keyCertSign,cRLSign"};
+  X509* signer = issue(&pinned);
+  const TC_bytes anchor_bytes = certificate_der(anchor, anchor_der);
+  const TC_bytes candidates[] = {certificate_der(signer, signer_der)};
+  const TC_X509_revocation_options options =
+      revocation_inputs(anchor_bytes, candidates, 1, EMPTY_CRL, NULL, 0);
+
+  /* The anchor keyUsage omits cRLSign, so the anchor key signs no CRL. */
+  munit_assert_uint(revocation.anchor.usage, ==, 0);
+  munit_assert_int(check_revocation(&pki.target_bytes, 1, &options, &result), ==, TC_TLV_INVALID);
+
+  /* With CRL_SIGN authorized the signer is the anchor. The P-384 curve makes
+   * the direct anchor signature check fail, so the CRL reaches the signer
+   * search and the anchored signer path. */
+  revocation.anchor.usage = TC_X509_ANCHOR_USAGE_CRL_SIGN;
+  revocation.anchor.trust.public_key.curve = TC_EC_P384;
+  munit_assert_int(check_revocation(&pki.target_bytes, 1, &options, &result), ==, TC_TLV_OK);
+  munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
+
+  /* The same key bits under other curve parameters are a different key. */
+  revocation.anchor.trust.public_key.algorithm.parameters = (TC_bytes){secp384r1, sizeof secp384r1};
+  munit_assert_int(check_revocation(&pki.target_bytes, 1, &options, &result), ==, TC_TLV_INVALID);
+  X509_free(anchor);
+  X509_free(signer);
+  hierarchy_free();
+  return MUNIT_OK;
+}
+
+/* A delegated responder is validated under the selected anchor's
+ * CertPathControls and below the validated path to its issuer (RFC 5937
+ * section 3.1, RFC 5914 section 2.5). A delegate outside a permitted
+ * dNSName subtree signs no accepted response, so the member falls back to
+ * CRLs, and none are held for it. */
+TC_TEST(delegate_path_controls)
+{
+  static uint8_t anchor_der[OCSP_FILE_CAPACITY], intermediate_der[OCSP_FILE_CAPACITY],
+      leaf_der[OCSP_FILE_CAPACITY], responses_der[2][OCSP_FILE_CAPACITY];
+  const char* const names[] = {"DNS:good.example", "DNS:evil.example"};
+  const char* constraint = "critical,permitted;DNS:good.example";
+  TC_X509_revocation_report result;
+  hierarchy_init();
+
+  /* The anchor's nameConstraints bind a delegate for the first member. */
+  certificate_spec constrained = {.key = pki.ca_key,
+                                  .name = "tiny-crypto-c OCSP CA",
+                                  .signer = pki.ca_key,
+                                  .serial = 2,
+                                  .ca = 1,
+                                  .key_usage = "critical,keyCertSign,cRLSign",
+                                  .name_constraints = constraint};
+  X509* anchor = issue(&constrained);
+  const TC_bytes anchor_bytes = certificate_der(anchor, anchor_der);
+  for (size_t i = 0; i < 2; ++i) {
+    certificate_spec delegate_fields = delegate_spec();
+    delegate_fields.nocheck = 1;
+    delegate_fields.subject_alt_name = names[i];
+    X509* delegate = issue(&delegate_fields);
+    const TC_bytes candidates[] = {certificate_der(delegate, delegate_bytes)};
+    response_spec spec = response_by(delegate, pki.responder_key);
+    spec.flags = OCSP_NOCERTS;
+    const TC_bytes response = build_response(&spec, response_bytes);
+    const TC_X509_revocation_options options =
+        revocation_inputs(anchor_bytes, candidates, 1, NO_CRL, &response, 1);
+    const TC_TLV_result status = check_revocation(&pki.target_bytes, 1, &options, &result);
+    if (i) {
+      munit_assert_int(status, ==, TC_TLV_UNSUPPORTED);
+    } else {
+      munit_assert_int(status, ==, TC_TLV_OK);
+      munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
+    }
+    X509_free(delegate);
+  }
+
+  /* An intermediate's nameConstraints bind a delegate for the member it
+   * issued. The CA's empty CRL settles the intermediate. */
+  EVP_PKEY* intermediate_key = EVP_EC_gen("prime256v1");
+  EVP_PKEY* leaf_key = EVP_EC_gen("prime256v1");
+  munit_assert_not_null(intermediate_key);
+  munit_assert_not_null(leaf_key);
+  const certificate_spec intermediate_fields = {.key = intermediate_key,
+                                                .name = "tiny-crypto-c OCSP intermediate",
+                                                .issuer = pki.ca,
+                                                .signer = pki.ca_key,
+                                                .serial = 3,
+                                                .ca = 1,
+                                                .key_usage = "critical,keyCertSign,cRLSign",
+                                                .name_constraints = constraint};
+  X509* intermediate = issue(&intermediate_fields);
+  const certificate_spec leaf_fields = {.key = leaf_key,
+                                        .name = "tiny-crypto-c OCSP leaf",
+                                        .issuer = intermediate,
+                                        .signer = intermediate_key,
+                                        .serial = 4,
+                                        .key_usage = "critical,digitalSignature",
+                                        .subject_alt_name = "DNS:good.example"};
+  X509* leaf = issue(&leaf_fields);
+  const TC_bytes chain[] = {certificate_der(intermediate, intermediate_der),
+                            certificate_der(leaf, leaf_der)};
+  for (size_t i = 0; i < 2; ++i) {
+    certificate_spec delegate_fields = delegate_spec();
+    delegate_fields.issuer = intermediate;
+    delegate_fields.signer = intermediate_key;
+    delegate_fields.nocheck = 1;
+    delegate_fields.subject_alt_name = names[i];
+    X509* delegate = issue(&delegate_fields);
+    const TC_bytes candidates[] = {pki.ca_bytes, certificate_der(delegate, delegate_bytes)};
+    response_spec spec = response_by(delegate, pki.responder_key);
+    spec.flags = OCSP_NOCERTS;
+    spec.cert_id_subject = leaf;
+    spec.cert_id_issuer = intermediate;
+    const TC_bytes responses[] = {{NULL, 0}, build_response(&spec, responses_der[i])};
+    const TC_X509_revocation_options options =
+        revocation_inputs(pki.ca_bytes, candidates, 2, EMPTY_CRL, responses, 2);
+    const TC_TLV_result status = check_revocation(chain, 2, &options, &result);
+    if (i) {
+      munit_assert_int(status, ==, TC_TLV_UNSUPPORTED);
+    } else {
+      munit_assert_int(status, ==, TC_TLV_OK);
+      munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
+      /* A chain stored in the search scratch is an argument error: the
+       * delegate path is assembled there. */
+      munit_assert_size(revocation.search.capacity, >=, 2);
+      revocation.search.path[0] = chain[0];
+      revocation.search.path[1] = chain[1];
+      munit_assert_int(check_revocation(revocation.search.path, 2, &options, &result), ==,
+                       TC_TLV_ARGUMENT);
+      /* The delegate path below the intermediate needs two search spans. */
+      revocation.search.capacity = 1;
+      munit_assert_int(check_revocation(chain, 2, &options, &result), ==, TC_TLV_LIMIT);
+    }
+    X509_free(delegate);
+  }
+  X509_free(leaf);
+  X509_free(intermediate);
+  X509_free(anchor);
+  EVP_PKEY_free(leaf_key);
+  EVP_PKEY_free(intermediate_key);
+  hierarchy_free();
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
@@ -948,6 +1142,8 @@ int main(int argc, char** argv)
       {"/work-limits", work_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/unsuccessful", unsuccessful, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/path-fallback", path_fallback, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/anchored-crl-signer", anchored_crl_signer, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/delegate-path-controls", delegate_path_controls, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/x509/ocsp/openssl", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);

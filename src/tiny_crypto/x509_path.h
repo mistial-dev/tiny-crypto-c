@@ -4,7 +4,12 @@
  * path discovery from a certificate store.
  * Standards: RFC 5280 section 6, RFC 5937.
  * Configuration: TC_ENABLE_X509_PATH.
- * Limitations: revocation is in x509_revocation.h.
+ * Limitations: every intermediate must be a v3 certificate with
+ * basicConstraints cA TRUE, and with keyCertSign when keyUsage is present.
+ * RFC 5280 section 6.1.4(k) lets a relying party establish CA status of v1
+ * and v2 certificates out of band. This library has no such input and rejects
+ * them. Name-constraint forms outside TC_X509_name_within surface as
+ * UNSUPPORTED. Revocation is in x509_revocation.h.
  * Contracts: docs/api.md, including its size_t work units.
  * Guide: docs/x509-path.md. */
 #ifndef TINY_CRYPTO_X509_PATH_H_
@@ -237,8 +242,9 @@ typedef struct {
  * spent.
  * Returns VALID with out written. ERROR for NULL arguments, unknown flags, a
  * source with a NULL candidate or anchor callback and a nonzero count, overlap,
- * a callback that returns an empty record or an argument error found while
- * searching.
+ * a callback that returns an empty candidate or a usable anchor without a
+ * name, or an argument error found while searching. An x509_unusable anchor
+ * is skipped and counts as an INVALID candidate.
  * LIMIT when max_work, search capacity or a path bound runs out, or when
  * that was the most severe candidate failure. UNSUPPORTED and INVALID
  * report the most severe failure among the attempted candidates. out changes
@@ -287,7 +293,9 @@ TC_X509_path_status TC_X509_path_validate(const TC_bytes* chain, size_t count,
  * stable throughout validation, and result policy spans may also borrow
  * anchor->policy_set. Other rules, work and statuses match
  * TC_X509_path_validate, with these additions. INVALID for an x509_unusable
- * anchor or a CertPathControls duplicate in anchor->extensions. UNSUPPORTED
+ * anchor. certificatePolicies, policyConstraints, inhibitAnyPolicy and
+ * nameConstraints in anchor->extensions are ignored (RFC 5914 section 2.6).
+ * UNSUPPORTED
  * for an unimplemented critical anchor extension, or for a path control in
  * the anchor's extension spans that its record fields omit (see
  * TC_X509_store_anchor). ERROR for unknown policy_flags or replaced_controls

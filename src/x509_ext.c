@@ -26,7 +26,7 @@ TC_TLV_result TC_X509_subject_key_identifier_read(TC_bytes value, const TC_TLV_l
     return result;
   if (!limits->max_elements)
     return TC_TLV_LIMIT;
-  if (!tc_pki_tag(&element, 4) || element.encoded.length != value.length)
+  if (!tc_tlv_tag_is(&element, 4) || element.encoded.length != value.length)
     return TC_TLV_INVALID;
   *out = element.value;
   return TC_TLV_OK;
@@ -131,7 +131,7 @@ static TC_TLV_result next_sequence(const TC_TLV_reader* reader, TC_TLV_reader* n
   result = TC_TLV_next(next, element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(element, 0x30) || !element->header.constructed)
+  if (!tc_tlv_tag_is(element, 0x30) || !element->header.constructed)
     return TC_TLV_INVALID;
   return tc_pki_child_open(fields, next, element->value);
 }
@@ -199,7 +199,7 @@ TC_TLV_result TC_X509_extension_next(TC_TLV_reader* reader, TC_X509_extension* o
   result = required_field(&fields, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (tc_pki_tag(&element, 1)) {
+  if (tc_tlv_tag_is(&element, 1)) {
     /* DEFAULT FALSE is omitted in DER. */
     if (TC_DER_boolean(element.encoded, &extension.critical) != TC_TLV_OK || !extension.critical)
       return TC_TLV_INVALID;
@@ -207,7 +207,7 @@ TC_TLV_result TC_X509_extension_next(TC_TLV_reader* reader, TC_X509_extension* o
     if (result != TC_TLV_OK)
       return result;
   }
-  if (!tc_pki_tag(&element, 4) || !tc_pki_end(&fields))
+  if (!tc_tlv_tag_is(&element, 4) || !tc_pki_end(&fields))
     return TC_TLV_INVALID;
   extension.value = element.value;
   tc_pki_child_close(&next, &fields);
@@ -254,7 +254,7 @@ TC_TLV_result tc_x509_policy_information_next(TC_TLV_reader* reader, TC_X509_pol
   result = TC_TLV_next(&fields, &element);
   if (result == TC_TLV_OK) {
     /* policyQualifiers SEQUENCE SIZE (1..MAX) OF PolicyQualifierInfo. */
-    if (!tc_pki_tag(&element, 0x30) || !element.header.constructed || !element.value.length ||
+    if (!tc_tlv_tag_is(&element, 0x30) || !element.header.constructed || !element.value.length ||
         !tc_pki_end(&fields))
       return TC_TLV_INVALID;
     policy.qualifiers = element.encoded;
@@ -351,7 +351,7 @@ TC_TLV_result TC_X509_basic_constraints_read(TC_bytes value, const TC_TLV_limits
   if (result != TC_TLV_OK)
     return result;
   result = TC_TLV_next(&reader, &element);
-  if (result == TC_TLV_OK && tc_pki_tag(&element, 1)) {
+  if (result == TC_TLV_OK && tc_tlv_tag_is(&element, 1)) {
     if (TC_DER_boolean(element.encoded, &constraints.ca) != TC_TLV_OK || !constraints.ca)
       return TC_TLV_INVALID;
     result = TC_TLV_next(&reader, &element);
@@ -387,7 +387,7 @@ TC_TLV_result TC_X509_key_usage_read(TC_bytes value, const TC_TLV_limits* limits
     return result;
   if (!limits->max_elements)
     return TC_TLV_LIMIT;
-  if (!tc_pki_tag(&element, 3) || element.encoded.length != value.length)
+  if (!tc_tlv_tag_is(&element, 3) || element.encoded.length != value.length)
     return TC_TLV_INVALID;
   result = tc_der_bit_string_contents(element.value, &bits, &unused);
   if (result != TC_TLV_OK)

@@ -72,16 +72,16 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
     const unsigned id = tc_pki_extension_id(&extension);
     if (!id)
       continue;
-    /* RFC 5914 section 2.6: these duplicate CertPathControls and must not
-     * appear in TrustAnchorInfo exts. Reject them so a constraint is never
-     * silently dropped. */
-    if (trust_anchor_info && tc_pki_extension_path_control(id))
-      return TC_TLV_INVALID;
+    /* RFC 5914 section 2.6: these duplicate CertPathControls, must not
+     * appear in TrustAnchorInfo exts and are ignored if they do. Their OIDs
+     * still take part in the duplicate check. */
+    if (trust_anchor_info && tc_x509_anchor_exts_ignored(id))
+      continue;
     switch (id) {
     case TC_PKI_EXT_CERTIFICATE_POLICIES: {
       TC_TLV_element value;
       result = TC_TLV_read(extension.value, TC_TLV_DER, limits, &value);
-      if (result != TC_TLV_OK || !tc_pki_tag(&value, 0x30) ||
+      if (result != TC_TLV_OK || !tc_tlv_tag_is(&value, 0x30) ||
           value.encoded.length != extension.value.length)
         return TC_TLV_INVALID;
       /* Checked after the loop, which owns the OID scratch until then. */

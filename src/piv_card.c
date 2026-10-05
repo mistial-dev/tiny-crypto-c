@@ -1,12 +1,14 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/piv_card.h>
-#include <tiny_crypto/twic_uuid.h>
 #if TC_ENABLE_PIV_OBJECTS
+#include "piv_identifiers_internal.h"
+#include "twic_card_identifiers_internal.h"
 #include "credential_text_internal.h"
 #include "string_internal.h"
 #include "pki_reader_internal.h"
 #include "pki_tree_internal.h"
+#include "piv_uuid_internal.h"
 
 enum {
   FASCN_BYTES = 25,
@@ -16,13 +18,6 @@ enum {
   GENERAL_NAME_OTHER = 0,
   GENERAL_NAME_URI = 6
 };
-
-typedef enum {
-  IDENTIFIERS_STRICT,
-  IDENTIFIERS_TWIC_READER,
-  IDENTIFIERS_PIV_AUTHENTICATION,
-  IDENTIFIERS_TWIC_PIV_AUTHENTICATION
-} identifiers_policy;
 
 static int uuid_prefix(TC_bytes text)
 {
@@ -39,33 +34,24 @@ static TC_TLV_result uuid_read(TC_bytes text, uint8_t uuid[UUID_BYTES])
 {
   if (!text.data || text.length != UUID_URN_BYTES || !uuid_prefix(text))
     return TC_TLV_INVALID;
-  size_t position = UUID_PREFIX_BYTES;
-  for (size_t i = 0; i < UUID_BYTES; ++i) {
-    if (i == 4 || i == 6 || i == 8 || i == 10)
-      if (text.data[position++] != '-')
-        return TC_TLV_INVALID;
-    const int high = tc_credential_hex_digit(text.data[position++]);
-    const int low = tc_credential_hex_digit(text.data[position++]);
-    if (high < 0 || low < 0)
+  /* RFC 4122 section 3: five hyphen-separated groups of 4, 2, 2, 2 and 6
+   * octets. */
+  static const uint8_t groups[] = {4, 2, 2, 2, 6};
+  size_t position = UUID_PREFIX_BYTES, offset = 0;
+  for (size_t group = 0; group < sizeof groups; ++group) {
+    if (group && text.data[position++] != '-')
       return TC_TLV_INVALID;
-    uuid[i] = (uint8_t)(high * 16 + low);
+    if (!tc_credential_hex_decode(text.data + position, groups[group], uuid + offset))
+      return TC_TLV_INVALID;
+    position += 2u * groups[group];
+    offset += groups[group];
   }
   return TC_TLV_OK;
 }
 
-static int uuid_profile(const uint8_t* uuid, TC_PIV_card_profile profile)
+int tc_piv_card_uuid_valid(const uint8_t uuid[UUID_BYTES])
 {
-  static const uint8_t nil[UUID_BYTES] = {0};
-  if (profile == TC_TWIC_LEGACY_CARD)
-    return !memcmp(uuid, nil, sizeof nil);
-  if ((uuid[8] & 0xc0) != 0x80)
-    return 0;
-  if (profile == TC_TWIC_NEXGEN_CARD) {
-    uint64_t number;
-    return TC_TWIC_uuid_read((TC_bytes){uuid, UUID_BYTES}, &number) == TC_TLV_OK;
-  }
-  const unsigned version = uuid[6] >> 4;
-  return version == 1 || version == 4 || version == 5;
+  return tc_piv_uuid_valid(uuid, TC_PIV_CARD_UUID_VERSIONS);
 }
 
 static TC_TLV_result read_fascn(const TC_X509_general_name* name, TC_PIV_oid_profile profile,
@@ -79,11 +65,16 @@ static TC_TLV_result read_fascn(const TC_X509_general_name* name, TC_PIV_oid_pro
       tc_pki_tree_oid_value(name->encoded, 0xa0, TC_TLV_DER, limits, tree, &other);
   if (result != TC_TLV_OK)
     return result;
-  /* Recognize both namespaces before applying the selected acceptance policy.
-   */
+  /* Recognize every namespace the build knows before applying the selected
+   * acceptance policy, so a TWIC FASC-N under the PIV profile is INVALID. */
+#if TC_ENABLE_TWIC
+  const TC_PIV_oid_profile recognized = TC_PIV_OIDS_TWIC_COMPATIBLE;
+#else
+  const TC_PIV_oid_profile recognized = TC_PIV_OIDS_ONLY;
+#endif
   if (tc_pki_work_charge(tree->work, other.oid.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  if (TC_PIV_oid_identify(other.oid, TC_PIV_OIDS_TWIC_COMPATIBLE) != TC_PIV_OID_FASCN)
+  if (TC_PIV_oid_identify(other.oid, recognized) != TC_PIV_OID_FASCN)
     return TC_TLV_OK;
   if (tc_pki_work_charge(tree->work, other.oid.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
@@ -102,14 +93,11 @@ static TC_TLV_result read_fascn(const TC_X509_general_name* name, TC_PIV_oid_pro
   return TC_TLV_OK;
 }
 
-static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile profile,
-                                      identifiers_policy policy,
-                                      const uint8_t card_guid[UUID_BYTES],
-                                      const TC_TLV_limits* limits, TC_TLV_frames frames,
-                                      size_t* work, TC_PIV_card_identifiers* out)
+TC_TLV_result tc_piv_identifiers_read(TC_bytes encoded, const tc_piv_identifier_rules* rules,
+                                      const uint8_t* card_guid, const TC_TLV_limits* limits,
+                                      TC_TLV_frames frames, size_t* work,
+                                      TC_PIV_card_identifiers* out)
 {
-  if (profile != TC_PIV_CARD && profile != TC_TWIC_LEGACY_CARD && profile != TC_TWIC_NEXGEN_CARD)
-    return TC_TLV_ARGUMENT;
   TC_TLV_result result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
@@ -118,14 +106,7 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
   uint8_t uuids[2][UUID_BYTES] = {{0}};
   size_t uuid_count = 0;
   const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
-  const int authentication =
-      policy == IDENTIFIERS_PIV_AUTHENTICATION || policy == IDENTIFIERS_TWIC_PIV_AUTHENTICATION;
-  const int reader_policy =
-      policy == IDENTIFIERS_TWIC_READER || policy == IDENTIFIERS_TWIC_PIV_AUTHENTICATION;
-  const TC_PIV_oid_profile oids =
-      profile == TC_PIV_CARD && policy != IDENTIFIERS_TWIC_PIV_AUTHENTICATION
-          ? TC_PIV_OIDS_ONLY
-          : TC_PIV_OIDS_TWIC_COMPATIBLE;
+  const int authentication = rules->authentication;
   TC_TLV_reader reader;
   /* One full framing scan, then bounded schema scans through every name. */
   result = tc_pki_tree_open(encoded, 0x30, TC_TLV_DER, limits, &tree, &reader);
@@ -149,7 +130,7 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
     if (result != TC_TLV_OK)
       return result;
     if (name.type == GENERAL_NAME_OTHER) {
-      result = read_fascn(&name, oids, limits, &tree, &identifiers);
+      result = read_fascn(&name, rules->oids, limits, &tree, &identifiers);
       if (result != TC_TLV_OK)
         return result;
     } else if (name.type == GENERAL_NAME_URI) {
@@ -165,13 +146,12 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
       if (tc_pki_work_charge(work, name.value.length) != TC_TLV_OK)
         return TC_TLV_LIMIT;
       result = uuid_read(name.value, uuids[uuid_count]);
-      if (result != TC_TLV_OK || !uuid_profile(uuids[uuid_count], profile))
+      if (result != TC_TLV_OK || !rules->uuid_valid(uuids[uuid_count]))
         return TC_TLV_INVALID;
       uuid_urns[uuid_count++] = name.value;
     }
   }
-  if (!identifiers.fascn.data ||
-      (!reader_policy && profile != TC_TWIC_LEGACY_CARD && uuid_count == 0))
+  if (!identifiers.fascn.data || (!rules->uuid_optional && uuid_count == 0))
     return TC_TLV_INVALID;
   /* Index of the card UUID. Authentication certificates may also carry a
    * cardholder UUID, in either order. */
@@ -188,7 +168,7 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
     identifiers.uuid_urn = uuid_urns[card_index];
     if (uuid_count == 2) {
       const size_t cardholder_index = card_index ^ 1u;
-      if ((uuids[cardholder_index][6] >> 4) != 4)
+      if (!tc_piv_uuid_valid(uuids[cardholder_index], TC_PIV_CARDHOLDER_UUID_VERSIONS))
         return TC_TLV_INVALID;
       identifiers.cardholder_uuid_urn = uuid_urns[cardholder_index];
     }
@@ -201,12 +181,11 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
   result = TC_FASCN_read(identifiers.fascn, &decoded);
   if (result != TC_TLV_OK)
     return result;
-  if (profile == TC_TWIC_NEXGEN_CARD && identifiers.uuid_urn.data) {
+  if (rules->uuid_fascn_check && identifiers.uuid_urn.data) {
     if (tc_pki_work_charge(work, UUID_BYTES) != TC_TLV_OK)
       return TC_TLV_LIMIT;
     int matched;
-    result = TC_TWIC_uuid_match((TC_bytes){uuids[card_index], sizeof uuids[card_index]}, &decoded,
-                                &matched);
+    result = rules->uuid_fascn_check(uuids[card_index], &decoded, &matched);
     if (result != TC_TLV_OK)
       return result;
     if (!matched)
@@ -220,17 +199,16 @@ TC_TLV_result TC_PIV_card_identifiers_read(TC_bytes encoded, TC_PIV_card_profile
                                            const TC_TLV_limits* limits, TC_TLV_frames frames,
                                            size_t* work, TC_PIV_card_identifiers* out)
 {
-  return identifiers_read(encoded, profile, IDENTIFIERS_STRICT, NULL, limits, frames, work, out);
-}
-
-TC_TLV_result TC_TWIC_card_identifiers_read(TC_bytes encoded, TC_PIV_card_profile profile,
-                                            const TC_TLV_limits* limits, TC_TLV_frames frames,
-                                            size_t* work, TC_PIV_card_identifiers* out)
-{
-  if (profile != TC_TWIC_LEGACY_CARD && profile != TC_TWIC_NEXGEN_CARD)
+  static const tc_piv_identifier_rules piv = {TC_PIV_OIDS_ONLY, 0, 0, tc_piv_card_uuid_valid, NULL};
+  tc_piv_identifier_rules rules = piv;
+#if TC_ENABLE_TWIC
+  if (profile != TC_PIV_CARD && !tc_twic_identifier_rules(profile, 0, &rules))
     return TC_TLV_ARGUMENT;
-  return identifiers_read(encoded, profile, IDENTIFIERS_TWIC_READER, NULL, limits, frames, work,
-                          out);
+#else
+  if (profile != TC_PIV_CARD)
+    return TC_TLV_ARGUMENT;
+#endif
+  return tc_piv_identifiers_read(encoded, &rules, NULL, limits, frames, work, out);
 }
 
 TC_TLV_result TC_PIV_authentication_identifiers_read(TC_bytes encoded, TC_bytes card_guid,
@@ -238,29 +216,17 @@ TC_TLV_result TC_PIV_authentication_identifiers_read(TC_bytes encoded, TC_bytes 
                                                      TC_TLV_frames frames, size_t* work,
                                                      TC_PIV_card_identifiers* out)
 {
+  static const tc_piv_identifier_rules rules = {TC_PIV_OIDS_ONLY, 1, 0, tc_piv_card_uuid_valid,
+                                                NULL};
   if (!card_guid.data || card_guid.length != UUID_BYTES)
     return TC_TLV_ARGUMENT;
   uint8_t expected[UUID_BYTES];
   memcpy(expected, card_guid.data, sizeof expected);
-  return identifiers_read(encoded, TC_PIV_CARD, IDENTIFIERS_PIV_AUTHENTICATION, expected, limits,
-                          frames, work, out);
+  return tc_piv_identifiers_read(encoded, &rules, expected, limits, frames, work, out);
 }
 
-TC_TLV_result TC_TWIC_authentication_identifiers_read(TC_bytes encoded, TC_bytes card_guid,
-                                                      const TC_TLV_limits* limits,
-                                                      TC_TLV_frames frames, size_t* work,
-                                                      TC_PIV_card_identifiers* out)
-{
-  if (!card_guid.data || card_guid.length != UUID_BYTES)
-    return TC_TLV_ARGUMENT;
-  uint8_t expected[UUID_BYTES];
-  memcpy(expected, card_guid.data, sizeof expected);
-  return identifiers_read(encoded, TC_PIV_CARD, IDENTIFIERS_TWIC_PIV_AUTHENTICATION, expected,
-                          limits, frames, work, out);
-}
-
-static TC_TLV_result identifiers_match(const TC_PIV_card_identifiers* identifiers, TC_bytes fascn,
-                                       TC_bytes guid, int reader_policy, size_t* work, int* matched)
+TC_TLV_result tc_piv_identifiers_match(const TC_PIV_card_identifiers* identifiers, TC_bytes fascn,
+                                       TC_bytes guid, int uuid_optional, size_t* work, int* matched)
 {
   TC_bytes writes[2];
   tc_pki_storage_plan plan;
@@ -298,7 +264,7 @@ static TC_TLV_result identifiers_match(const TC_PIV_card_identifiers* identifier
   }
   const int fascn_matches = !memcmp(identifiers->fascn.data, fascn.data, FASCN_BYTES);
   const int uuid_matches =
-      (reader_policy && !identifiers->uuid_urn.length) || !memcmp(uuid, guid.data, UUID_BYTES);
+      (uuid_optional && !identifiers->uuid_urn.length) || !memcmp(uuid, guid.data, UUID_BYTES);
   *matched = fascn_matches && uuid_matches;
   return TC_TLV_OK;
 }
@@ -307,13 +273,6 @@ TC_TLV_result TC_PIV_card_identifiers_match(const TC_PIV_card_identifiers* ident
                                             TC_bytes fascn, TC_bytes guid, size_t* work,
                                             int* matched)
 {
-  return identifiers_match(identifiers, fascn, guid, 0, work, matched);
-}
-
-TC_TLV_result TC_TWIC_card_identifiers_match(const TC_PIV_card_identifiers* identifiers,
-                                             TC_bytes fascn, TC_bytes guid, size_t* work,
-                                             int* matched)
-{
-  return identifiers_match(identifiers, fascn, guid, 1, work, matched);
+  return tc_piv_identifiers_match(identifiers, fascn, guid, 0, work, matched);
 }
 #endif

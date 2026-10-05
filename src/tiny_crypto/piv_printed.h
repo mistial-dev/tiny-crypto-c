@@ -15,6 +15,7 @@ extern "C" {
 
 typedef enum { TC_PIV_PRINTED_CONTENTS, TC_PIV_PRINTED_CONTAINER } TC_PIV_printed_encoding;
 
+/* The TWIC profile requires TC_ENABLE_TWIC. */
 typedef enum { TC_PIV_PRINTED_PROFILE_PIV, TC_PIV_PRINTED_PROFILE_TWIC } TC_PIV_printed_profile;
 
 typedef struct {

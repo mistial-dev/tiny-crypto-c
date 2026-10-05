@@ -160,7 +160,7 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
       (request->twic_reader_policy && request->card_key != EXAMPLE_CREDENTIAL_PIV_AUTHENTICATION) ||
       (request->profile == TC_PIV_CARD
            ? request->chuid_profile != TC_CHUID_PROFILE_PIV &&
-                 request->chuid_profile != TC_CHUID_PROFILE_LEGACY_KEY_MAP
+                 request->chuid_profile != TC_CHUID_PROFILE_PIV_SP800_73_4
            : request->chuid_profile != TC_CHUID_PROFILE_TWIC_SIGNED))
     return EXAMPLE_CREDENTIAL_ERROR;
   if ((available & request->required_objects) != request->required_objects)
@@ -207,7 +207,7 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
   }
 
   const TC_PIV_key_policy key_policy = {request->profile, card_context->options->at,
-                                        request->rsa_padding, request->allow_legacy_rsa1024};
+                                        request->rsa_padding, request->allow_rsa1024};
   TC_PIV_key_parameters key_parameters;
   switch (TC_PIV_key_parameters_select(&accepted.card.certificate, &key_policy, &key_parameters)) {
   case TC_PIV_OK:

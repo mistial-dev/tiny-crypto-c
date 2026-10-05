@@ -1,0 +1,14 @@
+# Null-guard cases the quick suite does not reach. Each group names the opt-in
+# suite that covers it. Remove an entry when a quick test reaches the case.
+
+# Extended OpenSSL RSA suites (test_rsa_pss_openssl, test_rsa_private_openssl).
+TC_RSA_validate_crt crt
+TC_RSA_validate_crt key
+TC_RSA_validate_crt work
+TC_RSA_validate_crt workspace
+TC_RSA_verify_pss_prepared digest.data
+TC_RSA_verify_pss_prepared options
+TC_RSA_verify_pss_prepared setup
+TC_RSA_verify_pss_prepared signature.data
+TC_RSA_verify_pss_prepared work
+TC_RSA_verify_pss_prepared workspace

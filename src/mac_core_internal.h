@@ -3,6 +3,14 @@
 #define TC_MAC_CORE_INTERNAL_H_
 #include "block_cipher_internal.h"
 
+/* Builds with a MAC user: AES-CMAC (fixed or dynamic key), CCM, EAX, EAX',
+ * SIV, DES CMAC and ISO 9797-1 MACs, and the CTR_DRBG derivation function. */
+#define TC_MAC_CORE_ENABLED                                                                        \
+  ((TC_ENABLE_AES && (TC_AES_ENABLE_CMAC || TC_AES_ENABLE_DYNAMIC || TC_AES_ENABLE_CCM ||          \
+                      TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME || TC_AES_ENABLE_SIV)) ||       \
+   (TC_ENABLE_DES && (TC_DES_ENABLE_CMAC || TC_DES_ENABLE_ISO9797)) ||                             \
+   (TC_ENABLE_DRBG && TC_DRBG_ENABLE_CTR))
+
 /* Big-endian GF(2^n) doubling (SP 800-38B). input and output may be the
  * same block. */
 void tc_mac_gf_double(uint8_t* output, const uint8_t* input, size_t block_size, uint8_t reduction);
@@ -34,4 +42,17 @@ TC_status tc_mac_cmac_final(const tc_block_cipher* cipher, uint8_t* mac, uint8_t
 TC_status tc_mac_cmac_parts(const tc_block_cipher* cipher, const uint8_t* initial,
                             const TC_bytes* parts, size_t count, const uint8_t* complete_subkey,
                             const uint8_t* partial_subkey, uint8_t* tag);
+
+/* One-shot SP 800-38B CMAC of msg over a keyed cipher whose doubling uses
+ * reduction. The tag is the leading tag.capacity bytes of T (section 6.2
+ * step 7). tc_internal_tag_length_allowed with the block size as maximum
+ * selects the lengths, and short_tag picks the entry point. The tag is
+ * written last, so it may overlap msg, and every failure leaves it
+ * unchanged. Subkeys and the full tag are wiped. */
+TC_status tc_mac_cmac_oneshot(const tc_block_cipher* cipher, uint8_t reduction, TC_bytes msg,
+                              TC_buffer tag, int short_tag);
+/* Recompute a tag of tag.length bytes as above and compare it with
+ * TC_ct_equal. Returns TC_OK, TC_MISMATCH or TC_ERROR. */
+TC_status tc_mac_cmac_verify(const tc_block_cipher* cipher, uint8_t reduction, TC_bytes msg,
+                             TC_bytes tag, int short_tag);
 #endif

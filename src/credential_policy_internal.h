@@ -12,7 +12,7 @@
 
 /* Resolve the card profile. Sets *piv for PIV cards and *oids to the OID
  * profile the card accepts: PIV OIDs only for PIV, PIV or TWIC OIDs for TWIC
- * Legacy and NEXGEN. Returns 1 when options->certificate.purpose is empty or
+ * Legacy and NEXGEN when TC_ENABLE_TWIC is set. Returns 1 when options->certificate.purpose is empty or
  * names a content-signing OID accepted by that profile. Returns 0 for an
  * unknown profile, NULL arguments or any other requested purpose. */
 int tc_credential_profile(TC_PIV_card_profile profile, const TC_validation_options* options,
@@ -27,8 +27,8 @@ TC_TLV_result tc_credential_signer_read(TC_bytes certificate, const TC_TLV_limit
 
 /* Configure policy for a parsed content signer in one extension pass. When
  * policy->purpose is empty, or the card is TWIC, the first content-signing EKU
- * in the signer becomes the purpose. TWIC-compatible matching also accepts the
- * TWIC OID. PIV cards (piv != 0) additionally require the PIV content-signing
+ * in the signer becomes the purpose. purpose_oids selects the content-signing
+ * OIDs matched, PIV only or either of a PIV/TWIC pair. PIV cards (piv != 0) additionally require the PIV content-signing
  * certificate policy, set it as the explicit initial policy, and reject
  * signers that expire before card_expiration when it is non-NULL. Every
  * profile requires digitalSignature keyUsage and a present EKU with
@@ -41,7 +41,8 @@ TC_TLV_result tc_credential_signer_read(TC_bytes certificate, const TC_TLV_limit
  * TC_TLV_OK. Returns TC_TLV_INVALID when the signer lacks the required EKU or
  * policy. */
 TC_TLV_result tc_credential_signer_policy(const TC_X509_certificate* signer, int piv,
-                                          int twic_compatible, const TC_X509_time* card_expiration,
+                                          TC_PIV_oid_profile purpose_oids,
+                                          const TC_X509_time* card_expiration,
                                           TC_X509_path_options* policy,
                                           const TC_X509_path_workspace* storage, size_t* work);
 

@@ -47,7 +47,7 @@ leading text (RFC 7468 §2 allows it).
   (`MM` is the ordinal of the PEM block in the RFC). Public keys and
   attribute certificates are included where the RFC has them.
   * RFC 7468: GnuTLS ECDSA CA, sha1WithRSA `CN=Atlantis`, `X509 CERTIFICATE`
-    legacy label, CRL, attribute certificate, `CERTIFICATE CHAIN`.
+    label, CRL, attribute certificate, `CERTIFICATE CHAIN`.
   * RFC 8410 §10.1: Ed25519 self-signed certificate.
   * RFC 9802: HSS/LMS, XMSS and XMSS^MT CA certificates.
   * RFC 9881: ML-DSA-44/65/87 self-signed certificates and public keys.

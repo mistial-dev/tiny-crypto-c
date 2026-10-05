@@ -766,6 +766,27 @@ TC_TEST(sign_budget_preflight)
 
 /* The work counter is written during the call, so a peer or signer public
  * key that contains it is an argument error with the key bytes unchanged. */
+/* A span whose address range wraps is a caller error, found before any read. */
+TC_TEST(wrapping_spans)
+{
+#if TC_EC_ENABLE_P256
+  TC_EC_workspace workspace;
+  TC_work_budget work = {UINT32_MAX};
+  uint8_t scalar[32] = {0}, output[65];
+  scalar[31] = 1;
+  const uint8_t* wrapping = (const uint8_t*)(UINTPTR_MAX - 15u);
+  munit_assert_int(TC_EC_public_key(TC_EC_P256, (TC_bytes){wrapping, 32},
+                                    (TC_buffer){output, sizeof output}, &workspace, &work),
+                   ==, TC_EC_ARGUMENT);
+  munit_assert_int(TC_EC_public_key(TC_EC_P256, (TC_bytes){scalar, 32},
+                                    (TC_buffer){(uint8_t*)wrapping, sizeof output}, &workspace,
+                                    &work),
+                   ==, TC_EC_ARGUMENT);
+  munit_assert_uint(work.remaining, ==, UINT32_MAX);
+#endif
+  return MUNIT_OK;
+}
+
 TC_TEST(work_overlaps_public_key)
 {
   TC_EC_workspace workspace;
@@ -819,6 +840,7 @@ static MunitTest tests[] = {
     {"/coordinate-bytes", coordinate_bytes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/short-output", short_output_and_lengths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/sign-budget-preflight", sign_budget_preflight, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/wrapping-spans", wrapping_spans, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/work-overlaps-public-key", work_overlaps_public_key, NULL, NULL, MUNIT_TEST_OPTION_NONE,
      NULL},
     {"/captured-answer", captured_answer, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

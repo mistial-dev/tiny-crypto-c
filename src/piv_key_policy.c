@@ -1,12 +1,13 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-/* Key policy of the key proofs: certificate key use, the SP 800-78-5
- * algorithm identifiers of Table 9 with the per-key rules of Table 10, and
- * the TWIC reader profiles. */
+/* Key policy of the key proofs: certificate key use and the SP 800-78-5
+ * algorithm identifiers of Table 9 with the per-key rules of Table 10.
+ * twic_key_policy.c holds the TWIC profile rules. */
 #include <tiny_crypto/piv_key_proof.h>
 #if TC_ENABLE_PIV_KEY_PROOF
 #include "internal.h"
 #include "piv_key_proof_internal.h"
+#include "twic_key_policy_internal.h"
 
 enum {
   KEY_USAGE_EXTENSION = 0x0f, /* id-ce-keyUsage, 2.5.29.15 */
@@ -19,10 +20,21 @@ enum {
 /* SP 800-78-5 Table 10: RSA-2048 (07) ends after 2030. */
 static const TC_X509_time rsa2048_end = {2030, 12, 31, 23, 59, 59};
 
+const tc_piv_key_profile_rules* tc_piv_key_profile_rules_get(TC_PIV_card_profile profile)
+{
+  static const tc_piv_key_profile_rules piv = {0, 1, 0};
+  if (profile == TC_PIV_CARD)
+    return &piv;
+#if TC_ENABLE_TWIC
+  return tc_twic_key_profile_rules(profile);
+#else
+  return NULL;
+#endif
+}
+
 int tc_piv_key_policy_valid(const TC_PIV_key_policy* policy)
 {
-  return (policy->profile == TC_PIV_CARD || policy->profile == TC_TWIC_LEGACY_CARD ||
-          policy->profile == TC_TWIC_NEXGEN_CARD) &&
+  return tc_piv_key_profile_rules_get(policy->profile) &&
          (policy->rsa_padding == TC_PIV_RSA_PKCS1_V15 || policy->rsa_padding == TC_PIV_RSA_PSS) &&
          policy->allow_rsa1024 <= 1 && TC_X509_time_check(&policy->at) == TC_TLV_OK;
 }
@@ -58,7 +70,7 @@ static int exponent_valid(TC_bytes exponent)
 
 /* RSA identifiers of Table 9 and the Table 10 rules of the profile. */
 static TC_PIV_result rsa_algorithm(const TC_X509_public_key* key, const TC_PIV_key_policy* policy,
-                                   uint8_t* algorithm)
+                                   const tc_piv_key_profile_rules* rules, uint8_t* algorithm)
 {
   if (!exponent_valid(key->exponent) || !key->modulus.data || key->modulus.length != key->bits / 8u)
     return TC_PIV_INVALID;
@@ -67,16 +79,16 @@ static TC_PIV_result rsa_algorithm(const TC_X509_public_key* key, const TC_PIV_k
     return TC_PIV_OK;
   }
   if (key->bits == 1024) {
-    /* Table 10 keeps 06 for retired keys only. TWIC Legacy readers may
-     * accept it by explicit policy (TWIC Part 2 v5 Appendix H). */
-    if (policy->profile != TC_TWIC_LEGACY_CARD || !policy->allow_rsa1024)
+    /* Table 10 keeps 06 for retired keys only. A profile may accept it by
+     * explicit policy. */
+    if (!rules->rsa1024 || !policy->allow_rsa1024)
       return TC_PIV_UNSUPPORTED;
     *algorithm = TC_PIV_ALGORITHM_RSA_1024;
     return TC_PIV_OK;
   }
   if (key->bits != 2048)
     return TC_PIV_UNSUPPORTED;
-  if (policy->profile == TC_PIV_CARD) {
+  if (rules->rsa2048_sunset) {
     int order = 0;
     if (TC_X509_time_compare(&policy->at, &rsa2048_end, &order) != TC_TLV_OK || order > 0)
       return TC_PIV_UNSUPPORTED;
@@ -113,13 +125,14 @@ TC_PIV_result TC_PIV_key_parameters_select(const TC_X509_certificate* certificat
   uint16_t usage = 0;
   if (key_usage(certificate, &usage) != TC_TLV_OK || !(usage & TC_KEY_USAGE_DIGITAL_SIGNATURE))
     return TC_PIV_INVALID;
+  const tc_piv_key_profile_rules* rules = tc_piv_key_profile_rules_get(policy->profile);
   const TC_X509_public_key* key = &certificate->public_key;
   TC_PIV_key_parameters selected;
   memset(&selected, 0, sizeof selected);
   selected.challenge.signature.hash = TC_HASH_SHA256;
   TC_PIV_result result = TC_PIV_UNSUPPORTED;
   if (key->type == TC_KEY_RSA) {
-    result = rsa_algorithm(key, policy, &selected.algorithm);
+    result = rsa_algorithm(key, policy, rules, &selected.algorithm);
     selected.challenge.signature.scheme = TC_SIGNATURE_RSA_V15;
     if (policy->rsa_padding == TC_PIV_RSA_PSS) {
       selected.challenge.signature.scheme = TC_SIGNATURE_RSA_PSS;
@@ -132,8 +145,7 @@ TC_PIV_result TC_PIV_key_parameters_select(const TC_X509_certificate* certificat
   }
   if (result != TC_PIV_OK)
     return result;
-  /* TWIC Part 2 v5 4.5 and 5.3: the NEXGEN card authentication key is 9E07. */
-  if (policy->profile == TC_TWIC_NEXGEN_CARD && selected.algorithm != TC_PIV_ALGORITHM_RSA_2048)
+  if (rules->required_algorithm && selected.algorithm != rules->required_algorithm)
     return TC_PIV_UNSUPPORTED;
   *out = selected;
   return TC_PIV_OK;

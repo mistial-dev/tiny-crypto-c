@@ -14,26 +14,6 @@
 #define TC_AES_GCM_PHASE_TEXT 2u
 #define TC_AES_GCM_PHASE_FINAL 3u
 
-static void tc_aes_gcm_make_j0(struct TC_AES_GCM_ctx* ctx, const uint8_t* iv, size_t iv_len)
-{
-  uint8_t length_block[TC_AES_BLOCKLEN] = {0};
-
-  memset(ctx->s, 0, TC_AES_BLOCKLEN);
-  memset(ctx->ghash, 0, TC_AES_BLOCKLEN);
-  if (iv_len == 12) {
-    memset(ctx->j0, 0, TC_AES_BLOCKLEN);
-    memcpy(ctx->j0, iv, iv_len);
-    ctx->j0[15] = 1;
-  } else {
-    tc_aes_gcm_hash_bytes(ctx, iv, iv_len);
-    tc_internal_store_be64(length_block + 8, (uint64_t)iv_len * 8u);
-    tc_aes_gcm_ghash_block(ctx, length_block);
-    memcpy(ctx->j0, ctx->s, TC_AES_BLOCKLEN);
-  }
-  memset(ctx->s, 0, TC_AES_BLOCKLEN);
-  memset(ctx->ghash, 0, TC_AES_BLOCKLEN);
-}
-
 static int tc_aes_gcm_length_is_valid(uint64_t current, size_t additional, uint64_t limit)
 {
   return (uint64_t)additional <= (limit - current);
@@ -78,6 +58,30 @@ static void tc_aes_gcm_absorb(struct TC_AES_GCM_ctx* ctx, const uint8_t* data, s
       memset(ctx->ghash, 0, TC_AES_BLOCKLEN);
     }
   }
+}
+
+/* J0 (SP 800-38D section 7.1 step 2): IV || 0^31 || 1 for a 96-bit IV,
+ * otherwise GHASH(IV || 0^(s+64) || [len(IV)]_64). S and the partial block
+ * start empty and end empty. */
+static void tc_aes_gcm_make_j0(struct TC_AES_GCM_ctx* ctx, const uint8_t* iv, size_t iv_len)
+{
+  uint8_t length_block[TC_AES_BLOCKLEN] = {0};
+
+  memset(ctx->s, 0, TC_AES_BLOCKLEN);
+  memset(ctx->ghash, 0, TC_AES_BLOCKLEN);
+  ctx->ghash_len = 0;
+  if (iv_len == 12) {
+    memset(ctx->j0, 0, TC_AES_BLOCKLEN);
+    memcpy(ctx->j0, iv, iv_len);
+    ctx->j0[15] = 1;
+  } else {
+    tc_aes_gcm_absorb(ctx, iv, iv_len);
+    tc_aes_gcm_pad_ghash(ctx);
+    tc_internal_store_be64(length_block + 8, (uint64_t)iv_len * 8u);
+    tc_aes_gcm_ghash_block(ctx, length_block);
+    memcpy(ctx->j0, ctx->s, TC_AES_BLOCKLEN);
+  }
+  memset(ctx->s, 0, TC_AES_BLOCKLEN);
 }
 
 /* inc32 (SP 800-38D section 6.2): only the low 32 bits of the counter block
@@ -216,12 +220,9 @@ static TC_status tc_aes_gcm_init_impl(struct TC_AES_GCM_ctx* ctx, TC_bytes key, 
 #endif
   tc_aes_gcm_make_j0(ctx, iv, iv_len);
   memcpy(ctx->counter, ctx->j0, TC_AES_BLOCKLEN);
-  memcpy(ctx->s, zero, TC_AES_BLOCKLEN);
-  memcpy(ctx->ghash, zero, TC_AES_BLOCKLEN);
   ctx->aad_len = 0;
   ctx->text_len = 0;
   ctx->stream_pos = TC_AES_BLOCKLEN;
-  ctx->ghash_len = 0;
   ctx->tag_len = (uint8_t)tag_len;
   ctx->phase = TC_AES_GCM_PHASE_AAD;
   return TC_OK;

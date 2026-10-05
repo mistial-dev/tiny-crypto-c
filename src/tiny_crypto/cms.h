@@ -42,9 +42,12 @@ typedef enum {
    * SMIMECapabilities (RFC 8551 section 2.5.2) and entryUUID (RFC 4530). */
   TC_CMS_ATTRIBUTE_OIDS_CMS = 0,
   /* CMS identifiers plus pivSigner-DN and pivFASC-N (FIPS 201-3 Table B-2).
-   * twicFASC-N returns UNSUPPORTED under every other-attribute policy. */
+   * With TC_ENABLE_TWIC, twicFASC-N returns UNSUPPORTED under every
+   * other-attribute policy. A build without TWIC treats it as any other
+   * attribute. */
   TC_CMS_ATTRIBUTE_OIDS_PIV = 1,
-  /* PIV identifiers plus twicFASC-N (TWIC Part 2 v5 section 6). */
+  /* PIV identifiers plus twicFASC-N (TWIC Part 2 v5 section 6). Requires
+   * TC_ENABLE_TWIC. */
   TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC = 2
 } TC_CMS_attribute_oids;
 

@@ -190,6 +190,11 @@ static TC_APDU_result response_collect(TC_APDU_channel* channel, TC_APDU_command
       result = answer_read(state, received, &answer);
     if (result != TC_APDU_OK)
       return result;
+    /* The response data field holds at most the Ne encoded in this step:
+     * short Le 00 is 256, extended 0000 is 65536 and an absent Le is 0
+     * (5.1 Table 1). */
+    if (answer.data.length > step.ne)
+      return TC_APDU_INVALID;
     state->sw = answer.sw;
     const uint8_t sw1 = (uint8_t)(answer.sw >> 8), sw2 = (uint8_t)answer.sw;
     if (sw1 == WRONG_LENGTH) {

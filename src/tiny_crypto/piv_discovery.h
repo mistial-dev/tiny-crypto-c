@@ -17,6 +17,7 @@ extern "C" {
 
 /* The rule set for the policy bytes. PIV follows SP 800-73-5 Part 1. TWIC
  * reads the Discovery Object of either application on a TWIC card. */
+/* The TWIC profile requires TC_ENABLE_TWIC. */
 typedef enum { TC_PIV_DISCOVERY_PIV, TC_PIV_DISCOVERY_TWIC } TC_PIV_discovery_profile;
 
 /* Bits of the first PIN usage policy byte (Part 1 section 3.3.2). */

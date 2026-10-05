@@ -5,7 +5,7 @@
  * generation.
  * Standards: RFC 8017, FIPS 186-5 appendices A.1 and C.
  * Configuration: TC_ENABLE_RSA, TC_RSA_ENABLE_1024/2048/3072/4096 and
- * TC_RSA_SMALL. RSA-1024 is a legacy size and is disabled by default.
+ * TC_RSA_SMALL. RSA-1024 is disabled by default.
  * Limitations: two-prime keys of 1024, 2048, 3072 or 4096 bits.
  * Contracts: docs/api.md, including its TC_work_budget units.
  * Guide: docs/rsa.md. */
@@ -480,7 +480,8 @@ TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,
                                           const TC_RSA_workspace* workspace,
                                           TC_RSA_execution* execution);
 /* 1 when a big-endian magnitude is odd and 2^16 < e < 2^256 (FIPS 186-5
- * A.1.1), otherwise 0. Leading zero octets are ignored. Charges no work. */
+ * A.1.1), otherwise 0. Leading zero octets are ignored. A NULL span with a
+ * nonzero length returns 0. Charges no work. */
 int TC_RSA_exponent_in_fips_range(TC_bytes exponent);
 
 /* Check CRT components against an already validated, unchanged private key

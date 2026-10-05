@@ -420,19 +420,6 @@ static int scalar_valid(ec_state* s, const word* scalar)
          tc_mp_subtract(s->w->reduced, scalar, F(s, EC_N), s->words);
 }
 
-static int spans_disjoint(const TC_bytes* spans, size_t count)
-{
-  for (size_t i = 0; i < count; ++i) {
-    if (!tc_internal_span_valid(spans[i].data, spans[i].length))
-      return 0;
-    for (size_t j = 0; j < i; ++j)
-      if (!tc_internal_ranges_disjoint(spans[i].data, spans[i].length, spans[j].data,
-                                       spans[j].length))
-        return 0;
-  }
-  return 1;
-}
-
 /* Public key or ECDH on validated arguments. output holds the full encoding.
  * The workspace is wiped. */
 static TC_EC_result key_operation(size_t bytes, const uint8_t* scalar, const uint8_t* peer,
@@ -477,7 +464,8 @@ TC_EC_result TC_EC_public_key(TC_EC_curve curve, TC_bytes private_key, TC_buffer
                             {public_key.data, public_key.capacity},
                             {(const uint8_t*)workspace, sizeof *workspace},
                             {(const uint8_t*)work, sizeof *work}};
-  if (!workspace || !work || !private_key.data || !public_key.data || !spans_disjoint(spans, 4))
+  if (!workspace || !work || !private_key.data || !public_key.data ||
+      !tc_internal_writes_disjoint(spans, 4, NULL, 0))
     return TC_EC_ARGUMENT;
   if (!bytes)
     return TC_EC_UNSUPPORTED;
@@ -506,7 +494,7 @@ TC_EC_result TC_EC_generate_key_pair(TC_EC_curve curve, TC_buffer private_key, T
                             {(const uint8_t*)workspace, sizeof *workspace},
                             {(const uint8_t*)execution, sizeof *execution}};
   if (!workspace || !execution || !execution->random.fill || !private_key.data ||
-      !public_key.data || !spans_disjoint(spans, 4))
+      !public_key.data || !tc_internal_writes_disjoint(spans, 4, NULL, 0))
     return TC_EC_ARGUMENT;
   if (!bytes)
     return TC_EC_UNSUPPORTED;
@@ -545,7 +533,7 @@ TC_EC_result TC_ECDH(TC_EC_curve curve, TC_bytes private_key, TC_bytes peer_publ
                             {(const uint8_t*)workspace, sizeof *workspace},
                             {(const uint8_t*)work, sizeof *work}};
   if (!workspace || !work || !private_key.data || !peer_public_key.data || !shared_secret.data ||
-      !spans_disjoint(spans, 4) ||
+      !tc_internal_writes_disjoint(spans, 4, NULL, 0) ||
       !tc_internal_ranges_disjoint(peer_public_key.data, peer_public_key.length, shared_secret.data,
                                    shared_secret.capacity) ||
       !tc_internal_ranges_disjoint(peer_public_key.data, peer_public_key.length, workspace,
@@ -699,7 +687,7 @@ TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_b
   const TC_bytes writes[] = {{(const uint8_t*)workspace, sizeof *workspace},
                              {(const uint8_t*)work, sizeof *work}};
   const TC_bytes inputs[] = {public_key, digest, signature};
-  if (!spans_disjoint(writes, 2))
+  if (!tc_internal_writes_disjoint(writes, 2, NULL, 0))
     return TC_EC_ARGUMENT;
   for (size_t i = 0; i < 3; ++i)
     for (size_t j = 0; j < 2; ++j)
@@ -721,106 +709,42 @@ TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_b
 void (*tc_test_ecdsa_fault)(uint8_t* signature, size_t length);
 #endif
 
-#if TC_HASH_CORE_ENABLED
+#if TC_HMAC_CORE_ENABLED
+/* RFC 6979 section 3.2 HMAC_DRBG state: K and V, one digest each. */
 typedef struct {
   const tc_hash_algorithm_info* hash;
   size_t digest_length;
-  size_t block_length;
+  TC_HMAC_context hmac;
   uint8_t key[TC_HASH_CORE_MAX_DIGEST];
   uint8_t value[TC_HASH_CORE_MAX_DIGEST];
   uint8_t generated;
 } tc_rfc6979;
 
-static TC_status tc_ecdsa_hmac(const tc_hash_algorithm_info* hash, size_t block_length,
-                               const uint8_t* key, size_t key_length, const TC_bytes* parts,
-                               size_t part_count, uint8_t* tag)
+/* Write HMAC_K(parts) into output, which may alias K or V. */
+static TC_status tc_rfc6979_hmac(tc_rfc6979* state, const TC_bytes* parts, size_t count,
+                                 uint8_t* output)
 {
-  TC_hash_context context;
-  uint8_t block[TC_HASH_CORE_MAX_BLOCK], inner[TC_HASH_CORE_MAX_DIGEST];
-  const size_t digest_length = tc_hash_core_digest_bytes(hash);
-  if (key_length > block_length)
-    return TC_ERROR;
-  memset(block, 0x36, block_length);
-  for (size_t i = 0; i < key_length; ++i)
-    block[i] ^= key[i];
-  TC_status status = tc_hash_core_init(hash, &context);
-  if (status == TC_OK)
-    status = tc_hash_core_update(hash, &context, block, block_length);
-  for (size_t i = 0; status == TC_OK && i < part_count; ++i)
-    status = tc_hash_core_update(hash, &context, parts[i].data, parts[i].length);
-  if (status == TC_OK)
-    status = tc_hash_core_final(hash, &context, inner);
-  memset(block, 0x5c, block_length);
-  for (size_t i = 0; i < key_length; ++i)
-    block[i] ^= key[i];
-  if (status == TC_OK)
-    status = tc_hash_core_init(hash, &context);
-  if (status == TC_OK)
-    status = tc_hash_core_update(hash, &context, block, block_length);
-  if (status == TC_OK)
-    status = tc_hash_core_update(hash, &context, inner, digest_length);
-  if (status == TC_OK)
-    status = tc_hash_core_final(hash, &context, tag);
-  tc_hash_core_clear(hash, &context);
-  TC_secure_zero(block, sizeof block);
-  TC_secure_zero(inner, sizeof inner);
-  return status;
+  return tc_hmac_core_parts(state->hash, &state->hmac, state->key, state->digest_length, parts,
+                            count, output);
 }
 
-static const uint8_t* tc_ecdsa_order(size_t bytes)
+/* V = HMAC_K(V). */
+static TC_status tc_rfc6979_next(tc_rfc6979* state)
 {
-#if TC_EC_ENABLE_P192
-  if (bytes == 24)
-    return &params_192[1][0];
-#endif
-#if TC_EC_ENABLE_P256
-  if (bytes == 32)
-    return &params_256[1][0];
-#endif
-#if TC_EC_ENABLE_P384
-  if (bytes == 48)
-    return &params_384[1][0];
-#endif
-  return NULL;
+  return tc_rfc6979_hmac(state, &(TC_bytes){state->value, state->digest_length}, 1, state->value);
 }
 
-static void tc_ecdsa_bits2octets(uint8_t* output, size_t width, TC_bytes digest)
-{
-  const uint8_t* order = tc_ecdsa_order(width);
-  memset(output, 0, width);
-  if (digest.length >= width)
-    memcpy(output, digest.data, width);
-  else
-    memcpy(output + width - digest.length, digest.data, digest.length);
-  uint8_t reduced[TC_EC_MAX_BYTES];
-  unsigned borrow = 0;
-  for (size_t i = width; i > 0; --i) {
-    const unsigned a = output[i - 1], b = EC_BYTE(order + i - 1) + borrow;
-    reduced[i - 1] = (uint8_t)(a - b);
-    borrow = a < b;
-  }
-  const uint8_t use_reduced = (uint8_t)(borrow - 1u);
-  for (size_t i = 0; i < width; ++i)
-    output[i] = (uint8_t)((reduced[i] & use_reduced) | (output[i] & (uint8_t)~use_reduced));
-  TC_secure_zero(reduced, sizeof reduced);
-}
-
+/* Steps d through g of RFC 6979 section 3.2, or the retry update in step h.3
+ * when private_key is empty: K = HMAC_K(V || separator || x || h1), then
+ * V = HMAC_K(V). */
 static TC_status tc_rfc6979_reseed(tc_rfc6979* state, uint8_t separator, TC_bytes private_key,
                                    TC_bytes reduced_digest)
 {
   const TC_bytes parts[] = {
       {state->value, state->digest_length}, {&separator, 1}, private_key, reduced_digest};
-  uint8_t next[TC_HASH_CORE_MAX_DIGEST];
-  TC_status status = tc_ecdsa_hmac(state->hash, state->block_length, state->key,
-                                   state->digest_length, parts, private_key.data ? 4 : 2, next);
+  TC_status status = tc_rfc6979_hmac(state, parts, private_key.data ? 4 : 2, state->key);
   if (status == TC_OK)
-    memcpy(state->key, next, state->digest_length);
-  if (status == TC_OK)
-    status = tc_ecdsa_hmac(state->hash, state->block_length, state->key, state->digest_length,
-                           &(TC_bytes){state->value, state->digest_length}, 1, next);
-  if (status == TC_OK)
-    memcpy(state->value, next, state->digest_length);
-  TC_secure_zero(next, sizeof next);
+    status = tc_rfc6979_next(state);
   return status;
 }
 
@@ -830,57 +754,85 @@ static TC_status tc_rfc6979_fill(void* context, uint8_t* output, size_t length)
   if (state->generated &&
       tc_rfc6979_reseed(state, 0, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}) != TC_OK)
     return TC_ERROR;
-  size_t written = 0;
-  uint8_t next[TC_HASH_CORE_MAX_DIGEST];
-  while (written < length) {
-    if (tc_ecdsa_hmac(state->hash, state->block_length, state->key, state->digest_length,
-                      &(TC_bytes){state->value, state->digest_length}, 1, next) != TC_OK) {
-      TC_secure_zero(next, sizeof next);
+  for (size_t written = 0; written < length;) {
+    if (tc_rfc6979_next(state) != TC_OK)
       return TC_ERROR;
-    }
-    memcpy(state->value, next, state->digest_length);
     const size_t take =
         length - written < state->digest_length ? length - written : state->digest_length;
     memcpy(output + written, state->value, take);
     written += take;
   }
   state->generated = 1;
-  TC_secure_zero(next, sizeof next);
   return TC_OK;
 }
 
-static TC_status tc_rfc6979_init(tc_rfc6979* state, TC_hash_algorithm algorithm,
-                                 TC_bytes private_key, TC_bytes digest, size_t width)
+/* RFC 6979 section 2.3.4 bits2octets(h1): the FIPS 186-5 digest scalar from
+ * digest_scalar as bytes octets. workspace is scratch and is wiped. */
+static void tc_rfc6979_digest_octets(size_t bytes, TC_bytes digest, uint8_t* output,
+                                     TC_ECDSA_workspace* workspace)
 {
-  const tc_hash_algorithm_info* hash = tc_hash_core_lookup(algorithm);
-  if (!hash || tc_hash_core_digest_bytes(hash) != digest.length)
-    return TC_ERROR;
+  ec_state s;
+  initialize(&s, &workspace->ec, bytes);
+  digest_scalar(&s, workspace->scalars[1], digest.data, digest.length);
+  tc_mp_to_be(output, workspace->scalars[1], bytes);
+  TC_secure_zero(workspace, sizeof *workspace);
+}
+
+/* Steps b through g of RFC 6979 section 3.2. The caller checked that hash
+ * produces digest.length bytes. */
+static TC_status tc_rfc6979_init(tc_rfc6979* state, const tc_hash_algorithm_info* hash,
+                                 TC_bytes private_key, TC_bytes digest, size_t bytes,
+                                 TC_ECDSA_workspace* workspace)
+{
   memset(state, 0, sizeof *state);
   state->hash = hash;
   state->digest_length = digest.length;
-  state->block_length = algorithm == TC_HASH_SHA384 || algorithm == TC_HASH_SHA512 ? 128u : 64u;
   memset(state->value, 1, state->digest_length);
   uint8_t reduced[TC_EC_MAX_BYTES];
-  tc_ecdsa_bits2octets(reduced, width, digest);
-  TC_status status = tc_rfc6979_reseed(state, 0, private_key, (TC_bytes){reduced, width});
+  tc_rfc6979_digest_octets(bytes, digest, reduced, workspace);
+  TC_status status = tc_rfc6979_reseed(state, 0, private_key, (TC_bytes){reduced, bytes});
   if (status == TC_OK)
-    status = tc_rfc6979_reseed(state, 1, private_key, (TC_bytes){reduced, width});
+    status = tc_rfc6979_reseed(state, 1, private_key, (TC_bytes){reduced, bytes});
   TC_secure_zero(reduced, sizeof reduced);
   return status;
 }
 #endif
+
+/* Storage rules shared by both signing entry points: every span present,
+ * and the inputs, signature, workspace and execution pairwise disjoint.
+ * execution is NULL when the caller owns it internally. */
+static int sign_storage_valid(TC_bytes private_key, TC_bytes public_key, TC_bytes digest,
+                              TC_buffer signature, const TC_ECDSA_workspace* workspace,
+                              const TC_EC_execution* execution)
+{
+  const TC_bytes spans[] = {private_key,
+                            digest,
+                            {signature.data, signature.capacity},
+                            {(const uint8_t*)workspace, sizeof *workspace},
+                            {(const uint8_t*)execution, execution ? sizeof *execution : 0}};
+  return workspace && private_key.data && public_key.data && digest.data && digest.length &&
+         signature.data && tc_internal_writes_disjoint(spans, 5, NULL, 0) &&
+         tc_internal_ranges_disjoint(public_key.data, public_key.length, signature.data,
+                                     signature.capacity) &&
+         tc_internal_ranges_disjoint(public_key.data, public_key.length, workspace,
+                                     sizeof *workspace) &&
+         (!execution || tc_internal_ranges_disjoint(public_key.data, public_key.length, execution,
+                                                    sizeof *execution));
+}
 
 TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, const TC_ECDSA_sign_options* options,
                                   TC_bytes private_key, TC_bytes public_key, TC_bytes digest,
                                   TC_buffer signature, TC_ECDSA_workspace* workspace,
                                   TC_work_budget* work)
 {
-  if (!options || !work)
+  /* Check storage before RFC 6979 reads the key and digest. */
+  if (!options || !work ||
+      !sign_storage_valid(private_key, public_key, digest, signature, workspace, NULL))
     return TC_EC_ARGUMENT;
   const size_t bytes = TC_EC_coordinate_bytes(curve);
   if (!bytes)
     return TC_EC_UNSUPPORTED;
-#if TC_HASH_CORE_ENABLED
+#if TC_HMAC_CORE_ENABLED
   const tc_hash_algorithm_info* hash = tc_hash_core_lookup(options->hash);
   if (!hash)
     return TC_EC_UNSUPPORTED;
@@ -889,7 +841,7 @@ TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, const TC_ECDSA_sign_options
   if (!options->candidate_attempts)
     return TC_EC_LIMIT;
   tc_rfc6979 state;
-  if (tc_rfc6979_init(&state, options->hash, private_key, digest, bytes) != TC_OK) {
+  if (tc_rfc6979_init(&state, hash, private_key, digest, bytes, workspace) != TC_OK) {
     TC_secure_zero(&state, sizeof state);
     return TC_EC_ERROR;
   }
@@ -919,20 +871,8 @@ TC_EC_result TC_ECDSA_sign_digest_external_random(TC_EC_curve curve, TC_bytes pr
   const size_t bytes = TC_EC_coordinate_bytes(curve);
   uint8_t nonce[TC_EC_MAX_BYTES];
   uint8_t candidate[2 * TC_EC_MAX_BYTES];
-  const TC_bytes spans[] = {private_key,
-                            digest,
-                            {signature.data, signature.capacity},
-                            {(const uint8_t*)workspace, sizeof *workspace},
-                            {(const uint8_t*)execution, sizeof *execution}};
-  if (!workspace || !execution || !execution->random.fill || !private_key.data ||
-      !public_key.data || !digest.data || !digest.length || !signature.data ||
-      !spans_disjoint(spans, 5) ||
-      !tc_internal_ranges_disjoint(public_key.data, public_key.length, signature.data,
-                                   signature.capacity) ||
-      !tc_internal_ranges_disjoint(public_key.data, public_key.length, workspace,
-                                   sizeof *workspace) ||
-      !tc_internal_ranges_disjoint(public_key.data, public_key.length, execution,
-                                   sizeof *execution))
+  if (!execution || !execution->random.fill ||
+      !sign_storage_valid(private_key, public_key, digest, signature, workspace, execution))
     return TC_EC_ARGUMENT;
   if (!bytes)
     return TC_EC_UNSUPPORTED;

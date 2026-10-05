@@ -294,7 +294,7 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
    * the TWIC profile, and the TWIC application profile rejects it. */
   TC_PIV_CHUID_validation_request piv_application = request;
   piv_application.encoded = (TC_bytes){state->piv_chuid, state->piv_chuid_length};
-  piv_application.chuid_profile = TC_CHUID_PROFILE_LEGACY_KEY_MAP;
+  piv_application.chuid_profile = TC_CHUID_PROFILE_PIV_SP800_73_4;
   munit_assert_int(TC_PIV_CHUID_validate(&piv_application, &state->context, &work, &chuid), ==,
                    TC_CREDENTIAL_VALID);
   munit_assert_not_null(chuid.object.authentication_key_map.data);

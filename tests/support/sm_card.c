@@ -57,6 +57,21 @@ static TC_status deliver_plain(TC_bytes answer, TC_buffer response, size_t* leng
   return TC_OK;
 }
 
+/* Deliver a plain answer (data, SW1 SW2) in chunks of at most Ne bytes,
+ * following with 61XX and GET RESPONSE (ISO/IEC 7816-4:2020 5.1, 5.3.4). */
+static TC_status deliver_chunked(tc_sm_card* card, TC_bytes answer, size_t le, TC_buffer response,
+                                 size_t* length)
+{
+  if (answer.length < 2 || answer.length - 2 > sizeof card->pending)
+    return TC_ERROR;
+  const size_t data_length = answer.length - 2;
+  memcpy(card->pending, answer.data, data_length);
+  card->pending_length = data_length;
+  card->pending_offset = 0;
+  card->pending_sw = (uint16_t)(answer.data[data_length] << 8 | answer.data[data_length + 1]);
+  return deliver(card, le, response, length);
+}
+
 /* Check the C-MAC and decrypt the collected SM data field (4.2.3). Returns
  * 0 for a malformed field or MAC. */
 static int command_open(tc_sm_card* card)
@@ -153,7 +168,8 @@ static TC_status transmit(void* context, TC_bytes command, TC_buffer response, s
     if (card->key_command.data && (command.length != card->key_command.length ||
                                    memcmp(command.data, card->key_command.data, command.length)))
       card->broken = 1;
-    return deliver_plain(card->key_answer, response, length);
+    /* Short Le 00 asks for up to 256 bytes. */
+    return deliver_chunked(card, card->key_answer, CHUNK, response, length);
   }
   if (c[0] == 0x1c || c[0] == 0x0c)
     return fragment(card, command, response, length);

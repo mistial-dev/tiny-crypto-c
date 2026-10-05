@@ -85,11 +85,12 @@ static int encode_check(uint32_t ne, TC_APDU_length_format format, const uint8_t
          written == expected_length && memcmp(encoded, expected, expected_length) == 0;
 }
 
-/* Size of an EXTENDED case 4 command with nc data bytes, or 0 on failure. */
+/* Size of an EXTENDED case 4 command with nc data bytes, or 0 on failure.
+ * Sizing never reads the data. Spans must not wrap the 16-bit address space,
+ * so a span near SIZE_MAX bytes starts at address 1. */
 static size_t extended_size(size_t nc, uint32_t ne, TC_APDU_result expected)
 {
-  static const uint8_t byte = 0;
-  const TC_APDU_command command = {{&byte, nc}, ne, 0x00, 0xcb, 0x3f, 0xff};
+  const TC_APDU_command command = {{(const uint8_t*)1, nc}, ne, 0x00, 0xcb, 0x3f, 0xff};
   size_t size = 1;
   if (TC_APDU_command_size(&command, TC_APDU_EXTENDED, &size) != expected) {
     return 0;
@@ -115,8 +116,9 @@ static int length_checks(void)
   if (extended_size(SIZE_MAX - 9u, 65536ul, TC_APDU_OK) != SIZE_MAX) {
     return 4;
   }
+  /* Without Le, header and 3-byte Lc overflow with the largest span that fits. */
   if (extended_size(SIZE_MAX - 8u, 65536ul, TC_APDU_LIMIT) != 1 ||
-      extended_size(TC_APDU_MAX_NC, 0, TC_APDU_LIMIT) != 1) {
+      extended_size(TC_APDU_MAX_NC - 1u, 0, TC_APDU_LIMIT) != 1) {
     return 5;
   }
   return 0;

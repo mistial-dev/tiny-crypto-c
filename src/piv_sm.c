@@ -19,29 +19,6 @@ const tc_sm_suite* tc_sm_suite_get(unsigned suite)
   return NULL;
 }
 
-int tc_sm_disjoint(const TC_bytes* writable, size_t count, const TC_bytes* input, size_t inputs)
-{
-  size_t i, j;
-  if ((count && !writable) || (inputs && !input))
-    return 0;
-  for (j = 0; j < inputs; ++j)
-    if (!input[j].data && input[j].length)
-      return 0;
-  for (i = 0; i < count; ++i) {
-    if (!writable[i].data && writable[i].length)
-      return 0;
-    for (j = 0; j < i; ++j)
-      if (!tc_internal_ranges_disjoint(writable[i].data, writable[i].length, writable[j].data,
-                                       writable[j].length))
-        return 0;
-    for (j = 0; j < inputs; ++j)
-      if (!tc_internal_ranges_disjoint(writable[i].data, writable[i].length, input[j].data,
-                                       input[j].length))
-        return 0;
-  }
-  return 1;
-}
-
 TC_status tc_sm_mac(TC_PIV_SM_workspace* w, const uint8_t* key, size_t key_len, TC_bytes prefix,
                     const TC_bytes* input, size_t count, uint8_t output[16])
 {
@@ -81,7 +58,7 @@ TC_status TC_PIV_SM_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite, const uint8
   size_t public_length;
   unsigned attempt;
   TC_status status = TC_ERROR;
-  if (!settings || !random.fill || !tc_sm_disjoint(writable, 3, input, 1))
+  if (!settings || !random.fill || !tc_internal_writes_disjoint(writable, 3, input, 1))
     return TC_ERROR;
   public_length = 1 + 2 * settings->coordinate_bytes;
   TC_PIV_SM_clear(session);
@@ -218,7 +195,7 @@ TC_status TC_PIV_SM_finish(TC_PIV_SM* session, const TC_PIV_SM_peer* peer,
                               peer->nonce,
                               peer->cryptogram,
                               authenticated_key};
-    if (!session || !workspace || !tc_sm_disjoint(writable, 2, input, 5) ||
+    if (!session || !workspace || !tc_internal_writes_disjoint(writable, 2, input, 5) ||
         session->state != TC_PIV_SM_ESTABLISHING)
       return TC_ERROR;
   }

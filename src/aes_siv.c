@@ -97,20 +97,13 @@ static TC_status tc_aes_siv_crypt(const uint8_t* key, const TC_bytes* ad, size_t
     struct TC_AES_key_ctx k2;
     uint8_t computed[TC_AES_BLOCKLEN];
   } st;
-  size_t i;
   TC_status status = TC_ERROR;
 
-  if (key == NULL || (ad_count != 0 && ad == NULL) || ad_count > TC_AES_SIV_MAX_AD || v == NULL ||
-      !tc_aes_text_ok(input, output))
+  /* Decrypt runs S2V over the AD after writing candidate plaintext, so the
+   * AD descriptors and their bytes must stay outside the output. */
+  if (key == NULL || ad_count > TC_AES_SIV_MAX_AD || v == NULL || !tc_aes_text_ok(input, output) ||
+      !tc_internal_parts_valid(ad, ad_count, output.data, input_len))
     return TC_ERROR;
-
-  /* Decrypt runs S2V over the AD after writing candidate plaintext, so an AD
-   * span inside the output would authenticate overwritten bytes. */
-  for (i = 0; i < ad_count; ++i) {
-    if (!tc_internal_span_valid(ad[i].data, ad[i].length) ||
-        !tc_internal_ranges_disjoint(ad[i].data, ad[i].length, output.data, input_len))
-      return TC_ERROR;
-  }
 
   if (TC_AES_key_init(&st.k1, (TC_bytes){key, TC_AES_KEYLEN}) != TC_OK ||
       TC_AES_key_init(&st.k2, (TC_bytes){key + TC_AES_KEYLEN, TC_AES_KEYLEN}) != TC_OK)

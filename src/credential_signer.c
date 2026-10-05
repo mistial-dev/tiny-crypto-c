@@ -25,7 +25,7 @@ static TC_credential_status signer_validate(TC_bytes certificate, tc_credential_
                                                     tc_credential_scratch(context), work, &parsed);
   if (checked == TC_TLV_OK)
     checked =
-        tc_credential_signer_policy(&parsed, session->piv, !session->piv, NULL,
+        tc_credential_signer_policy(&parsed, session->piv, session->oids, NULL,
                                     &session->policy.path, tc_credential_scratch(context), work);
   if (checked != TC_TLV_OK)
     return tc_validation_status(checked);

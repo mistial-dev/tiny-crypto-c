@@ -145,7 +145,7 @@ FEATURES += [
 FEATURES.append(("TWIC unsigned CHUID reader", c_array(chuid(unsigned=True)) +
     "TC_PIV_CHUID c; CHECK(TC_PIV_CHUID_read((TC_bytes){data,sizeof data},"
     "TC_PIV_CHUID_CONTAINER,TC_CHUID_PROFILE_TWIC_UNSIGNED,&c)); consume(c.card_uuid.data,c.card_uuid.length);",
-    NO256 + " -DTC_ENABLE_TLV=1 -DTC_ENABLE_PIV_CHUID=1"))
+    NO256 + " -DTC_ENABLE_TLV=1 -DTC_ENABLE_PIV_CHUID=1 -DTC_ENABLE_TWIC=1"))
 for kind, inherited in (("rsa", False), ("ec", False), ("ec", True)):
     setup = c_array(eac_certificate(kind, not inherited))
     setup += "TC_EAC_CVC c; TC_TLV_limits bounds={4096,4096,128,8}; TC_TLV_frame frames[8]; "

@@ -7,14 +7,22 @@
 #include "pki_internal.h"
 #include "piv_container_internal.h"
 #include "credential_text_internal.h"
+#include "piv_uuid_internal.h"
 #include <string.h>
 
 /* One bit per TC_PIV_CHUID_profile value. */
 #define PROFILE_BIT(profile) (1u << (profile))
-#define PIV_PROFILES                                                                               \
-  (PROFILE_BIT(TC_CHUID_PROFILE_PIV) | PROFILE_BIT(TC_CHUID_PROFILE_LEGACY_KEY_MAP))
-#define SIGNED_PROFILES (PIV_PROFILES | PROFILE_BIT(TC_CHUID_PROFILE_TWIC_SIGNED))
-#define ALL_PROFILES (SIGNED_PROFILES | PROFILE_BIT(TC_CHUID_PROFILE_TWIC_UNSIGNED))
+#define SP800_73_4_PROFILE PROFILE_BIT(TC_CHUID_PROFILE_PIV_SP800_73_4)
+#define PIV_PROFILES (PROFILE_BIT(TC_CHUID_PROFILE_PIV) | SP800_73_4_PROFILE)
+#if TC_ENABLE_TWIC
+#define TWIC_SIGNED_PROFILE PROFILE_BIT(TC_CHUID_PROFILE_TWIC_SIGNED)
+#define TWIC_UNSIGNED_PROFILE PROFILE_BIT(TC_CHUID_PROFILE_TWIC_UNSIGNED)
+#else
+#define TWIC_SIGNED_PROFILE 0u
+#define TWIC_UNSIGNED_PROFILE 0u
+#endif
+#define SIGNED_PROFILES (PIV_PROFILES | TWIC_SIGNED_PROFILE)
+#define ALL_PROFILES (SIGNED_PROFILES | TWIC_UNSIGNED_PROFILE)
 
 enum {
   BUFFER_LENGTH_TAG = 0xee,
@@ -32,20 +40,22 @@ enum {
 
 /* CHUID fields in their required order. allowed lists the profiles in which a
  * field may appear. required lists the profiles in which it must appear. PIV
- * follows SP 800-73-4 Part 1 Table 9, TWIC follows TWIC Part 2 sections 4.6.1
- * and 4.6.3, and the key map follows SP 800-73-2 Part 1 Table 8. */
+ * follows SP 800-73-5 Part 1 Table 10, TWIC follows TWIC Part 2 v5 sections
+ * 4.6.1 and 4.6.3. The SP 800-73-4 profile adds Buffer Length, Organizational
+ * Identifier and DUNS from SP 800-73-4 Part 1 Table 9 and the key map from
+ * SP 800-73-2 Part 1 Table 8. */
 static const struct {
   uint8_t tag;
   uint8_t allowed, required;
 } fields[] = {
-    {BUFFER_LENGTH_TAG, PIV_PROFILES, 0},
+    {BUFFER_LENGTH_TAG, SP800_73_4_PROFILE, 0},
     {FASCN_TAG, ALL_PROFILES, ALL_PROFILES},
-    {ORGANIZATION_TAG, PIV_PROFILES, 0},
-    {DUNS_TAG, PIV_PROFILES, 0},
+    {ORGANIZATION_TAG, SP800_73_4_PROFILE, 0},
+    {DUNS_TAG, SP800_73_4_PROFILE, 0},
     {CARD_UUID_TAG, ALL_PROFILES, ALL_PROFILES},
     {EXPIRATION_TAG, ALL_PROFILES, ALL_PROFILES},
     {CARDHOLDER_UUID_TAG, PIV_PROFILES, 0},
-    {KEY_MAP_TAG, PROFILE_BIT(TC_CHUID_PROFILE_LEGACY_KEY_MAP), 0},
+    {KEY_MAP_TAG, SP800_73_4_PROFILE, 0},
     {SIGNATURE_TAG, SIGNED_PROFILES, SIGNED_PROFILES},
     {ERROR_DETECTION_TAG, ALL_PROFILES, ALL_PROFILES},
 };
@@ -70,10 +80,21 @@ static int fixed_length(const TC_TLV_element* element, size_t length)
   return element->value.length == length;
 }
 
-static TC_TLV_result field_store(const TC_TLV_element* element, TC_PIV_CHUID* chuid)
+/* A 16-byte UUID field. The PIV profile also checks the RFC 4122 variant and
+ * version (SP 800-73-5 Part 1 sections 3.4.1 and 3.4.2). TWIC and SP 800-73-4
+ * cards keep their own GUID rules, such as the zero GUID of Legacy TWIC. */
+static int uuid_field(const TC_TLV_element* element, TC_PIV_CHUID_profile profile,
+                      unsigned versions)
+{
+  return fixed_length(element, 16) &&
+         (profile != TC_CHUID_PROFILE_PIV || tc_piv_uuid_valid(element->value.data, versions));
+}
+
+static TC_TLV_result field_store(const TC_TLV_element* element, TC_PIV_CHUID_profile profile,
+                                 TC_PIV_CHUID* chuid)
 {
   switch (element->header.tag[0]) {
-  /* SP 800-73-4 Part 1 Table 9 gives fixed sizes for the deprecated fields. */
+  /* SP 800-73-4 Part 1 Table 9 gives fixed sizes for these fields. */
   case BUFFER_LENGTH_TAG:
     return fixed_length(element, 2) ? TC_TLV_OK : TC_TLV_INVALID;
   case ORGANIZATION_TAG:
@@ -86,7 +107,7 @@ static TC_TLV_result field_store(const TC_TLV_element* element, TC_PIV_CHUID* ch
     chuid->fascn = element->value;
     return TC_TLV_OK;
   case CARD_UUID_TAG:
-    if (!fixed_length(element, 16))
+    if (!uuid_field(element, profile, TC_PIV_CARD_UUID_VERSIONS))
       return TC_TLV_INVALID;
     chuid->card_uuid = element->value;
     return TC_TLV_OK;
@@ -96,7 +117,7 @@ static TC_TLV_result field_store(const TC_TLV_element* element, TC_PIV_CHUID* ch
     chuid->expiration = element->value;
     return TC_TLV_OK;
   case CARDHOLDER_UUID_TAG:
-    if (!fixed_length(element, 16))
+    if (!uuid_field(element, profile, TC_PIV_CARDHOLDER_UUID_VERSIONS))
       return TC_TLV_INVALID;
     chuid->cardholder_uuid = element->value;
     return TC_TLV_OK;
@@ -111,7 +132,7 @@ static TC_TLV_result field_store(const TC_TLV_element* element, TC_PIV_CHUID* ch
     chuid->signature = element->value;
     return TC_TLV_OK;
   default:
-    /* The Error Detection Code is empty (SP 800-73-4 Part 1 section 3.1.2). */
+    /* The Error Detection Code is empty (SP 800-73-5 Part 1 section 3.1.2). */
     return element->value.length ? TC_TLV_INVALID : TC_TLV_OK;
   }
 }
@@ -124,7 +145,7 @@ static TC_TLV_result read_fields(TC_bytes contents, TC_PIV_CHUID_profile profile
   TC_TLV_reader reader;
   TC_TLV_element element;
   size_t position = 0;
-  /* Signed content starts after the Buffer Length element, which the
+  /* Signed content starts after an SP 800-73-4 Buffer Length element, which the
    * signature excludes (SP 800-73-4 Part 1 section 3.1.2). */
   const uint8_t* signed_start = contents.data;
   TC_TLV_result result = TC_TLV_reader_init(&reader, contents, TC_TLV_ISO7816, &limits);
@@ -136,7 +157,7 @@ static TC_TLV_result read_fields(TC_bytes contents, TC_PIV_CHUID_profile profile
     if (element.header.tag_length != 1 || !field_find(tag, profile_bit, &position))
       return TC_TLV_INVALID;
     ++position;
-    result = field_store(&element, chuid);
+    result = field_store(&element, profile, chuid);
     if (result != TC_TLV_OK)
       return result;
     if (tag == BUFFER_LENGTH_TAG)
@@ -163,9 +184,8 @@ TC_TLV_result TC_PIV_CHUID_read(TC_bytes encoded, TC_PIV_CHUID_encoding encoding
   TC_PIV_CHUID chuid;
   TC_bytes contents = encoded;
   TC_TLV_result result;
-  if (!out || (!encoded.data && encoded.length) ||
-      (profile != TC_CHUID_PROFILE_PIV && profile != TC_CHUID_PROFILE_TWIC_SIGNED &&
-       profile != TC_CHUID_PROFILE_TWIC_UNSIGNED && profile != TC_CHUID_PROFILE_LEGACY_KEY_MAP) ||
+  if (!out || (!encoded.data && encoded.length) || (unsigned)profile >= 8 ||
+      !(PROFILE_BIT(profile) & ALL_PROFILES) ||
       (encoding != TC_PIV_CHUID_CONTENTS && encoding != TC_PIV_CHUID_CONTAINER) ||
       !tc_internal_ranges_disjoint(encoded.data, encoded.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;

@@ -308,7 +308,18 @@ def render(report):
              "Install PlatformIO 6.1.19 and Arm GCC 12.3.Rel1. Set",
              "`PICO_SDK_PATH` to an unmodified Pico SDK 2.3.1 checkout and",
              "`PICO_TOOLCHAIN_PATH` to the Arm compiler's `bin` directory.",
-             "The script installs the required Uno platform and packages.", ""]
+             "The script installs the required Uno platform and packages.", "",
+             "## Object sizes", "",
+             "Each board section lists the TLV and PKI object sizes. Nesting frames are",
+             "caller-owned, so multiply the frame size by the allowed depth. X.509",
+             "parsing also needs the listed scratch per extension, and its input must",
+             "stay available while the parsed fields are in use. Name comparison needs",
+             "two caller-sized Unicode scalar arrays (4 bytes per scalar) and an",
+             "attribute-match array (1 byte per entry). [Path validation](x509-path.md)",
+             "describes workspace setup and buffer lifetimes.", "",
+             "Stack figures are the largest single frame the compiler reports at `-Os`",
+             "without LTO. Called functions, callbacks and the application's signature",
+             "verifier add to them, so measure a complete validation on the target.", ""]
     for board, title in (("uno", "Arduino Uno"), ("pico2", "Raspberry Pi Pico 2")):
         data = report["boards"][board]
         cap = data["capacity"]
@@ -326,33 +337,24 @@ def render(report):
         for field in ("reader", "stream", "frame", "element", "largest_stack_frame"):
             if type(storage[field]) is not int or storage[field] <= 0:
                 raise ValueError("Invalid TLV storage measurement")
-        lines += [f"TLV object sizes: reader {storage['reader']}, stream {storage['stream']},",
-                  f"element {storage['element']}, and nesting frame {storage['frame']} bytes.",
-                  "Frame storage is caller-owned. Multiply its size by the allowed depth.",
-                  f"The largest compiler-reported TLV/DER stack frame is {storage['largest_stack_frame']} bytes",
-                  "at `-Os` without LTO. Called functions and callbacks need additional stack.", ""]
+        lines += [f"TLV objects: reader {storage['reader']}, stream {storage['stream']}, "
+                  f"element {storage['element']}, nesting frame {storage['frame']} bytes.",
+                  f"Largest TLV/DER stack frame: {storage['largest_stack_frame']} bytes.", ""]
         pki = data["pki"]
         for field in ("certificate", "public_key", "chuid", "cvc", "extension_slot", "eac_certificate", "eac_key",
                       "path_workspace", "policy_node", "policy_edge", "policy_expected", "policy_mapping",
                       "largest_stack_frame"):
             if type(pki[field]) is not int or pki[field] <= 0:
                 raise ValueError("Invalid PKI storage measurement")
-        lines += [f"Parsed object sizes: X.509 certificate {pki['certificate']}, public key {pki['public_key']},",
-                  f"CHUID {pki['chuid']}, and CVC {pki['cvc']} bytes.",
-                  f"EAC certificate and public-key objects use {pki['eac_certificate']} and {pki['eac_key']} bytes.",
-                  f"X.509 needs another {pki['extension_slot']} bytes of scratch space per extension,",
-                  "plus the nesting frames above. Input buffers must remain available while",
-                  "using the parsed fields.",
-                  f"The path workspace descriptor uses {pki['path_workspace']} bytes, excluding its arrays.",
-                  f"Policy array entries use {pki['policy_node']} bytes per node, {pki['policy_edge']} per edge,",
-                  f"{pki['policy_expected']} per expected policy, and {pki['policy_mapping']} per mapping.",
-                  "Name comparison also needs two caller-sized Unicode scalar arrays (4 bytes per scalar)",
-                  "and an attribute-match array (1 byte per entry). See [path validation](x509-path.md)",
-                  "for workspace setup and buffer lifetimes.",
-                  f"The largest compiler-reported PKI stack frame is {pki['largest_stack_frame']} bytes",
-                  "at `-Os` without LTO. This includes name and path processing, but excludes",
-                  "called functions and the application's signature verifier. Object and frame sizes",
-                  "alone do not establish that a complete validation fits on the board.", ""]
+        lines += [f"PKI objects: X.509 certificate {pki['certificate']}, public key {pki['public_key']}, "
+                  f"CHUID {pki['chuid']}, CVC {pki['cvc']},",
+                  f"EAC certificate {pki['eac_certificate']}, EAC public key {pki['eac_key']}, "
+                  f"extension scratch {pki['extension_slot']} bytes.",
+                  f"Path workspace descriptor: {pki['path_workspace']} bytes plus its arrays. Policy entries: "
+                  f"node {pki['policy_node']}, edge {pki['policy_edge']},",
+                  f"expected policy {pki['policy_expected']}, mapping {pki['policy_mapping']} bytes.",
+                  f"Largest PKI stack frame, including name and path processing: "
+                  f"{pki['largest_stack_frame']} bytes.", ""]
         lines += ["| Feature | Flash bytes | Flash % | Static RAM bytes | RAM % | Reserved stack / heap bytes |",
                   "| --- | ---: | ---: | ---: | ---: | ---: |"]
         for row in data["rows"]:

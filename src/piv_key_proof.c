@@ -8,26 +8,16 @@
 #include "piv_key_proof_internal.h"
 #include "piv_link_internal.h"
 #include "piv_template_internal.h"
+#include "twic_key_policy_internal.h"
 
 enum { GENERAL_AUTHENTICATE = 0x87 };
 
-/* Key references of Part 1 Table 5 that sign challenges on the selected
- * application. The TWIC application offers 9E only (TWIC Part 2 v5 5.3
- * syntax table, TWIC Part 3 v4 4.4.4). */
-static int key_reference_valid(const TC_PIV_link* link, uint8_t key)
+/* Key references of Part 1 Table 5 that sign challenges on the PIV
+ * application. */
+static int key_reference_valid(uint8_t key)
 {
-  if (link->application == TC_PIV_APPLICATION_TWIC)
-    return key == TC_PIV_KEY_CARD_AUTHENTICATION;
   return key == TC_PIV_KEY_PIV_AUTHENTICATION || key == TC_PIV_KEY_DIGITAL_SIGNATURE ||
          key == TC_PIV_KEY_CARD_AUTHENTICATION;
-}
-
-/* The TWIC application proves under the profile of its SELECT. A TWIC
- * card's PIV application reports TC_PIV_CARD, so the caller names the TWIC
- * profile there. */
-static int profile_valid(const TC_PIV_link* link, TC_PIV_card_profile profile)
-{
-  return link->application != TC_PIV_APPLICATION_TWIC || profile == link->profile;
 }
 
 /* 1 when the inputs stay outside the link storage, which every exchange
@@ -70,18 +60,27 @@ static int arguments_valid(const TC_PIV_link* link, const TC_PIV_key_proof_reque
          inputs_disjoint(link, request, provider, workspace, work);
 }
 
+/* Key and profile rules of the selected application. */
+static TC_PIV_result application_allows(const TC_PIV_link* link,
+                                        const TC_PIV_key_proof_request* request)
+{
+#if TC_ENABLE_TWIC
+  if (link->application == TC_PIV_APPLICATION_TWIC)
+    return tc_twic_proof_allowed(link, request->key_reference, request->policy.profile);
+#else
+  (void)link;
+#endif
+  return key_reference_valid(request->key_reference) ? TC_PIV_OK : TC_PIV_ARGUMENT;
+}
+
 /* Link state rules checked before any random request or command. */
 static TC_PIV_result proof_allowed(const TC_PIV_link* link, const TC_PIV_key_proof_request* request)
 {
   if (link->application == TC_PIV_APPLICATION_NONE)
     return TC_PIV_REFUSED;
-  if (!key_reference_valid(link, request->key_reference) ||
-      !profile_valid(link, request->policy.profile))
-    return TC_PIV_ARGUMENT;
-  /* TWIC Part 2 v5 5.3: GENERAL AUTHENTICATE is a NEXGEN command of the TWIC
-   * application. A Legacy card proves 9E on its PIV application. */
-  if (link->application == TC_PIV_APPLICATION_TWIC && link->profile != TC_TWIC_NEXGEN_CARD)
-    return TC_PIV_UNSUPPORTED;
+  const TC_PIV_result allowed = application_allows(link, request);
+  if (allowed != TC_PIV_OK)
+    return allowed;
   if (link->flags & TC_PIV_LINK_SM_LOST)
     return TC_PIV_REFUSED;
   /* Part 1 Table 5: on contactless, 9A and 9C need the VCI and 9E is

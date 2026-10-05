@@ -612,7 +612,7 @@ TC_TEST(test_tdes_single_des_equivalence)
 #endif /* TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB */
 
 #if TC_DES_ENABLE_CMAC
-/* OpenSSL-cross-checked KATs (legacy des-cbc / des-ede-cbc / des-ede3-cbc). */
+/* OpenSSL-cross-checked KATs (des-cbc / des-ede-cbc / des-ede3-cbc from the OpenSSL legacy provider). */
 /* Keep this exact message paired with the checked-in known-answer tag. */
 static const uint8_t cmac_kat_msg[] = "tiny-DES-c CMAC Test!";
 static const uint8_t cmac_kat_des[8] = {0x0a, 0xa5, 0xf5, 0xff, 0x35, 0xe8, 0x9f, 0x6a};
@@ -716,6 +716,14 @@ TC_TEST(test_des_cmac_tag_policy)
                    TC_DES_CMAC_short_tag((TC_bytes){NULL, 16}, (TC_bytes){cmac_kat_msg, msglen},
                                          (TC_buffer){tag, below}));
   munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
+
+  /* A NULL tag with an accepted length is rejected before the MAC runs. */
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC((TC_bytes){tdes2_key, 16}, (TC_bytes){cmac_kat_msg, msglen},
+                               (TC_buffer){NULL, TC_MIN_TAG_LEN}));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC_short_tag((TC_bytes){tdes2_key, 16},
+                                         (TC_bytes){cmac_kat_msg, msglen}, (TC_buffer){NULL, 1}));
 
   /* Short-tag entry: 1 and min - 1 give the leading bytes of the full tag. */
   munit_assert_int(TC_OK, ==,

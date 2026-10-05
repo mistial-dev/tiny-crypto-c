@@ -50,7 +50,8 @@ test-compilers:
 	test $$tested -gt 0 && test $$failed -eq 0
 
 FULL_TEST_ARGS := TINY_CRYPTO_TEST_FULL=ON CTEST_LABELS=
-SANITIZE_ARGS := TINY_CRYPTO_SANITIZE=address,undefined CMAKE_BUILD_TYPE=Debug
+SANITIZE_ARGS := TINY_CRYPTO_SANITIZE=address,undefined TINY_CRYPTO_TEST_NULL_GUARD=ON \
+	CMAKE_BUILD_TYPE=Debug
 # MemorySanitizer needs clang on Linux. macOS clang does not offer it.
 MSAN_ARGS := TINY_CRYPTO_SANITIZE=memory CMAKE_BUILD_TYPE=Debug
 

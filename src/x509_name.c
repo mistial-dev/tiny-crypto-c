@@ -318,7 +318,7 @@ static TC_TLV_result next_rdn(TC_TLV_reader* reader, const tc_pki_tree_workspace
   result = tc_pki_tree_next(reader, tree, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, 0x31) || !element.value.length)
+  if (!tc_tlv_tag_is(&element, 0x31) || !element.value.length)
     return TC_TLV_INVALID;
   *out = element.value;
   return TC_TLV_OK;

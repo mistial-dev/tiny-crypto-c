@@ -157,6 +157,12 @@ TC_TEST(request_sizing)
                                                (TC_buffer){NULL, 0}, &length),
                    ==, TC_TLV_LIMIT);
   munit_assert_size(length, ==, expected.length);
+  /* length and work are both written, so they must not share storage. */
+  size_t shared = 20000000;
+  munit_assert_int(TC_X509_ocsp_request_encode(&request, &fixture.workspace, &shared,
+                                               (TC_buffer){NULL, 0}, &shared),
+                   ==, TC_TLV_ARGUMENT);
+  munit_assert_size(shared, ==, 20000000);
   memset(encoded, 0xa5, sizeof encoded);
   length = 0;
   munit_assert_int(TC_X509_ocsp_request_encode(&request, &fixture.workspace, &work,
@@ -219,6 +225,55 @@ TC_TEST(request_sizing)
                                                (TC_buffer){encoded, sizeof encoded}, &length),
                    ==, TC_TLV_LIMIT);
   munit_assert_size(length, ==, 0);
+  return MUNIT_OK;
+}
+
+/* RFC 6960 section 4.1.1: issuerNameHash covers the DER of the issuer field
+ * in the certificate being checked. A trust-anchor name that is DN-equal but
+ * re-encodes one PrintableString as UTF8String gives the same request and
+ * still matches the captured response. */
+TC_TEST(issuer_name_encoding)
+{
+  static uint8_t name[OCSP_FILE_CAPACITY];
+  uint8_t encoded[512];
+  ocsp_fixture_init(&fixture);
+  char path[512];
+  munit_assert_int(snprintf(path, sizeof path, "%s/card01_issuer.der", TC_SD33_OCSP_ROOT), >, 0);
+  TC_X509_trust_anchor anchor = ocsp_read_anchor(&fixture, path, issuer_bytes);
+  const TC_bytes certificate =
+      read_fixture(TC_SD33_CERT_ROOT, 1, "piv_auth_cert", certificate_bytes);
+  const TC_bytes expected = read_fixture(TC_SD33_OCSP_ROOT, 1, "request_sha1", expected_bytes);
+  const TC_bytes response = read_fixture(TC_SD33_OCSP_ROOT, 1, "response", response_bytes);
+
+  /* Find an id-at attribute (06 03 55 04 xx) other than countryName, which is
+   * PrintableString by definition, with a PrintableString value. */
+  munit_assert_size(anchor.name.length, <=, sizeof name);
+  memcpy(name, anchor.name.data, anchor.name.length);
+  size_t tag = 0;
+  for (size_t i = 0; i + 5 < anchor.name.length && !tag; ++i)
+    if (name[i] == 0x06 && name[i + 1] == 3 && name[i + 2] == 0x55 && name[i + 3] == 4 &&
+        name[i + 4] != 6 && name[i + 5] == 0x13)
+      tag = i + 5;
+  munit_assert_size(tag, !=, 0);
+  name[tag] = 0x0c;
+  anchor.name = (TC_bytes){name, anchor.name.length};
+
+  TC_X509_ocsp_encode_request encode = {
+      certificate, &anchor, TC_HASH_SHA1, {NULL, 0}, &fixture.limits};
+  size_t work = 20000000, length = 0;
+  munit_assert_int(TC_X509_ocsp_request_encode(&encode, &fixture.workspace, &work,
+                                               (TC_buffer){encoded, sizeof encoded}, &length),
+                   ==, TC_TLV_OK);
+  munit_assert_size(length, ==, expected.length);
+  munit_assert_memory_equal(length, encoded, expected.data);
+
+  TC_X509_ocsp_verify_request request =
+      ocsp_request(&fixture, response, certificate, &anchor, captured_at);
+  TC_X509_ocsp_report result = {0};
+  work = 20000000;
+  munit_assert_int(TC_X509_ocsp_response_verify(&request, &fixture.workspace, &work, &result), ==,
+                   TC_TLV_OK);
+  munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
   return MUNIT_OK;
 }
 
@@ -303,6 +358,7 @@ int main(int argc, char** argv)
       {"/captured-responses", captured_responses, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/time-arguments", time_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/request-sizing", request_sizing, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/issuer-name-encoding", issuer_name_encoding, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/example", example, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/x509/ocsp/sd33", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};

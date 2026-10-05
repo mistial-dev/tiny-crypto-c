@@ -287,7 +287,7 @@ static TC_TLV_result smtp_utf8(TC_bytes contents, const TC_TLV_limits* limits, s
     return TC_TLV_INVALID;
   if (oid.value.length != sizeof smtp_oid || memcmp(oid.value.data, smtp_oid, sizeof smtp_oid))
     return TC_TLV_END;
-  if (!tc_pki_tag(&value, 0x0c))
+  if (!tc_tlv_tag_is(&value, 0x0c))
     return TC_TLV_INVALID;
   *mailbox = value.value;
   return TC_TLV_OK;
@@ -762,7 +762,7 @@ TC_TLV_result tc_x509_certificate_names_check_san(const TC_X509_certificate* cer
           result = TC_TLV_read(attribute.value, TC_TLV_DER, limits, &value);
           if (result != TC_TLV_OK)
             return result;
-          if (!tc_pki_tag(&value, 0x16))
+          if (!tc_tlv_tag_is(&value, 0x16))
             return TC_TLV_INVALID;
           name.type = 1;
           name.value = value.value;
@@ -789,23 +789,12 @@ TC_TLV_result TC_X509_certificate_names_check(const TC_X509_certificate* certifi
                                               const TC_X509_constraint_workspace* workspace,
                                               size_t* work, int* permitted)
 {
-  TC_bytes san = {NULL, 0};
-  TC_TLV_reader reader;
-  TC_X509_extension extension;
-  TC_TLV_result result;
+  TC_bytes san;
   if (!certificate || !constraints || !limits || !work)
     return TC_TLV_ARGUMENT;
-  result = tc_pki_extensions_init(&reader, certificate, limits, work);
+  const TC_TLV_result result =
+      tc_pki_extension_find_id(certificate, TC_PKI_EXT_SUBJECT_ALT_NAME, limits, work, &san);
   if (result != TC_TLV_OK)
-    return result;
-  while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
-    if (tc_pki_extension_id(&extension) == TC_PKI_EXT_SUBJECT_ALT_NAME) {
-      if (san.data)
-        return TC_TLV_INVALID;
-      san = extension.value;
-    }
-  }
-  if (result != TC_TLV_END)
     return result;
   return tc_x509_certificate_names_check_san(certificate, san, constraints, limits, workspace, work,
                                              permitted);

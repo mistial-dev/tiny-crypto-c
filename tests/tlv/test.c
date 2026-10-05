@@ -51,6 +51,27 @@ TC_TEST(headers)
                TC_TLV_INVALID);
   munit_assert(TC_TLV_read((TC_bytes){leadingzero, sizeof leadingzero}, TC_TLV_ISO7816, &limits,
                            &e) == TC_TLV_OK);
+  /* ISO/IEC 7816-4:2020 6.3 c) allows one to five length bytes, so 81 to 84
+   * start a long form and 85 to FE are malformed. BER and DER keep LIMIT for
+   * a long form wider than the configured length octets (X.690 8.1.3.5). */
+  {
+    static const uint8_t four[] = {0x04, 0x84, 0, 0, 0, 1, 0xaa};
+    static const TC_TLV_profile iso[] = {TC_TLV_ISO7816, TC_TLV_ISO7816_PAD_ZERO,
+                                         TC_TLV_ISO7816_PAD_ZERO_FF};
+    uint8_t wide[2] = {0x04, 0};
+    for (i = 0; i < sizeof iso / sizeof *iso; ++i) {
+      munit_assert_int(TC_TLV_read((TC_bytes){four, sizeof four}, iso[i], &limits, &e), ==,
+                       TC_TLV_OK);
+      for (unsigned first = 0x85; first < 0xff; ++first) {
+        wide[1] = (uint8_t)first;
+        munit_assert_int(TC_TLV_header_read((TC_bytes){wide, sizeof wide}, iso[i], &limits, &h), ==,
+                         TC_TLV_INVALID);
+      }
+    }
+    wide[1] = (uint8_t)(0x81 + sizeof(size_t));
+    munit_assert_int(TC_TLV_header_read((TC_bytes){wide, sizeof wide}, TC_TLV_DER, &limits, &h), ==,
+                     TC_TLV_LIMIT);
+  }
   for (i = 0; i < sizeof badlength / sizeof badlength[0]; ++i)
     munit_assert(TC_TLV_read((TC_bytes){badtags[i], badlength[i]}, TC_TLV_DER, &limits, &e) < 0);
   memset(&h, 0x5a, sizeof h);

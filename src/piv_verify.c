@@ -22,8 +22,6 @@ enum {
    * try. */
   RETRIES_FLOOR = 2,
   RETRIES_MAXIMUM = 15,
-  RETRY_STATUS = 0x63c0,
-  NO_COUNT_STATUS = 0x6300,
   /* DO 99 (4), DO 8E (10) and SW1 SW2. */
   VERIFY_ANSWER_BYTES = 4 + 10 + TC_APDU_STATUS_BYTES
 };
@@ -84,26 +82,31 @@ static void pin_status_record(TC_PIV_link* link, uint8_t reference, uint16_t sw)
     link->flags &= (uint8_t)~TC_PIV_LINK_PIN_VERIFIED;
 }
 
-/* Interpret a retry query: 9000 verified, 63CX with a count, 6300 without
- * one (Part 2 footnote 7). Other statuses are CARD_STATUS. */
+/* Interpret a retry query with TC_PIV_status_classify: 9000 verified, 63CX
+ * with a count, 6300 without one (Part 2 footnote 7). Other statuses are
+ * CARD_STATUS. The classifier writes retries only for 63CX. */
 static TC_PIV_result query_result(TC_PIV_link* link, uint8_t reference, uint16_t sw,
                                   TC_PIV_reference_status* status)
 {
+  unsigned retries = RETRIES_MAXIMUM + 1u;
+  const TC_PIV_status meaning =
+      TC_PIV_status_classify(sw, TC_PIV_COMMAND_VERIFY, link->application, &retries);
   status->retries = 0;
   status->verified = 0;
   status->submitted = 0;
   status->retries_known = 0;
   pin_status_record(link, reference, sw);
-  if (sw == TC_PIV_SW_SUCCESS_VALUE) {
+  if (meaning == TC_PIV_SW_SUCCESS) {
     status->verified = 1;
     return TC_PIV_OK;
   }
-  if ((sw & 0xfff0) == RETRY_STATUS) {
-    status->retries = sw & 0x0f;
+  if (meaning != TC_PIV_SW_VERIFY_FAILED)
+    return TC_PIV_CARD_STATUS;
+  if (retries <= RETRIES_MAXIMUM) {
+    status->retries = retries;
     status->retries_known = 1;
-    return TC_PIV_OK;
   }
-  return sw == NO_COUNT_STATUS ? TC_PIV_OK : TC_PIV_CARD_STATUS;
+  return TC_PIV_OK;
 }
 
 TC_PIV_result TC_PIV_verify_status(TC_PIV_link* link, uint8_t reference,

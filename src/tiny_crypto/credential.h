@@ -57,8 +57,8 @@ typedef struct {
 /* Authenticate a signed CHUID and bind it to the validated card certificate
  * (SP 800-73-5 Part 1 sections 3.1.2 and 3.1.2.1, TWIC Part 2 v5 section 6).
  * - request->profile selects the card profile. PIV takes the PIV or
- *   LEGACY_KEY_MAP CHUID profile. TWIC profiles take TWIC_SIGNED for the TWIC
- *   application, or LEGACY_KEY_MAP for the PIV application of a TWIC card,
+ *   PIV_SP800_73_4 CHUID profile. TWIC profiles take TWIC_SIGNED for the TWIC
+ *   application, or PIV_SP800_73_4 for the PIV application of a TWIC card,
  *   whose CHUID keeps the SP 800-73-2 Authentication Key Map (3D).
  *   twic_reader_policy is 0 or 1 and applies to the PIV profile only.
  * - card and card_expiration come from the already validated card
@@ -96,7 +96,7 @@ typedef struct {
   /* Accepted CHUID from TC_PIV_CHUID_validate at context->options->at. */
   const TC_PIV_CHUID_report* chuid;
   const TC_X509_time* card_expiration;
-  /* Select the current or legacy biometric CMS profile explicitly. */
+  /* Select the SP 800-76-2 or FIPS 201-1 biometric CMS profile explicitly. */
   TC_PIV_CMS_kind signature_profile;
   TC_PIV_CBEFF_format format;
   /* Set to one to require the CBEFF validity period at context time. */
@@ -283,6 +283,7 @@ TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_r
                                               size_t* work, TC_PIV_security_report* out);
 #endif
 
+#if TC_ENABLE_TWIC
 enum { TC_TWIC_UNSIGNED_CHUID_CONTAINER = 0x3002 };
 
 typedef struct {
@@ -313,6 +314,7 @@ typedef struct {
 TC_credential_status
 TC_TWIC_unsigned_CHUID_validate(const TC_TWIC_unsigned_CHUID_validation_request* request,
                                 const TC_validation_context* context, size_t* work);
+#endif
 #endif
 
 #if TC_ENABLE_CREDENTIAL

@@ -72,7 +72,7 @@ validity), named `<TAG>_cvca`, `<TAG>_dv`, `<TAG>_terminal`:
 | `BP384ST` | ECDSA-SHA-256 brainpoolP384r1 | Signature-terminal (ST) authorization |
 | `BP384`, `BP512`, `BP320`, `BP256T`, `BP512T` | ECDSA-SHA-256 | Brainpool r and twisted curves |
 | `BP224` / `P224` | ECDSA-SHA-224 | |
-| `BP192` / `P192`, `BP160` / `P160` | ECDSA-SHA-1 | legacy sizes |
+| `BP192` / `P192`, `BP160` / `P160` | ECDSA-SHA-1 | curves below 224 bits |
 | `P256`, `P384`, `P521`, `K256` | ECDSA-SHA-256 | NIST P-curves and secp256k1 |
 | `RPSS256`, `RPSS1` | RSA-PSS SHA-256 (2048), SHA-1 (1536) | |
 | `RV15256`, `RV151` | RSA PKCS#1 v1.5 SHA-256 (3072), SHA-1 (1024) | |

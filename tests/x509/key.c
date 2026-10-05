@@ -182,6 +182,11 @@ TC_TEST(key_challenge_argument)
                                             (TC_random_source){counting_random, workspace.digest},
                                             &workspace, &work, &challenge),
                    ==, TC_KEY_CHALLENGE_ARGUMENT);
+  /* The random context shares the work budget, which prepare writes. */
+  munit_assert_int(TC_key_challenge_prepare(&key, &options,
+                                            (TC_random_source){counting_random, &work}, &workspace,
+                                            &work, &challenge),
+                   ==, TC_KEY_CHALLENGE_ARGUMENT);
   munit_assert_size(calls, ==, 0);
   munit_assert_uint(work.remaining, ==, 1000);
   munit_assert_memory_equal(sizeof workspace, &workspace, &saved);

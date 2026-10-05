@@ -673,6 +673,34 @@ TC_TEST(test_ccm_api)
                      ==, TC_ERROR);
   }
 
+  /* SP 800-38C A.1: a short tag outside the even lengths 4..TC_MIN_TAG_LEN - 1
+   * is rejected with the text and tag outputs unchanged. */
+  for (i = 1; i < TC_MIN_TAG_LEN; ++i) {
+    if (i >= 4 && i % 2 == 0)
+      continue;
+    memset(ciphertext, 0xa5, sizeof(ciphertext));
+    memset(tag, 0xa5, sizeof(tag));
+    munit_assert_int(TC_AES_CCM_encrypt_short_tag(
+                         (TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                         (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+                         (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
+                         (TC_bytes){ccm_nist_plaintext1, sizeof(ccm_nist_plaintext1)},
+                         (TC_buffer){ciphertext, sizeof(ccm_nist_plaintext1)}, (TC_buffer){tag, i}),
+                     ==, TC_ERROR);
+    munit_assert_true(tc_test_all_value(ciphertext, sizeof(ciphertext), 0xa5));
+    munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
+    memset(buffer, 0xa5, sizeof(buffer));
+    munit_assert_int(
+        TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                     (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+                                     (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
+                                     (TC_bytes){ccm_nist_ciphertext1, sizeof(ccm_nist_ciphertext1)},
+                                     (TC_bytes){ccm_nist_tag1, i},
+                                     (TC_buffer){buffer, sizeof(ccm_nist_ciphertext1)}),
+        ==, TC_ERROR);
+    munit_assert_true(tc_test_all_value(buffer, sizeof(buffer), 0xa5));
+  }
+
   munit_assert_int(TC_AES_CCM_encrypt((TC_bytes){NULL, TC_AES_KEYLEN},
                                       (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
                                       (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},

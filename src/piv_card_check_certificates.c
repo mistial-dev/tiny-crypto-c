@@ -8,6 +8,9 @@
 #if TC_ENABLE_PIV_CARD_CHECK
 #include "internal.h"
 #include "piv_card_check_internal.h"
+#include "piv_identifiers_internal.h"
+#include "twic_card_check_internal.h"
+#include "twic_profile_internal.h"
 #include "validation_internal.h"
 #include <string.h>
 
@@ -116,6 +119,24 @@ static TC_TLV_result key_policy(uint8_t key, TC_bytes encoded, TC_PIV_card_profi
  * card identifier rules of profile, 9A the PIV Authentication rules against
  * card_guid (SP 800-73-5 Part 1 sections 3.1.3, 3.1.4 and 3.4). Charges the
  * extension bytes, then the reader. */
+/* The SAN identifiers under the request's profile and reader policy. */
+static TC_TLV_result identifiers_read(TC_bytes subject_alt_name,
+                                      const TC_PIV_card_certificate_request* request,
+                                      const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                      size_t* work, TC_PIV_card_identifiers* out)
+{
+#if TC_ENABLE_TWIC
+  if (request->twic_reader_policy || request->profile != TC_PIV_CARD)
+    return tc_twic_certificate_identifiers_read(subject_alt_name, request, limits, frames, work,
+                                                out);
+#endif
+  if (request->key_reference == KEY_PIV_AUTHENTICATION)
+    return TC_PIV_authentication_identifiers_read(subject_alt_name, request->card_guid, limits,
+                                                  frames, work, out);
+  return TC_PIV_card_identifiers_read(subject_alt_name, request->profile, limits, frames, work,
+                                      out);
+}
+
 static TC_TLV_result san_identifiers(const TC_X509_certificate* certificate,
                                      const TC_PIV_card_certificate_request* request,
                                      const TC_validation_context* context, size_t* work,
@@ -136,18 +157,7 @@ static TC_TLV_result san_identifiers(const TC_X509_certificate* certificate,
       continue;
     if (found)
       return TC_TLV_INVALID;
-    if (request->key_reference == KEY_PIV_AUTHENTICATION)
-      status = request->twic_reader_policy
-                   ? TC_TWIC_authentication_identifiers_read(extension.value, request->card_guid,
-                                                             limits, frames, work, out)
-                   : TC_PIV_authentication_identifiers_read(extension.value, request->card_guid,
-                                                            limits, frames, work, out);
-    else
-      status = request->profile == TC_PIV_CARD
-                   ? TC_PIV_card_identifiers_read(extension.value, request->profile, limits, frames,
-                                                  work, out)
-                   : TC_TWIC_card_identifiers_read(extension.value, request->profile, limits,
-                                                   frames, work, out);
+    status = identifiers_read(extension.value, request, limits, frames, work, out);
     found = 1;
   }
   if (status == TC_TLV_END)
@@ -155,13 +165,21 @@ static TC_TLV_result san_identifiers(const TC_X509_certificate* certificate,
   return status;
 }
 
+static int profile_known(TC_PIV_card_profile profile)
+{
+#if TC_ENABLE_TWIC
+  if (tc_twic_card_profile(profile))
+    return 1;
+#endif
+  return profile == TC_PIV_CARD;
+}
+
+/* twic_reader_policy is 0, or 1 in builds with TWIC support. */
 static int request_valid(const TC_PIV_card_certificate_request* request)
 {
   const uint8_t key = request->key_reference;
-  if (!request->encoded.data || !request->encoded.length ||
-      (request->profile != TC_PIV_CARD && request->profile != TC_TWIC_LEGACY_CARD &&
-       request->profile != TC_TWIC_NEXGEN_CARD) ||
-      request->twic_reader_policy > 1)
+  if (!request->encoded.data || !request->encoded.length || !profile_known(request->profile) ||
+      request->twic_reader_policy > TC_ENABLE_TWIC)
     return 0;
   if (key == KEY_CARD_AUTHENTICATION)
     return !request->twic_reader_policy;
@@ -301,9 +319,9 @@ static void slot_identifiers(tc_piv_check_run* run, size_t slot,
       san_identifiers(&validated->certificate, &request, context, run->work, &identifiers);
   int matched = 1;
   if (status == TC_TLV_OK && slots[slot].key == KEY_PIV_AUTHENTICATION)
-    status = (run->twic_piv ? TC_TWIC_card_identifiers_match : TC_PIV_card_identifiers_match)(
-        &identifiers, report->chuid.object.fascn, report->chuid.object.card_uuid, run->work,
-        &matched);
+    status = tc_piv_identifiers_match(&identifiers, report->chuid.object.fascn,
+                                      report->chuid.object.card_uuid, run->twic_piv, run->work,
+                                      &matched);
   if (!tc_piv_check_status(run, check,
                            status == TC_TLV_OK && !matched ? TC_CREDENTIAL_INVALID
                                                            : tlv_credential(status)))
@@ -341,8 +359,8 @@ static void slot_check(tc_piv_check_run* run, size_t slot)
   }
   const TC_validation_context* context = request->card;
   const TC_PIV_certificate_profile profile =
-      request->inventory->link.application == TC_PIV_APPLICATION_TWIC ? TC_PIV_CERTIFICATE_TWIC
-                                                                      : TC_PIV_CERTIFICATE_SLOT;
+      tc_twic_application(request->inventory->link.application) ? TC_PIV_CERTIFICATE_TWIC
+                                                                : TC_PIV_CERTIFICATE_SLOT;
   TC_PIV_certificate container_fields;
   TC_X509_certificate parsed;
   TC_validation_options options;

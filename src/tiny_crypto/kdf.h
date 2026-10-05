@@ -34,7 +34,7 @@
  *   TC_KBKDF_HMAC_SHA384_*  TC_ENABLE_HMAC && TC_ENABLE_SHA384
  *   TC_KBKDF_HMAC_SHA512_*  TC_ENABLE_HMAC && TC_ENABLE_SHA512
  *   TC_KBKDF_AES_CMAC_*     TC_ENABLE_AES && TC_AES_ENABLE_CMAC (key = TC_AES_KEYLEN)
- *   TC_KBKDF_DES_CMAC_*     TC_ENABLE_DES && TC_DES_ENABLE_CMAC (legacy, 64-bit PRF)
+ *   TC_KBKDF_DES_CMAC_*     TC_ENABLE_DES && TC_DES_ENABLE_CMAC (64-bit PRF)
  */
 
 /* PRF availability, resolved once so kdf.c, kdf.hpp and tests share it. Each
@@ -270,8 +270,9 @@ TC_status TC_KBKDF_AES_CMAC_pipeline(TC_bytes key, const struct TC_KBKDF_params*
 
 #if TC_KBKDF_HAVE_DES_CMAC
 /*
- * TDEA-CMAC is a 64-bit-block PRF kept for CAVP and legacy interoperability
- * (SP 800-131A deprecates it). key.length is 8, 16 or 24.
+ * TDEA-CMAC is a 64-bit-block PRF for protocols that derive keys with TDEA.
+ * SP 800-131A Rev. 2 Table 7 disallows it after 2023. key.length is 8, 16
+ * or 24.
  */
 /** @brief KBKDF counter mode with DES/TDEA-CMAC (h = 8). */
 TC_status TC_KBKDF_DES_CMAC_counter(TC_bytes key, const struct TC_KBKDF_params* params,

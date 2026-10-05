@@ -2,8 +2,8 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 /* Bounded TLV readers for DER, ISO/IEC 7816-4 and ASN.1 BER: single objects,
  * sibling readers, tree checks, whole-tree walks and an incremental stream.
- * Standards: ITU-T X.690 (02/2021), ISO/IEC 7816-4:2020 sections 6.4 and
- * 8.1.2.
+ * Standards: ITU-T X.690 (02/2021), ISO/IEC 7816-4:2020 sections 6.3, 6.4
+ * and 8.1.2.
  * Configuration: TC_ENABLE_TLV, TC_TLV_ENABLE_BER and TC_TLV_ENABLE_STREAM.
  * Limitations: framing checks only. der.h and the object readers check
  * values and schemas.
@@ -73,11 +73,13 @@ typedef struct {
  *                under ISO 7816, a non-minimal tag number, universal tag 0
  *                outside BER EOC, an FF length byte, an indefinite length
  *                outside BER constructed objects, a non-minimal DER length,
- *                or a value that overruns its parent.
+ *                an ISO 7816 length field above five bytes (first byte 85
+ *                to FE, ISO/IEC 7816-4:2020 6.3), or a value that overruns
+ *                its parent.
  *   LIMIT        a tag longer than TC_TLV_TAG_BYTES (three under ISO 7816),
- *                more length octets than a size_t holds (four under ISO
- *                7816), a value above max_value, input above max_input, or
- *                too many elements, levels or frames.
+ *                more length octets than a size_t holds, a value above
+ *                max_value, input above max_input, or too many elements,
+ *                levels or frames.
  *   UNSUPPORTED  TC_TLV_BER in a build without TC_TLV_ENABLE_BER, or an
  *                indefinite length passed to TC_TLV_read.
  *   ARGUMENT     NULL limits, reader or output, NULL input data with a

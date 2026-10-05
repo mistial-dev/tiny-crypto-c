@@ -5,6 +5,8 @@
 #if TC_ENABLE_PIV_COMMAND
 #include "internal.h"
 #include "piv_link_internal.h"
+#include "tlv_internal.h"
+#include "twic_aid_internal.h"
 
 enum {
   SELECT = 0xa4,
@@ -30,23 +32,16 @@ enum {
 const uint8_t* tc_piv_aid_prefix(TC_PIV_application_id application)
 {
   if (application == TC_PIV_APPLICATION_PIV)
-    return tc_piv_aid_prefixes[0];
+    return tc_piv_aid;
+#if TC_ENABLE_TWIC
   if (application == TC_PIV_APPLICATION_TWIC)
-    return tc_piv_aid_prefixes[1];
+    return tc_twic_aid_prefix;
+#endif
   return NULL;
 }
 
 /* Fixed framing bounds of the template (documented in piv_command.h). */
 static const TC_TLV_limits template_limits = {4096, 4096, 64, 4};
-
-static int tag_is(const TC_TLV_element* element, uint16_t tag)
-{
-  const TC_TLV_header* header = &element->header;
-  if (tag > 0xff)
-    return header->tag_length == 2 && header->tag[0] == (uint8_t)(tag >> 8) &&
-           header->tag[1] == (uint8_t)tag;
-  return header->tag_length == 1 && header->tag[0] == tag;
-}
 
 /* Keep the value of a DO that may appear once. seen collects one bit per DO,
  * and a second occurrence is INVALID. */
@@ -89,7 +84,8 @@ static TC_TLV_result limits_read(const TC_TLV_reader* parent, const TC_TLV_eleme
   for (size_t i = 0; result == TC_TLV_OK && i < 2; ++i) {
     result = TC_TLV_next(&reader, &integer);
     if (result == TC_TLV_OK)
-      result = tag_is(&integer, INTEGER) ? size_limit(integer.value, &values[i]) : TC_TLV_INVALID;
+      result =
+          tc_tlv_tag_is(&integer, INTEGER) ? size_limit(integer.value, &values[i]) : TC_TLV_INVALID;
   }
   if (result == TC_TLV_OK && TC_TLV_next(&reader, &integer) != TC_TLV_END)
     result = TC_TLV_INVALID;
@@ -114,7 +110,7 @@ static TC_TLV_result algorithms_read(const TC_TLV_reader* parent, const TC_TLV_e
   uint8_t found = 0;
   TC_TLV_result result = TC_TLV_reader_child(&reader, parent, element);
   while (result == TC_TLV_OK && (result = TC_TLV_next(&reader, &child)) == TC_TLV_OK) {
-    if (tag_is(&child, ALGORITHM)) {
+    if (tc_tlv_tag_is(&child, ALGORITHM)) {
       if (child.value.length != 1)
         return TC_TLV_INVALID;
       ++algorithms;
@@ -124,7 +120,7 @@ static TC_TLV_result algorithms_read(const TC_TLV_reader* parent, const TC_TLV_e
           return TC_TLV_INVALID;
         found = algorithm;
       }
-    } else if (tag_is(&child, OBJECT_IDENTIFIER)) {
+    } else if (tc_tlv_tag_is(&child, OBJECT_IDENTIFIER)) {
       if (child.value.length != 1 || child.value.data[0] || ++identifiers > 1)
         return TC_TLV_INVALID;
     }
@@ -146,7 +142,7 @@ static TC_TLV_result authority_read(const TC_TLV_reader* parent, const TC_TLV_el
   unsigned seen = 0;
   TC_TLV_result result = TC_TLV_reader_child(&reader, parent, element);
   while (result == TC_TLV_OK && (result = TC_TLV_next(&reader, &child)) == TC_TLV_OK)
-    if (tag_is(&child, AID) && (result = keep_once(&rid, &seen, 1u, &child)) != TC_TLV_OK)
+    if (tc_tlv_tag_is(&child, AID) && (result = keep_once(&rid, &seen, 1u, &child)) != TC_TLV_OK)
       return result;
   if (result != TC_TLV_END)
     return result;
@@ -175,17 +171,17 @@ static TC_TLV_result template_read(const TC_TLV_reader* parent, const TC_TLV_ele
   TC_TLV_element child;
   TC_TLV_result result = TC_TLV_reader_child(&reader, parent, element);
   while (result == TC_TLV_OK && (result = TC_TLV_next(&reader, &child)) == TC_TLV_OK) {
-    if (tag_is(&child, AID))
+    if (tc_tlv_tag_is(&child, AID))
       result = keep_once(&fields->aid, &fields->seen, FIELD_AID, &child);
-    else if (tag_is(&child, AUTHORITY)) {
+    else if (tc_tlv_tag_is(&child, AUTHORITY)) {
       result = keep_once(&fields->authority, &fields->seen, FIELD_AUTHORITY, &child);
       if (result == TC_TLV_OK)
         result = authority_read(&reader, &child);
-    } else if (tag_is(&child, LABEL))
+    } else if (tc_tlv_tag_is(&child, LABEL))
       result = keep_once(&fields->label, &fields->seen, FIELD_LABEL, &child);
-    else if (tag_is(&child, URL))
+    else if (tc_tlv_tag_is(&child, URL))
       result = keep_once(&fields->url, &fields->seen, FIELD_URL, &child);
-    else if (tag_is(&child, ALGORITHMS)) {
+    else if (tc_tlv_tag_is(&child, ALGORITHMS)) {
       result = keep_once(&fields->algorithms, &fields->seen, FIELD_ALGORITHMS, &child);
       if (result == TC_TLV_OK)
         result = algorithms_read(&reader, &child, &fields->suite);
@@ -205,17 +201,15 @@ static TC_TLV_result profile_get(const uint8_t* version, TC_PIV_application_id e
 {
   if (version[0] != TC_PIV_AID_VERSION)
     return TC_TLV_UNSUPPORTED;
-  if (expected == TC_PIV_APPLICATION_PIV) {
-    if (version[1])
-      return TC_TLV_UNSUPPORTED;
-    *out = TC_PIV_CARD;
-  } else if (version[1] == TC_TWIC_AID_SUBVERSION_NEXGEN)
-    *out = TC_TWIC_NEXGEN_CARD;
-  else if (version[1] == TC_TWIC_AID_SUBVERSION_LEGACY ||
-           (flags & TC_PIV_SELECT_TWIC_SUBVERSION_COMPATIBLE))
-    *out = TC_TWIC_LEGACY_CARD;
-  else
+#if TC_ENABLE_TWIC
+  if (expected == TC_PIV_APPLICATION_TWIC)
+    return tc_twic_aid_profile(version[1], flags, out);
+#endif
+  (void)expected;
+  (void)flags;
+  if (version[1])
     return TC_TLV_UNSUPPORTED;
+  *out = TC_PIV_CARD;
   return TC_TLV_OK;
 }
 
@@ -238,11 +232,11 @@ static TC_TLV_result application_parse(TC_bytes response, TC_PIV_application_id 
   memset(&parsed, 0, sizeof parsed);
   size_t index = 0;
   while ((result = TC_TLV_next(&reader, &element)) == TC_TLV_OK) {
-    if (tag_is(&element, TEMPLATE)) {
+    if (tc_tlv_tag_is(&element, TEMPLATE)) {
       result = index ? TC_TLV_INVALID : template_read(&reader, &element, &fields);
     } else if (!index) {
       result = TC_TLV_INVALID;
-    } else if (tag_is(&element, LIMITS)) {
+    } else if (tc_tlv_tag_is(&element, LIMITS)) {
       if (fields.seen & FIELD_LIMITS)
         result = TC_TLV_INVALID;
       fields.seen |= FIELD_LIMITS;
@@ -301,14 +295,13 @@ static TC_PIV_result template_result(TC_TLV_result result)
   }
 }
 
-/* A new selection resets the PIV security statuses (Part 2 3.1.1). Secure
- * messaging belongs to the PIV application, so selecting another application
- * ends a bound session. Reselecting PIV keeps it, since Part 2 4.3 names no
- * SELECT among the events that destroy the session keys. */
-static void selection_reset(TC_PIV_link* link, TC_PIV_application_id application)
+/* The card changed or may have changed its selection to another
+ * application: clear the application and its security statuses (SP 800-73-5
+ * Part 2 2.4.2 and 3.1.1). Secure messaging belongs to the PIV application
+ * (Part 2 4), so the session ends too. */
+static void selection_reset(TC_PIV_link* link)
 {
-  if (link->application != (uint8_t)application)
-    tc_piv_link_unbind(link);
+  tc_piv_link_unbind(link);
   link->application = TC_PIV_APPLICATION_NONE;
   link->profile = TC_PIV_CARD;
   link->sm_suite = 0;
@@ -346,10 +339,16 @@ TC_PIV_result TC_PIV_select(TC_PIV_link* link, TC_PIV_application_id application
                            : (TC_bytes){prefix, TC_PIV_AID_PREFIX_BYTES};
   const TC_APDU_command command = {aid,    TC_APDU_SHORT_MAX_NE, TC_PIV_PLAIN_CLA,
                                    SELECT, SELECT_BY_NAME,       0x00};
-  selection_reset(link, application);
+  /* Reselecting the current application keeps its state whatever the
+   * outcome. A failed SELECT keeps the current application and its security
+   * statuses (Part 2 3.1.1). A 9000, or a transport failure with an unknown
+   * outcome, moves the card away from the current application. */
+  const int switching = link->application != (uint8_t)application;
   TC_APDU_response answer;
   TC_PIV_result result =
       tc_piv_link_transceive(link, TC_PIV_COMMAND_SELECT, &command, response, &answer);
+  if (switching && (result != TC_PIV_OK || answer.sw == TC_PIV_SW_SUCCESS_VALUE))
+    selection_reset(link);
   if (result != TC_PIV_OK)
     return result;
   if (answer.sw != TC_PIV_SW_SUCCESS_VALUE)

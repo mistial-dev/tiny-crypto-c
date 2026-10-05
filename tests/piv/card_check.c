@@ -453,6 +453,11 @@ TC_TEST(card2_contact)
   /* Every entry matches kind 0 with any container, and iris fails it. */
   const TC_PIV_check_requirement biometrics[] = {{TC_PIV_CHECK_BIOMETRIC, 0, 0}};
   munit_assert_int(TC_PIV_card_report_accepts(&report, biometrics, 1), ==, 0);
+  /* The SP 800-73-4 CHUID profile also accepts an SP 800-73-5 CHUID. */
+  TC_PIV_card_check_request earlier = check_request();
+  earlier.piv_card_chuid = TC_CHUID_PROFILE_PIV_SP800_73_4;
+  munit_assert_int(check_run(&earlier), ==, TC_PIV_OK);
+  expect_passed(TC_PIV_CHECK_CHUID, 0x3000);
   munit_assert_size(card.violations, ==, 0);
   TC_PIV_inventory_clear(&inventory);
   TC_PIV_link_clear(&link);
@@ -934,25 +939,40 @@ TC_TEST(work_limit)
 TC_TEST(arguments)
 {
   TC_PIV_CHUID_profile chuid_profile = TC_CHUID_PROFILE_PIV;
-  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_PIV_CARD, &chuid_profile),
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_PIV_CARD,
+                                             TC_CHUID_PROFILE_PIV, &chuid_profile),
                    ==, TC_TLV_OK);
   munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_PIV);
-  munit_assert_int(
-      TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_TWIC_LEGACY_CARD, &chuid_profile), ==,
-      TC_TLV_OK);
-  munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_LEGACY_KEY_MAP);
-  munit_assert_int(
-      TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_TWIC_NEXGEN_CARD, &chuid_profile), ==,
-      TC_TLV_OK);
-  munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_LEGACY_KEY_MAP);
-  munit_assert_int(
-      TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_TWIC, TC_TWIC_NEXGEN_CARD, &chuid_profile), ==,
-      TC_TLV_OK);
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_TWIC_LEGACY_CARD,
+                                             TC_CHUID_PROFILE_PIV, &chuid_profile),
+                   ==, TC_TLV_OK);
+  munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_PIV_SP800_73_4);
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_TWIC_NEXGEN_CARD,
+                                             TC_CHUID_PROFILE_PIV, &chuid_profile),
+                   ==, TC_TLV_OK);
+  munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_PIV_SP800_73_4);
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_TWIC, TC_TWIC_NEXGEN_CARD,
+                                             TC_CHUID_PROFILE_PIV, &chuid_profile),
+                   ==, TC_TLV_OK);
   munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_TWIC_SIGNED);
-  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_TWIC, TC_PIV_CARD, &chuid_profile),
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_TWIC, TC_PIV_CARD,
+                                             TC_CHUID_PROFILE_PIV, &chuid_profile),
                    ==, TC_TLV_ARGUMENT);
-  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_PIV_CARD, NULL), ==,
-                   TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_PIV_CARD, TC_CHUID_PROFILE_PIV, NULL),
+      ==, TC_TLV_ARGUMENT);
+  /* piv_card_chuid changes only the PIV application of a PIV card. */
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_PIV_CARD,
+                                             TC_CHUID_PROFILE_PIV_SP800_73_4, &chuid_profile),
+                   ==, TC_TLV_OK);
+  munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_PIV_SP800_73_4);
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_TWIC, TC_TWIC_NEXGEN_CARD,
+                                             TC_CHUID_PROFILE_PIV_SP800_73_4, &chuid_profile),
+                   ==, TC_TLV_OK);
+  munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_TWIC_SIGNED);
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_PIV_CARD,
+                                             TC_CHUID_PROFILE_TWIC_UNSIGNED, &chuid_profile),
+                   ==, TC_TLV_ARGUMENT);
   load("sd33_card2");
   card2_trust(EVIDENCE_ALL, TC_VALIDATION_REVOCATION_REQUIRED);
   link_open(TC_PIV_CONTACT);
@@ -973,6 +993,9 @@ TC_TEST(arguments)
   munit_assert_int(TC_PIV_card_check(&request, &workspace, &work, &report), ==, TC_PIV_ARGUMENT);
   request = check_request();
   request.plain_copy_count = 1;
+  munit_assert_int(TC_PIV_card_check(&request, &workspace, &work, &report), ==, TC_PIV_ARGUMENT);
+  request = check_request();
+  request.piv_card_chuid = TC_CHUID_PROFILE_TWIC_SIGNED;
   munit_assert_int(TC_PIV_card_check(&request, &workspace, &work, &report), ==, TC_PIV_ARGUMENT);
   /* The contexts use different times. */
   request = check_request();

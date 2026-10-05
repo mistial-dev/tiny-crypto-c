@@ -204,7 +204,12 @@ typedef struct {
  * sm_card_cvc      the card CVC of the secure messaging session (the
  *                  certificate of TC_PIV_SM_key_request's peer), or empty.
  * plain_copies     objects read before secure messaging, such as 5FC122,
- *                  for COPY_MATCH. NULL with a zero count for none. */
+ *                  for COPY_MATCH. NULL with a zero count for none.
+ * piv_card_chuid   CHUID rules for the PIV application of a TC_PIV_CARD:
+ *                  TC_CHUID_PROFILE_PIV, the zero default (SP 800-73-5
+ *                  Part 1 Table 10), or TC_CHUID_PROFILE_PIV_SP800_73_4 for a
+ *                  card whose CHUID follows SP 800-73-4 (see
+ *                  TC_PIV_card_chuid_profile). */
 typedef struct {
   const TC_PIV_inventory* inventory;
   const TC_PIV_link* link;
@@ -215,13 +220,23 @@ typedef struct {
   TC_bytes sm_card_cvc;
   const TC_PIV_object* plain_copies;
   size_t plain_copy_count;
+  TC_PIV_CHUID_profile piv_card_chuid;
 } TC_PIV_card_check_request;
 
 /* Select the CHUID encoding rules for an application and credential profile.
- * The PIV application on a TWIC card uses the legacy key-map form; the TWIC
- * application uses its signed form. Invalid combinations return ARGUMENT. */
+ * The PIV application of a PIV card uses piv_card_chuid:
+ * TC_CHUID_PROFILE_PIV (SP 800-73-5 Part 1 Table 10) or
+ * TC_CHUID_PROFILE_PIV_SP800_73_4, which also accepts the Buffer Length,
+ * Organizational Identifier and DUNS fields of SP 800-73-4 Part 1 Table 9,
+ * the Authentication Key Map of SP 800-73-2 and a GUID of any RFC 4122
+ * version. The PIV application of a TWIC card uses
+ * TC_CHUID_PROFILE_PIV_SP800_73_4 and the TWIC application
+ * TC_CHUID_PROFILE_TWIC_SIGNED, whatever piv_card_chuid holds. Invalid
+ * combinations and another piv_card_chuid return ARGUMENT. */
 TC_TLV_result TC_PIV_card_chuid_profile(TC_PIV_application_id application,
-                                        TC_PIV_card_profile profile, TC_PIV_CHUID_profile* out);
+                                        TC_PIV_card_profile profile,
+                                        TC_PIV_CHUID_profile piv_card_chuid,
+                                        TC_PIV_CHUID_profile* out);
 
 /* Scratch and output storage of one card check.
  * gzip          GZIP decoder scratch for compressed certificates.

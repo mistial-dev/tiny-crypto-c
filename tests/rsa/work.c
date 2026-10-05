@@ -198,6 +198,18 @@ TC_TEST(encode_work)
                                             (TC_work_budget*)(void*)overlapping_options),
                    ==, TC_RSA_ARGUMENT);
   munit_assert_true(all_bytes(encoded, sizeof encoded, 0xa5));
+  /* An output range that wraps the address space is a caller error. */
+  TC_work_budget wrap_work = {UINT32_MAX};
+  uint8_t* const wrapping = (uint8_t*)(UINTPTR_MAX - 63u);
+  munit_assert_int(TC_RSA_encode_v15_digest(&sha256_v15, (TC_bytes){digest, SHA256_BYTES},
+                                            (TC_buffer){wrapping, 128}, &wrap_work),
+                   ==, TC_RSA_ARGUMENT);
+  const TC_RSA_pss_options sha256_pss = {TC_HASH_SHA256, TC_HASH_SHA256, 0};
+  munit_assert_int(TC_RSA_encode_pss_digest(&sha256_pss, (TC_bytes){digest, SHA256_BYTES},
+                                            (TC_bytes){NULL, 0}, (TC_buffer){wrapping, 128},
+                                            &wrap_work),
+                   ==, TC_RSA_ARGUMENT);
+  munit_assert_uint32(wrap_work.remaining, ==, UINT32_MAX);
   return MUNIT_OK;
 }
 

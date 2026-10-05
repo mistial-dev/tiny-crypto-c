@@ -19,13 +19,8 @@ TC_TWIC_CCL_result TC_TWIC_CCL_read(TC_bytes line, TC_TWIC_CCL_record* out)
     return TC_TWIC_CCL_INVALID;
   if (line.data[CCL_HEX_BYTES] != ',')
     return TC_TWIC_CCL_INVALID;
-  for (size_t i = 0; i < TC_TWIC_CCL_FASCN_BYTES; ++i) {
-    int high = tc_credential_hex_digit(line.data[2 * i]);
-    int low = tc_credential_hex_digit(line.data[2 * i + 1]);
-    if (high < 0 || low < 0)
-      return TC_TWIC_CCL_INVALID;
-    record.fascn[i] = (uint8_t)(high * 16 + low);
-  }
+  if (!tc_credential_hex_decode(line.data, TC_TWIC_CCL_FASCN_BYTES, record.fascn))
+    return TC_TWIC_CCL_INVALID;
   /* CCL rows spell the date as DDMmmYYYY, for example 29Feb2024. */
   if (!tc_credential_day_month_year(line.data + CCL_DATE_OFFSET, 1, &date))
     return TC_TWIC_CCL_INVALID;

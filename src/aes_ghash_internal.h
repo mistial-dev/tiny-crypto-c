@@ -20,9 +20,6 @@ void tc_aes_gcm_init_table(struct TC_AES_GCM_ctx* ctx);
  * ctx->ghash, the partial-block buffer, because it is read before S changes. */
 void tc_aes_gcm_ghash_block(struct TC_AES_GCM_ctx* ctx, const uint8_t* block);
 
-/* Absorb data into S, zero-padding the final partial block. Used for a
- * non-96-bit IV when deriving J0 (SP 800-38D section 7.1 step 2). */
-void tc_aes_gcm_hash_bytes(struct TC_AES_GCM_ctx* ctx, const uint8_t* data, size_t length);
 #endif
 
 #endif

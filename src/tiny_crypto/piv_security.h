@@ -6,8 +6,8 @@
  * Configuration: TC_ENABLE_PIV_OBJECTS.
  * Limitations: schema checks only. Authenticate the CMS before using the map.
  * Contracts: docs/api.md. */
-#ifndef TINY_CRYPTO_PIV_SECURITY_H
-#define TINY_CRYPTO_PIV_SECURITY_H
+#ifndef TINY_CRYPTO_PIV_SECURITY_H_
+#define TINY_CRYPTO_PIV_SECURITY_H_
 #include <tiny_crypto/tlv.h>
 #ifdef __cplusplus
 extern "C" {

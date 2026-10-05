@@ -369,7 +369,19 @@ TC_TEST(select_twic)
   return MUNIT_OK;
 }
 
-/* A failed SELECT leaves no application selected and wipes the response. */
+static void assert_selection(const TC_PIV_link* link, TC_PIV_application_id application,
+                             uint8_t security)
+{
+  TC_PIV_link_info info;
+  TC_PIV_link_info_get(link, &info);
+  munit_assert_int(info.application, ==, application);
+  munit_assert_uint8(info.pin_verified, ==, security);
+  munit_assert_uint8(info.vci, ==, security);
+}
+
+/* The card keeps its application and security statuses after a failed
+ * SELECT and on reselection of the current application. Selecting another
+ * application clears them (SP 800-73-5 Part 2 2.4.2 and 3.1.1). */
 TC_TEST(select_failures)
 {
   const tc_script_step steps[] = {
@@ -378,15 +390,18 @@ TC_TEST(select_failures)
       STEP(PIV_SELECT, PIV_APT "9000"),
       STEP(PIV_SELECT, "61154F0BA000000308000010000200 79064F04A0000003 9000"),
       STEP(PIV_SELECT, "6112"),
-      FAILED_STEP(PIV_SELECT)};
+      STEP(TWIC_SELECT, PIV_APT "9000"),
+      STEP(PIV_SELECT, PIV_APT "9000"),
+      FAILED_STEP(TWIC_SELECT)};
+  const uint8_t security = TC_PIV_LINK_PIN_VERIFIED | TC_PIV_LINK_VCI;
   TC_PIV_link link;
-  link_start(&link, steps, 6, TC_PIV_CONTACT);
+  link_start(&link, steps, sizeof steps / sizeof *steps, TC_PIV_CONTACT);
   TC_PIV_application out, preserved;
   memset(&out, 0x5a, sizeof out);
   preserved = out;
-  TC_PIV_link_info info;
   select_application(&link, TC_PIV_APPLICATION_PIV);
-  link.flags |= TC_PIV_LINK_PIN_VERIFIED;
+  link.flags |= security;
+  /* An unknown AID: the PIV application stays selected (Part 2 3.1.1). */
   memset(response_bytes, 0xee, sizeof response_bytes);
   munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_TWIC, 0, response_buffer(64), &out), ==,
                    TC_PIV_CARD_STATUS);
@@ -396,22 +411,31 @@ TC_TEST(select_failures)
       TC_PIV_SW_NOT_FOUND);
   munit_assert_memory_equal(sizeof out, &out, &preserved);
   munit_assert_true(tc_test_all_zero(response_bytes, 64));
-  TC_PIV_link_info_get(&link, &info);
-  munit_assert_int(info.application, ==, TC_PIV_APPLICATION_NONE);
-  munit_assert_uint8(info.pin_verified, ==, 0);
-  /* A good SELECT, then one with an unsupported version. */
+  assert_selection(&link, TC_PIV_APPLICATION_PIV, 1);
+  /* Reselecting PIV keeps the security statuses. */
   select_application(&link, TC_PIV_APPLICATION_PIV);
+  assert_selection(&link, TC_PIV_APPLICATION_PIV, 1);
+  /* A reselect answered with an unsupported version, then a 61XX that needs
+   * more room than offered, leave the selection unchanged. */
   munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_PIV, 0, response_buffer(64), &out), ==,
                    TC_PIV_UNSUPPORTED);
   munit_assert_uint16(TC_PIV_link_status(&link), ==, 0);
   munit_assert_true(tc_test_all_zero(response_bytes, 64));
-  TC_PIV_link_info_get(&link, &info);
-  munit_assert_int(info.application, ==, TC_PIV_APPLICATION_NONE);
-  /* A 61XX that needs more room than offered is LIMIT. */
+  assert_selection(&link, TC_PIV_APPLICATION_PIV, 1);
   munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_PIV, 0, response_buffer(8), &out), ==,
                    TC_PIV_LIMIT);
-  munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_PIV, 0, response_buffer(64), &out), ==,
+  assert_selection(&link, TC_PIV_APPLICATION_PIV, 1);
+  /* A 9000 for another application changes the card's selection, so the link
+   * clears its state even when the template is malformed. */
+  munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_TWIC, 0, response_buffer(64), &out), ==,
+                   TC_PIV_INVALID);
+  assert_selection(&link, TC_PIV_APPLICATION_NONE, 0);
+  /* A transport failure leaves the card's selection unknown. */
+  select_application(&link, TC_PIV_APPLICATION_PIV);
+  link.flags |= security;
+  munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_TWIC, 0, response_buffer(64), &out), ==,
                    TC_PIV_ERROR);
+  assert_selection(&link, TC_PIV_APPLICATION_NONE, 0);
   munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_PIV, 0, response_buffer(64), &out), ==,
                    TC_PIV_ERROR);
   munit_assert_memory_equal(sizeof out, &out, &preserved);
@@ -477,6 +501,7 @@ TC_TEST(get_data_piv)
       STEP("00CB3FFF055C035FC10200", "5302AA 9000"),
       STEP("00CB3FFF055C035FC10200", "5402AABB 9000"),
       STEP("00CB3FFF055C035FC10200", "53020762 82"),
+      STEP("00CB3FFF055C035FC10200", "53010700 6282"),
       STEP("00CB3FFF055C035FC10200", "6282"),
       STEP("00CB3FFF055C035FC10200", "6A82"),
       STEP("00CB3FFF055C035FC10200", "6982"),
@@ -512,11 +537,12 @@ TC_TEST(get_data_piv)
       TC_PIV_status_classify(0x6282, TC_PIV_COMMAND_GET_DATA, TC_PIV_APPLICATION_PIV, NULL), ==,
       TC_PIV_SW_END_OF_OBJECT);
   /* Malformed answers: bare 9000, empty 7E, 53 for 7E, trailing bytes,
-   * truncation, a foreign tag, inexact 6282 and 6282 without data. */
+   * truncation, a foreign tag, inexact 6282, padded 6282 and 6282 without
+   * data. PIV GET DATA defines no padding (ISO/IEC 7816-4:2020 8.1.2). */
   TC_PIV_data_object preserved;
   memset(&out, 0x5a, sizeof out);
   preserved = out;
-  static const char* const tags[] = {"5FC102", "7E",     "7E",     "5FC102",
+  static const char* const tags[] = {"5FC102", "7E",     "7E",     "5FC102", "5FC102",
                                      "5FC102", "5FC102", "5FC102", "5FC102"};
   for (size_t i = 0; i < sizeof tags / sizeof *tags; ++i) {
     memset(response_bytes, 0xee, sizeof response_bytes);
@@ -552,6 +578,11 @@ TC_TEST(get_data_twic)
                                   STEP("00CB3FFF055C03DFC10100", "DFC101028000 9000"),
                                   STEP("00CB3FFF055C03DFC10100", "9000"),
                                   STEP("00CB3FFF055C03DFC10100", "DFC10202AABB 9000"),
+                                  STEP("00CB3FFF055C03DFC10100", "DFC10102AABB00FF 6282"),
+                                  STEP("00CB3FFF055C03DFC10100", "5302AABB00 6282"),
+                                  STEP("00CB3FFF055C03DFC10100", "DFC10102AABB01 6282"),
+                                  STEP("00CB3FFF055C03DFC10100", "DFC10102AABB00 9000"),
+                                  STEP("00CB3FFF055C03DFC10100", "DFC10103AABB 6282"),
                                   STEP("00CB3FFF055C03DFC10100", "6A88")};
   TC_PIV_link link;
   link_start(&link, steps, sizeof steps / sizeof *steps, TC_PIV_CONTACT);
@@ -580,10 +611,42 @@ TC_TEST(get_data_twic)
   munit_assert_size(out.value.length, ==, 0);
   munit_assert_uint16(out.status, ==, 0x9000);
   munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_INVALID);
+  /* A 6282 answer may end with ISO/IEC 7816-4 padding bytes 00 and FF
+   * (TWIC Part 2 v5 5.2, ISO/IEC 7816-4:2020 8.1.3). */
+  munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_OK);
+  munit_assert_int(out.form, ==, TC_PIV_FORM_TEMPLATE);
+  munit_assert_ptr_equal(out.encoded.data, response_bytes);
+  munit_assert_size(out.encoded.length, ==, 6);
+  munit_assert_size(out.value.length, ==, 2);
+  munit_assert_uint16(out.status, ==, 0x6282);
+  munit_assert_uint16(TC_PIV_link_status(&link), ==, 0x6282);
+  munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_OK);
+  munit_assert_int(out.form, ==, TC_PIV_FORM_CONTAINER);
+  munit_assert_size(out.encoded.length, ==, 4);
+  munit_assert_uint16(out.status, ==, 0x6282);
+  /* Other trailing bytes, padding after 9000 and a truncated TLV stay
+   * malformed. */
+  for (size_t i = 0; i < 3; ++i)
+    munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_INVALID);
   munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_CARD_STATUS);
   munit_assert_int(TC_PIV_status_classify(TC_PIV_link_status(&link), TC_PIV_COMMAND_GET_DATA,
                                           TC_PIV_APPLICATION_TWIC, NULL),
                    ==, TC_PIV_SW_NOT_FOUND);
+  assert_script_done();
+  return MUNIT_OK;
+}
+
+/* An answer above Ne is INVALID (ISO/IEC 7816-4:2020 5.1 Table 1). */
+TC_TEST(get_data_above_ne)
+{
+  const tc_script_step steps[] = {STEP(TWIC_SELECT, TWIC_APT("1") "9000"),
+                                  STEP("00CB3FFF055C03DFC10104", "DFC10103AABBCC 9000")};
+  const TC_PIV_link_options options = {{TC_APDU_SHORT, 0, 32, 0, 0}, TC_PIV_CONTACT, 4};
+  TC_PIV_link link;
+  link_start_options(&link, steps, 2, &options);
+  select_application(&link, TC_PIV_APPLICATION_TWIC);
+  TC_PIV_data_object out;
+  munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_INVALID);
   assert_script_done();
   return MUNIT_OK;
 }
@@ -822,12 +885,17 @@ TC_TEST(pin_verify)
   munit_assert_memory_equal(13, script.sent[2],
                             "\x00\x20\x00\x80\x08"
                             "123456\xff\xff");
-  /* A new SELECT resets the PIN status. */
-  const tc_script_step again[] = {STEP(PIV_SELECT, PIV_APT "9000")};
+  /* Reselecting PIV keeps the PIN status and selecting TWIC clears it (Part
+   * 2 3.1.1). */
+  const tc_script_step again[] = {STEP(PIV_SELECT, PIV_APT "9000"),
+                                  STEP(TWIC_SELECT, TWIC_APT("3") "9000")};
   script.steps = again;
-  script.count = 1;
+  script.count = 2;
   script.next = 0;
   select_application(&link, TC_PIV_APPLICATION_PIV);
+  TC_PIV_link_info_get(&link, &info);
+  munit_assert_uint8(info.pin_verified, ==, 1);
+  select_application(&link, TC_PIV_APPLICATION_TWIC);
   TC_PIV_link_info_get(&link, &info);
   munit_assert_uint8(info.pin_verified, ==, 0);
   return MUNIT_OK;
@@ -1209,6 +1277,7 @@ int main(int argc, char** argv)
       {"/application/twic", application_twic, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/get-data/piv", get_data_piv, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/get-data/twic", get_data_twic, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/get-data/above-ne", get_data_above_ne, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/get-data/chained", get_data_chained, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/get-data/extended", get_data_extended, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/get-data/arguments", get_data_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

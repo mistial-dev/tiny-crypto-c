@@ -87,13 +87,41 @@ static inline unsigned tc_pki_extension_id(const TC_X509_extension* extension)
   return extension->oid.data[2];
 }
 
-/* RFC 5914 section 2.6: extensions duplicated by TrustAnchorInfo
- * CertPathControls. */
-static inline int tc_pki_extension_path_control(unsigned id)
+/* Borrow the extnValue of the one extension whose OID is oid. A NULL span
+ * means absent, and a second occurrence is INVALID. Work is charged as by
+ * tc_pki_extension_next. out changes only on OK. */
+static inline TC_TLV_result tc_pki_extension_find(const TC_X509_certificate* certificate,
+                                                  TC_bytes oid, const TC_TLV_limits* limits,
+                                                  size_t* work, TC_bytes* out)
 {
-  return id == TC_PKI_EXT_NAME_CONSTRAINTS || id == TC_PKI_EXT_CERTIFICATE_POLICIES ||
-         id == TC_PKI_EXT_POLICY_CONSTRAINTS || id == TC_PKI_EXT_INHIBIT_ANY_POLICY;
+  TC_TLV_reader reader;
+  TC_X509_extension extension;
+  TC_bytes value = {NULL, 0};
+  TC_TLV_result result = tc_pki_extensions_init(&reader, certificate, limits, work);
+  if (result != TC_TLV_OK)
+    return result;
+  while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
+    if (!tc_pki_equal(extension.oid, oid))
+      continue;
+    if (value.data)
+      return TC_TLV_INVALID;
+    value = extension.value;
+  }
+  if (result != TC_TLV_END)
+    return result;
+  *out = value;
+  return TC_TLV_OK;
 }
+
+/* tc_pki_extension_find for a standard extension on the 2.5.29 arc. */
+static inline TC_TLV_result tc_pki_extension_find_id(const TC_X509_certificate* certificate,
+                                                     unsigned id, const TC_TLV_limits* limits,
+                                                     size_t* work, TC_bytes* out)
+{
+  const uint8_t oid[] = {0x55, 0x1d, (uint8_t)id};
+  return tc_pki_extension_find(certificate, (TC_bytes){oid, sizeof oid}, limits, work, out);
+}
+
 /* Borrow the certificate's SKI. A NULL span means absent. An empty OCTET
  * STRING remains distinguishable. Output changes only on OK. Work is
  * provisional. Parsed inputs and output/work are disjoint. */
@@ -101,28 +129,20 @@ static inline TC_TLV_result tc_pki_subject_key_identifier(const TC_X509_certific
                                                           const TC_TLV_limits* limits, size_t* work,
                                                           TC_bytes* out)
 {
-  TC_TLV_reader reader;
-  TC_X509_extension extension;
-  TC_bytes identifier = {NULL, 0};
-  TC_TLV_result result;
+  TC_bytes value, identifier = {NULL, 0};
   if (!certificate || !limits || !work || !out)
     return TC_TLV_ARGUMENT;
-  result = tc_pki_extensions_init(&reader, certificate, limits, work);
+  TC_TLV_result result = tc_pki_extension_find_id(certificate, TC_PKI_EXT_SUBJECT_KEY_IDENTIFIER,
+                                                  limits, work, &value);
   if (result != TC_TLV_OK)
     return result;
-  while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
-    if (tc_pki_extension_id(&extension) != TC_PKI_EXT_SUBJECT_KEY_IDENTIFIER)
-      continue;
-    if (identifier.data)
-      return TC_TLV_INVALID;
-    if (tc_pki_work_charge(work, extension.value.length) != TC_TLV_OK)
+  if (value.data) {
+    if (tc_pki_work_charge(work, value.length) != TC_TLV_OK)
       return TC_TLV_LIMIT;
-    result = TC_X509_subject_key_identifier_read(extension.value, limits, &identifier);
+    result = TC_X509_subject_key_identifier_read(value, limits, &identifier);
     if (result != TC_TLV_OK)
       return result;
   }
-  if (result != TC_TLV_END)
-    return result;
   *out = identifier;
   return TC_TLV_OK;
 }

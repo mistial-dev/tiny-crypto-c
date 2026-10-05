@@ -22,7 +22,8 @@ int main(int argc, char** argv)
   FILE* file;
   TC_PIV_CVC cvc, saved;
   TC_TLV_result result;
-  if (argc != 2 && argc != 3)
+  /* reader CVC_FILE, or reader get-data|contents piv|sp800-73-4 CHUID_FILE. */
+  if (argc != 2 && argc != 4)
     return 2;
   file = fopen(argv[argc - 1], "rb");
   if (!file)
@@ -33,13 +34,15 @@ int main(int argc, char** argv)
     return 2;
   }
   fclose(file);
-  if (argc == 3) {
+  if (argc == 4) {
     TC_PIV_CHUID chuid, previous;
     TC_PIV_CHUID_encoding encoding =
         strcmp(argv[1], "contents") == 0 ? TC_PIV_CHUID_CONTENTS : TC_PIV_CHUID_CONTAINER;
-    result = TC_PIV_CHUID_read((TC_bytes){data, length}, encoding, TC_CHUID_PROFILE_PIV, &chuid);
+    TC_PIV_CHUID_profile profile =
+        strcmp(argv[2], "sp800-73-4") == 0 ? TC_CHUID_PROFILE_PIV_SP800_73_4 : TC_CHUID_PROFILE_PIV;
+    result = TC_PIV_CHUID_read((TC_bytes){data, length}, encoding, profile, &chuid);
     if (result != TC_TLV_OK) {
-      fprintf(stderr, "%s: %d\n", argv[2], result);
+      fprintf(stderr, "%s: %d\n", argv[3], result);
       return 1;
     }
     field("fascn", chuid.fascn);
@@ -51,8 +54,7 @@ int main(int argc, char** argv)
     field("signed_content_1", chuid.signed_content[1]);
     memcpy(&previous, &chuid, sizeof previous);
     for (i = 0; i < length; ++i) {
-      if (TC_PIV_CHUID_read((TC_bytes){data, i}, encoding, TC_CHUID_PROFILE_PIV, &chuid) ==
-              TC_TLV_OK ||
+      if (TC_PIV_CHUID_read((TC_bytes){data, i}, encoding, profile, &chuid) == TC_TLV_OK ||
           memcmp(&chuid, &previous, sizeof chuid))
         return 1;
     }
