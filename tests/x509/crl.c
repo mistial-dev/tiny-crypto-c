@@ -1633,12 +1633,29 @@ TC_TEST(issuer_inheritance)
         tc_x509_crl_entry_matches(&parsed, &certificate, &limits, &tree, &names, &matched), ==,
         TC_TLV_OK);
     munit_assert_size(work, ==, 0);
+    /* RFC 5280 section 7.1 name equality applies to the CRL issuer and to a
+     * certificateIssuer entry alike: a case change or another string type
+     * for the same DN still matches. */
     certificate_issuer[sizeof certificate_issuer - 1] += 'a' - 'A';
     work = WORK_BUDGET;
     munit_assert_int(
         tc_x509_crl_entry_matches(&parsed, &certificate, &limits, &tree, &names, &matched), ==,
         TC_TLV_OK);
-    munit_assert_int(matched, ==, !i);
+    munit_assert_int(matched, ==, 1);
+    certificate_issuer[sizeof certificate_issuer - 1] -= 'a' - 'A';
+    certificate_issuer[sizeof certificate_issuer - 3] = 0x13; /* PrintableString */
+    work = WORK_BUDGET;
+    matched = 99;
+    munit_assert_int(
+        tc_x509_crl_entry_matches(&parsed, &certificate, &limits, &tree, &names, &matched), ==,
+        TC_TLV_OK);
+    munit_assert_int(matched, ==, 1);
+    certificate_issuer[sizeof certificate_issuer - 1] = 'D';
+    work = WORK_BUDGET;
+    munit_assert_int(
+        tc_x509_crl_entry_matches(&parsed, &certificate, &limits, &tree, &names, &matched), ==,
+        TC_TLV_OK);
+    munit_assert_int(matched, ==, 0);
     const uint8_t other_serial = 99;
     certificate.serial = (TC_bytes){&other_serial, 1};
     work = WORK_BUDGET;

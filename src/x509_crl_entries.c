@@ -77,9 +77,12 @@ TC_TLV_result tc_x509_crl_find(const TC_X509_crl* crl, const TC_X509_crl_extensi
   return TC_TLV_OK;
 }
 
-/* A NULL query asks whether any directoryName is present. */
+/* A NULL query asks whether any directoryName is present. Otherwise found is
+ * set when a directoryName equals query under RFC 5280 section 7.1 name
+ * equality, the rule the CRL issuer and the IDP scope also use. */
 static TC_TLV_result entry_issuer_directory_name(TC_bytes names, TC_bytes query,
                                                  const TC_TLV_limits* limits,
+                                                 const TC_X509_name_workspace* name_workspace,
                                                  const tc_pki_tree_workspace* tree, int* found)
 {
   enum { DIRECTORY_NAME = 0xa4 };
@@ -98,9 +101,12 @@ static TC_TLV_result entry_issuer_directory_name(TC_bytes names, TC_bytes query,
       *found = 1;
       return TC_TLV_OK;
     }
-    if (tc_pki_work_charge(tree->work, element.value.length) != TC_TLV_OK)
-      return TC_TLV_LIMIT;
-    if (tc_pki_equal(element.value, query)) {
+    int equal;
+    result = tc_pki_name_equal(element.value, TC_TLV_DER, query, TC_TLV_DER, limits, name_workspace,
+                               tree, &equal);
+    if (result != TC_TLV_OK)
+      return result;
+    if (equal) {
       *found = 1;
       return TC_TLV_OK;
     }
@@ -128,7 +134,7 @@ TC_TLV_result tc_x509_crl_query_matches(const tc_x509_crl_revoked_entry* entry,
   if (!entry->issuer.names.length)
     return TC_X509_name_equal(entry->issuer.name, certificate->issuer, limits, names, tree->work,
                               matched);
-  return entry_issuer_directory_name(entry->issuer.names, certificate->issuer, limits, tree,
+  return entry_issuer_directory_name(entry->issuer.names, certificate->issuer, limits, names, tree,
                                      matched);
 }
 
@@ -184,7 +190,7 @@ static TC_TLV_result entry_issuer_has_dn(TC_bytes names, const TC_TLV_limits* li
 {
   int found;
   TC_TLV_result result =
-      entry_issuer_directory_name(names, (TC_bytes){NULL, 0}, limits, tree, &found);
+      entry_issuer_directory_name(names, (TC_bytes){NULL, 0}, limits, NULL, tree, &found);
   return result == TC_TLV_OK && !found ? TC_TLV_INVALID : result;
 }
 
