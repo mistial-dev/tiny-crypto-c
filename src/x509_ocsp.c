@@ -121,7 +121,9 @@ static TC_TLV_result cert_id_matches(TC_bytes encoded, const TC_X509_certificate
   *matched = 0;
   if (!tc_pki_equal(serial, certificate->serial))
     return TC_TLV_OK;
-  status = digest(hash, issuer->name, computed, work);
+  /* RFC 6960 section 4.1.1: issuerNameHash covers the DER of the issuer
+   * field in the certificate being checked. */
+  status = digest(hash, certificate->issuer, computed, work);
   if (status != TC_TLV_OK)
     return status;
   if (memcmp(name_hash.data, computed, info.digest_length))
@@ -808,7 +810,9 @@ TC_TLV_result TC_X509_ocsp_request_encode(const TC_X509_ocsp_encode_request* req
   uint8_t name_hash[64], key_hash[64];
   if (info.digest_length > sizeof name_hash)
     return TC_TLV_UNSUPPORTED;
-  status = digest(hash, issuer->name, name_hash, work);
+  /* RFC 6960 section 4.1.1: hash the certificate's issuer encoding. The
+   * DN check above only ties that issuer to the anchor. */
+  status = digest(hash, target.issuer, name_hash, work);
   if (status == TC_TLV_OK)
     status = digest(hash, issuer->public_key.key, key_hash, work);
   if (status != TC_TLV_OK)
