@@ -79,7 +79,7 @@ PROFILES = {
       static TC_ECDSA_workspace workspace;
       static uint8_t public_key[65], signature[64];
       TC_work_budget work = {UINT32_MAX};
-      const TC_ECDSA_sign_options options = {TC_HASH_SHA256, 4};
+      const TC_ECDSA_sign_options options = {TC_HASH_SHA256, 4, TC_APPROVED_ONLY};
       const TC_bytes point = {public_key, sizeof(public_key)};
       const TC_bytes digest = {key, sizeof(key)};
       if (TC_ECDSA_sign_digest(TC_EC_P256, &options, (TC_bytes){key, sizeof(key)}, point, digest, (TC_buffer){signature, sizeof(signature)}, &workspace, &work) != TC_EC_OK) return 1;

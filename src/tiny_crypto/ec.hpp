@@ -23,7 +23,9 @@ typedef ::TC_EC_workspace ec_workspace;
 typedef ::TC_ECDSA_workspace ecdsa_workspace;
 
 /* Thin wrappers over the C API. Contracts, statuses and work rules match
- * <tiny_crypto/ec.h>. Output arrays select their capacity from N. */
+ * <tiny_crypto/ec.h>. Output arrays select their capacity from N. Operations
+ * that create keys or apply protection take a trailing approval policy that
+ * defaults to TC_APPROVED_ONLY. ecdsa_sign_digest reads options.approval. */
 TC_CPP_NODISCARD inline size_t ec_coordinate_bytes(ec_curve curve) noexcept
 {
   return ::TC_EC_coordinate_bytes(curve);
@@ -34,19 +36,21 @@ TC_CPP_NODISCARD inline uint32_t ec_operation_work(ec_curve curve,
   return ::TC_EC_operation_work(curve, operation);
 }
 template <size_t N>
-TC_CPP_NODISCARD inline ec_result ec_public_key(ec_curve curve, bytes private_key,
-                                                uint8_t (&public_key)[N], ec_workspace& workspace,
-                                                TC_work_budget& work) noexcept
+TC_CPP_NODISCARD inline ec_result
+ec_public_key(ec_curve curve, bytes private_key, uint8_t (&public_key)[N], ec_workspace& workspace,
+              TC_work_budget& work, approval_policy approval = TC_APPROVED_ONLY) noexcept
 {
-  return ::TC_EC_public_key(curve, private_key, TC_buffer{public_key, N}, &workspace, &work);
+  return ::TC_EC_public_key(curve, approval, private_key, TC_buffer{public_key, N}, &workspace,
+                            &work);
 }
 template <size_t P, size_t Q>
 TC_CPP_NODISCARD inline ec_result
 ec_generate_key_pair(ec_curve curve, uint8_t (&private_key)[P], uint8_t (&public_key)[Q],
-                     ec_workspace& workspace, ec_execution& execution) noexcept
+                     ec_workspace& workspace, ec_execution& execution,
+                     approval_policy approval = TC_APPROVED_ONLY) noexcept
 {
-  return ::TC_EC_generate_key_pair(curve, TC_buffer{private_key, P}, TC_buffer{public_key, Q},
-                                   &workspace, &execution);
+  return ::TC_EC_generate_key_pair(curve, approval, TC_buffer{private_key, P},
+                                   TC_buffer{public_key, Q}, &workspace, &execution);
 }
 TC_CPP_NODISCARD inline ec_result ec_validate_public_key(ec_curve curve, bytes public_key,
                                                          ec_workspace& workspace,
@@ -57,10 +61,11 @@ TC_CPP_NODISCARD inline ec_result ec_validate_public_key(ec_curve curve, bytes p
 template <size_t N>
 TC_CPP_NODISCARD inline ec_result ecdh(ec_curve curve, bytes private_key, bytes peer_public_key,
                                        uint8_t (&shared_secret)[N], ec_workspace& workspace,
-                                       TC_work_budget& work) noexcept
+                                       TC_work_budget& work,
+                                       approval_policy approval = TC_APPROVED_ONLY) noexcept
 {
-  return ::TC_ECDH(curve, private_key, peer_public_key, TC_buffer{shared_secret, N}, &workspace,
-                   &work);
+  return ::TC_ECDH(curve, approval, private_key, peer_public_key, TC_buffer{shared_secret, N},
+                   &workspace, &work);
 }
 TC_CPP_NODISCARD inline ec_result ecdsa_verify_digest(ec_curve curve, bytes public_key,
                                                       bytes digest, bytes signature,
@@ -82,9 +87,10 @@ template <size_t N>
 TC_CPP_NODISCARD inline ec_result
 ecdsa_sign_digest_external_random(ec_curve curve, bytes private_key, bytes public_key, bytes digest,
                                   uint8_t (&signature)[N], ecdsa_workspace& workspace,
-                                  ec_execution& execution) noexcept
+                                  ec_execution& execution,
+                                  approval_policy approval = TC_APPROVED_ONLY) noexcept
 {
-  return ::TC_ECDSA_sign_digest_external_random(curve, private_key, public_key, digest,
+  return ::TC_ECDSA_sign_digest_external_random(curve, approval, private_key, public_key, digest,
                                                 TC_buffer{signature, N}, &workspace, &execution);
 }
 } // namespace tiny_crypto

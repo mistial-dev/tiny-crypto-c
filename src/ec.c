@@ -413,6 +413,17 @@ static TC_EC_result charge(TC_EC_curve curve, TC_EC_operation operation, TC_work
   return TC_EC_OK;
 }
 
+/* Coordinate width for an operation that applies protection or creates a key.
+ * SP 800-186 section 3.2.1.1 restricts P-192 to legacy use, which section
+ * 3.1.2 limits to processing already protected data. Returns 0 for P-192 without
+ * TC_PERMIT_DISALLOWED. */
+static size_t protection_bytes(TC_EC_curve curve, TC_approval_policy approval)
+{
+  if (curve == TC_EC_P192 && approval != TC_PERMIT_DISALLOWED)
+    return 0;
+  return TC_EC_coordinate_bytes(curve);
+}
+
 /* A private scalar is in [1, n - 1]. Expects an initialized state. */
 static int scalar_valid(ec_state* s, const word* scalar)
 {
@@ -468,10 +479,11 @@ done:
   return status;
 }
 
-TC_EC_result TC_EC_public_key(TC_EC_curve curve, TC_bytes private_key, TC_buffer public_key,
-                              TC_EC_workspace* workspace, TC_work_budget* work)
+TC_EC_result TC_EC_public_key(TC_EC_curve curve, TC_approval_policy approval, TC_bytes private_key,
+                              TC_buffer public_key, TC_EC_workspace* workspace,
+                              TC_work_budget* work)
 {
-  const size_t bytes = TC_EC_coordinate_bytes(curve);
+  const size_t bytes = protection_bytes(curve, approval);
   uint8_t point[1 + 2 * TC_EC_MAX_BYTES];
   const TC_bytes spans[] = {private_key,
                             {public_key.data, public_key.capacity},
@@ -495,10 +507,11 @@ TC_EC_result TC_EC_public_key(TC_EC_curve curve, TC_bytes private_key, TC_buffer
   return status;
 }
 
-TC_EC_result TC_EC_generate_key_pair(TC_EC_curve curve, TC_buffer private_key, TC_buffer public_key,
+TC_EC_result TC_EC_generate_key_pair(TC_EC_curve curve, TC_approval_policy approval,
+                                     TC_buffer private_key, TC_buffer public_key,
                                      TC_EC_workspace* workspace, TC_EC_execution* execution)
 {
-  const size_t bytes = TC_EC_coordinate_bytes(curve);
+  const size_t bytes = protection_bytes(curve, approval);
   uint8_t candidate[TC_EC_MAX_BYTES];
   uint8_t point[1 + 2 * TC_EC_MAX_BYTES];
   const TC_bytes spans[] = {{private_key.data, private_key.capacity},
@@ -535,10 +548,11 @@ TC_EC_result TC_EC_generate_key_pair(TC_EC_curve curve, TC_buffer private_key, T
   return status;
 }
 
-TC_EC_result TC_ECDH(TC_EC_curve curve, TC_bytes private_key, TC_bytes peer_public_key,
-                     TC_buffer shared_secret, TC_EC_workspace* workspace, TC_work_budget* work)
+TC_EC_result TC_ECDH(TC_EC_curve curve, TC_approval_policy approval, TC_bytes private_key,
+                     TC_bytes peer_public_key, TC_buffer shared_secret, TC_EC_workspace* workspace,
+                     TC_work_budget* work)
 {
-  const size_t bytes = TC_EC_coordinate_bytes(curve);
+  const size_t bytes = protection_bytes(curve, approval);
   uint8_t secret[TC_EC_MAX_BYTES];
   const TC_bytes spans[] = {private_key,
                             {shared_secret.data, shared_secret.capacity},
@@ -901,7 +915,7 @@ TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, const TC_ECDSA_sign_options
   if (!options || !work ||
       !sign_storage_valid(private_key, public_key, digest, signature, workspace, NULL))
     return TC_EC_ARGUMENT;
-  const size_t bytes = TC_EC_coordinate_bytes(curve);
+  const size_t bytes = protection_bytes(curve, options->approval);
   if (!bytes)
     return TC_EC_UNSUPPORTED;
 #if TC_HASH_CORE_ENABLED
@@ -919,7 +933,7 @@ TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, const TC_ECDSA_sign_options
   }
   TC_EC_execution execution = {{tc_rfc6979_fill, &state}, options->candidate_attempts, *work};
   const TC_EC_result result = TC_ECDSA_sign_digest_external_random(
-      curve, private_key, public_key, digest, signature, workspace, &execution);
+      curve, options->approval, private_key, public_key, digest, signature, workspace, &execution);
   *work = execution.work;
   TC_secure_zero(&state, sizeof state);
   return result;
@@ -933,14 +947,14 @@ TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, const TC_ECDSA_sign_options
 #endif
 }
 
-TC_EC_result TC_ECDSA_sign_digest_external_random(TC_EC_curve curve, TC_bytes private_key,
-                                                  TC_bytes public_key, TC_bytes digest,
-                                                  TC_buffer signature,
+TC_EC_result TC_ECDSA_sign_digest_external_random(TC_EC_curve curve, TC_approval_policy approval,
+                                                  TC_bytes private_key, TC_bytes public_key,
+                                                  TC_bytes digest, TC_buffer signature,
                                                   TC_ECDSA_workspace* workspace,
                                                   TC_EC_execution* execution)
 {
   ec_state s;
-  const size_t bytes = TC_EC_coordinate_bytes(curve);
+  const size_t bytes = protection_bytes(curve, approval);
   uint8_t nonce[TC_EC_MAX_BYTES];
   uint8_t candidate[2 * TC_EC_MAX_BYTES];
   if (!execution || !execution->random.fill ||

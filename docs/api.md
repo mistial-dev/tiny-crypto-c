@@ -279,9 +279,10 @@ an `approval` parameter after the size or curve it qualifies. C++ wrappers take 
 parameter as a trailing `tiny_crypto::approval_policy` argument that defaults to
 `TC_APPROVED_ONLY`.
 
-| Operation                                                        | Parameter | Requirement                                                             |
-| ---------------------------------------------------------------- | --------- | ----------------------------------------------------------------------- |
-| `TC_RSA_keygen_init`, `TC_RSA_validate_private_key` (`approval`) | RSA-1024  | FIPS 186-5 section 5.1 and appendix A.1.3 step 1 require `nlen >= 2048` |
+| Operation                                                                                                                                                                | Parameter | Requirement                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `TC_RSA_keygen_init`, `TC_RSA_validate_private_key` (`approval`)                                                                                                         | RSA-1024  | FIPS 186-5 section 5.1 and appendix A.1.3 step 1 require `nlen >= 2048`                                                   |
+| `TC_EC_public_key`, `TC_EC_generate_key_pair`, `TC_ECDH`, `TC_ECDSA_sign_digest_external_random` (`approval`), `TC_ECDSA_sign_digest` (`TC_ECDSA_sign_options.approval`) | P-192     | SP 800-186 section 3.2.1.1 restricts P-192 to legacy use, which section 3.1.2 limits to processing already protected data |
 
 ```c
 /* RSA-1024 key generation on request. */

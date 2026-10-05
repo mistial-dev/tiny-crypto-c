@@ -99,25 +99,26 @@ tiny_crypto::rsa_encode_pss_digest<128>(const tiny_crypto::rsa_pss_options&, tin
                                         TC_work_budget&) noexcept;
 #endif
 #if TC_ENABLE_EC
-template tiny_crypto::ec_result tiny_crypto::ec_public_key<65>(tiny_crypto::ec_curve,
-                                                               tiny_crypto::bytes, uint8_t (&)[65],
-                                                               tiny_crypto::ec_workspace&,
-                                                               TC_work_budget&) noexcept;
+template tiny_crypto::ec_result
+tiny_crypto::ec_public_key<65>(tiny_crypto::ec_curve, tiny_crypto::bytes, uint8_t (&)[65],
+                               tiny_crypto::ec_workspace&, TC_work_budget&,
+                               tiny_crypto::approval_policy) noexcept;
 template tiny_crypto::ec_result
 tiny_crypto::ec_generate_key_pair<32, 65>(tiny_crypto::ec_curve, uint8_t (&)[32], uint8_t (&)[65],
-                                          tiny_crypto::ec_workspace&,
-                                          tiny_crypto::ec_execution&) noexcept;
+                                          tiny_crypto::ec_workspace&, tiny_crypto::ec_execution&,
+                                          tiny_crypto::approval_policy) noexcept;
 template tiny_crypto::ec_result tiny_crypto::ecdh<32>(tiny_crypto::ec_curve, tiny_crypto::bytes,
                                                       tiny_crypto::bytes, uint8_t (&)[32],
-                                                      tiny_crypto::ec_workspace&,
-                                                      TC_work_budget&) noexcept;
+                                                      tiny_crypto::ec_workspace&, TC_work_budget&,
+                                                      tiny_crypto::approval_policy) noexcept;
 template tiny_crypto::ec_result tiny_crypto::ecdsa_sign_digest<64>(
     tiny_crypto::ec_curve, tiny_crypto::bytes, tiny_crypto::bytes, tiny_crypto::bytes,
     uint8_t (&)[64], tiny_crypto::ecdsa_workspace&, const tiny_crypto::ecdsa_sign_options&,
     TC_work_budget&) noexcept;
 template tiny_crypto::ec_result tiny_crypto::ecdsa_sign_digest_external_random<64>(
     tiny_crypto::ec_curve, tiny_crypto::bytes, tiny_crypto::bytes, tiny_crypto::bytes,
-    uint8_t (&)[64], tiny_crypto::ecdsa_workspace&, tiny_crypto::ec_execution&) noexcept;
+    uint8_t (&)[64], tiny_crypto::ecdsa_workspace&, tiny_crypto::ec_execution&,
+    tiny_crypto::approval_policy) noexcept;
 #endif
 
 /* Instantiate every wrapper class and the array-deduced member templates.

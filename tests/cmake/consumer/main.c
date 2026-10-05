@@ -165,8 +165,8 @@ int main(void)
     return 1;
   key[31] = 1;
   TC_work_budget work = {UINT32_MAX};
-  if (TC_EC_public_key(TC_EC_P256, (TC_bytes){key, sizeof key}, (TC_buffer){point, sizeof point},
-                       &workspace, &work) != TC_EC_OK)
+  if (TC_EC_public_key(TC_EC_P256, TC_APPROVED_ONLY, (TC_bytes){key, sizeof key},
+                       (TC_buffer){point, sizeof point}, &workspace, &work) != TC_EC_OK)
     return 1;
   if (TC_EC_validate_public_key(TC_EC_P256, (TC_bytes){point, sizeof point}, &workspace, &work) !=
       TC_EC_OK)
