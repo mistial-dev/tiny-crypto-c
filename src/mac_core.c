@@ -4,6 +4,7 @@
  * CMAC subkeys and finalization (SP 800-38B), and GF doubling. */
 #include "mac_core_internal.h"
 #include <string.h>
+#if TC_MAC_CORE_ENABLED
 
 void tc_mac_gf_double(uint8_t* output, const uint8_t* input, size_t block_size, uint8_t reduction)
 {
@@ -170,3 +171,4 @@ TC_status tc_mac_cmac_verify(const tc_block_cipher* cipher, uint8_t reduction, T
       tc_mac_cmac_oneshot(cipher, reduction, msg, (TC_buffer){computed, tag.length}, short_tag),
       computed, sizeof computed, tag.data, tag.length);
 }
+#endif

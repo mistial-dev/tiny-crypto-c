@@ -3,6 +3,14 @@
 #define TC_MAC_CORE_INTERNAL_H_
 #include "block_cipher_internal.h"
 
+/* Builds with a MAC user: AES-CMAC (fixed or dynamic key), CCM, EAX, EAX',
+ * SIV, DES CMAC and ISO 9797-1 MACs, and the CTR_DRBG derivation function. */
+#define TC_MAC_CORE_ENABLED                                                                        \
+  ((TC_ENABLE_AES && (TC_AES_ENABLE_CMAC || TC_AES_ENABLE_DYNAMIC || TC_AES_ENABLE_CCM ||          \
+                      TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME || TC_AES_ENABLE_SIV)) ||       \
+   (TC_ENABLE_DES && (TC_DES_ENABLE_CMAC || TC_DES_ENABLE_ISO9797)) ||                             \
+   (TC_ENABLE_DRBG && TC_DRBG_ENABLE_CTR))
+
 /* Big-endian GF(2^n) doubling (SP 800-38B). input and output may be the
  * same block. */
 void tc_mac_gf_double(uint8_t* output, const uint8_t* input, size_t block_size, uint8_t reduction);
