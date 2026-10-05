@@ -651,6 +651,28 @@ TC_TEST_SHARED(test_kbkdf_api)
                                 (TC_bytes){scratch + 8, 8}, (TC_buffer){scratch + 16, 32}),
                      ==, TC_OK);
 
+    /* Parameters stored inside the output are read once before the first
+       block, so later blocks keep the requested counter layout. */
+    {
+      union {
+        uint8_t bytes[96];
+        struct TC_KBKDF_params params[2];
+      } shared;
+      const struct TC_KBKDF_params layout = {TC_KBKDF_COUNTER_8, TC_KBKDF_CTR_BEFORE_ITER, 1};
+      uint8_t expected[96];
+      munit_assert_int(f->feedback((TC_bytes){key, klen}, &layout, (TC_bytes){iv, sizeof(iv)},
+                                   (TC_bytes){fixed, sizeof(fixed)},
+                                   (TC_buffer){expected, sizeof expected}),
+                       ==, TC_OK);
+      memset(shared.bytes, 0, sizeof shared.bytes);
+      shared.params[1] = layout;
+      munit_assert_int(f->feedback((TC_bytes){key, klen}, &shared.params[1],
+                                   (TC_bytes){iv, sizeof(iv)}, (TC_bytes){fixed, sizeof(fixed)},
+                                   (TC_buffer){shared.bytes, sizeof shared.bytes}),
+                       ==, TC_OK);
+      munit_assert_memory_equal(sizeof expected, shared.bytes, expected);
+    }
+
     /* Without a counter the width and location are ignored, and an empty IV
        or empty fixed input is valid in every mode. */
     p.use_counter = 0;

@@ -278,7 +278,7 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, TC_bytes 
   const uint8_t* chain_p = NULL;
   size_t chain_n = 0;
   size_t h, reps, pos;
-  unsigned r = 0, ctr_len = 0;
+  unsigned r = 0, ctr_len = 0, ctr_slot = 0;
   int use_ctr;
   uint32_t i;
 
@@ -291,14 +291,25 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, TC_bytes 
       !tc_kdf_output_disjoint(out, out_len, in2, in2_len))
     return TC_ERROR;
 
+  /* Read params once: output may share storage with them. ctr_slot is the
+   * counter's position among the block segments (SP 800-108r1 sections
+   * 4.1-4.3): between the two inputs in counter mode, else before the
+   * chaining value, after it, or after the fixed input. */
   use_ctr = (mode == TC_KDF_MODE_COUNTER) ? 1 : (params->use_counter != 0);
   if (use_ctr) {
     r = params->counter_bits;
     if (!tc_kdf_counter_bits_ok(r))
       return TC_ERROR;
     ctr_len = r / 8u;
-    if (mode != TC_KDF_MODE_COUNTER && (params->counter_location < TC_KBKDF_CTR_BEFORE_ITER ||
-                                        params->counter_location > TC_KBKDF_CTR_AFTER_FIXED))
+    if (mode == TC_KDF_MODE_COUNTER)
+      ctr_slot = 1;
+    else if (params->counter_location == TC_KBKDF_CTR_BEFORE_ITER)
+      ctr_slot = 0;
+    else if (params->counter_location == TC_KBKDF_CTR_AFTER_ITER)
+      ctr_slot = 1;
+    else if (params->counter_location == TC_KBKDF_CTR_AFTER_FIXED)
+      ctr_slot = 2;
+    else
       return TC_ERROR;
   }
 
@@ -328,7 +339,7 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, TC_bytes 
 
   pos = 0;
   for (i = 1; pos < out_len; ++i) {
-    unsigned count;
+    unsigned count = 0, slot;
     size_t take;
 
     if (use_ctr) {
@@ -347,45 +358,16 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, TC_bytes 
       chain_n = h;
     }
 
-    if (mode == TC_KDF_MODE_COUNTER) {
-      seg[0].data = in1;
-      seg[0].length = in1_len;
-      seg[1].data = ctr;
-      seg[1].length = ctr_len;
-      seg[2].data = in2;
-      seg[2].length = in2_len;
-      count = 3;
-    } else if (!use_ctr) {
-      seg[0].data = chain_p;
-      seg[0].length = chain_n;
-      seg[1].data = in2;
-      seg[1].length = in2_len;
-      count = 2;
-    } else if (params->counter_location == TC_KBKDF_CTR_BEFORE_ITER) {
-      seg[0].data = ctr;
-      seg[0].length = ctr_len;
-      seg[1].data = chain_p;
-      seg[1].length = chain_n;
-      seg[2].data = in2;
-      seg[2].length = in2_len;
-      count = 3;
-    } else if (params->counter_location == TC_KBKDF_CTR_AFTER_ITER) {
-      seg[0].data = chain_p;
-      seg[0].length = chain_n;
-      seg[1].data = ctr;
-      seg[1].length = ctr_len;
-      seg[2].data = in2;
-      seg[2].length = in2_len;
-      count = 3;
-    } else /* TC_KBKDF_CTR_AFTER_FIXED */
-    {
-      seg[0].data = chain_p;
-      seg[0].length = chain_n;
-      seg[1].data = in2;
-      seg[1].length = in2_len;
-      seg[2].data = ctr;
-      seg[2].length = ctr_len;
-      count = 3;
+    /* Block input: the counter at ctr_slot around the first input (in1 in
+     * counter mode, else the chaining value) and the fixed input. */
+    for (slot = 0; slot < 3; ++slot) {
+      if (use_ctr && slot == ctr_slot)
+        seg[count++] = (TC_bytes){ctr, ctr_len};
+      if (slot == 0)
+        seg[count++] =
+            mode == TC_KDF_MODE_COUNTER ? (TC_bytes){in1, in1_len} : (TC_bytes){chain_p, chain_n};
+      else if (slot == 1)
+        seg[count++] = (TC_bytes){in2, in2_len};
     }
 
     if (tc_kdf_prf_run(prf, initialized, ctx, seg, count, block) != TC_OK)
