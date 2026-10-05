@@ -15,6 +15,10 @@
   (TC_ENABLE_MD5 || TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || TC_ENABLE_SHA256 || TC_ENABLE_SHA384 ||  \
    TC_ENABLE_SHA512)
 
+/* The HMAC core serves the public HMAC API and RFC 6979 nonce generation for
+ * ECDSA, which needs HMAC without the public API. */
+#define TC_HMAC_CORE_ENABLED (TC_HASH_CORE_ENABLED && (TC_ENABLE_HMAC || TC_ENABLE_EC))
+
 /* Largest block and digest over the enabled algorithms. */
 #if TC_ENABLE_SHA384 || TC_ENABLE_SHA512
 #define TC_HASH_CORE_MAX_BLOCK 128u
@@ -72,7 +76,7 @@ typedef struct {
 } tc_hash_algorithm_info;
 
 /* Name an HMAC view function in a descriptor, or NULL without HMAC. */
-#if TC_ENABLE_HMAC
+#if TC_HMAC_CORE_ENABLED
 #define TC_HASH_HMAC_VIEW(function) function
 #else
 #define TC_HASH_HMAC_VIEW(function) NULL
@@ -138,7 +142,7 @@ void tc_hash_core_clear(const tc_hash_algorithm_info* info, void* context);
 TC_status tc_hash_core_digest(const tc_hash_algorithm_info* info, void* workspace, TC_bytes data,
                               uint8_t* digest);
 
-#if TC_ENABLE_HMAC
+#if TC_HMAC_CORE_ENABLED
 /* HMAC (FIPS 198-1) over the same descriptor. init wipes the HMAC context,
  * hashes keys longer than one block in the inner context, then stores the
  * inner state after K0 ^ ipad and the outer chaining state after K0 ^ opad.
@@ -163,6 +167,9 @@ TC_status tc_hmac_core_parts(const tc_hash_algorithm_info* info, void* context, 
 TC_status tc_hmac_core_resume_parts(const tc_hash_algorithm_info* info, const void* keyed,
                                     void* context, const TC_bytes* parts, size_t count,
                                     uint8_t* tag);
+#endif
+
+#if TC_ENABLE_HMAC
 /* One-shot HMAC truncated to tag.capacity bytes. Default entry points require
  * TC_HMAC_MIN_TAG_LEN_FOR(digest_bytes)..digest_bytes (RFC 2104 section 5),
  * while explicit short-tag entry points require TC_HASH_MAC_MIN_TAG_LEN..that

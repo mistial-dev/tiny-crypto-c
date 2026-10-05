@@ -161,7 +161,8 @@ struct TC_SHA512_ctx {
 };
 #endif
 
-#if TC_ENABLE_HMAC
+/* HMAC context types follow the enabled digests. RFC 6979 signing in ec.c
+ * uses them through the HMAC core when the public HMAC API is off. */
 #if TC_ENABLE_SHA1
 /**
  * @brief HMAC-SHA-1 Context Structure
@@ -211,7 +212,6 @@ struct TC_HMAC_SHA512_ctx {
   uint64_t outer_state[8];
 };
 #endif
-#endif /* TC_ENABLE_HMAC */
 
 /* Storage for any enabled SHA-1 or SHA-2 context, for code that selects the
  * hash at run time. Its size is the largest enabled context. A pointer to the
@@ -235,7 +235,6 @@ typedef union {
 #endif
 } TC_hash_context;
 
-#if TC_ENABLE_HMAC
 /* Storage for any enabled HMAC context, sized like TC_hash_context. */
 typedef union {
   uint8_t unused;
@@ -255,7 +254,6 @@ typedef union {
   struct TC_HMAC_SHA512_ctx sha512;
 #endif
 } TC_HMAC_context;
-#endif
 
 #ifdef __cplusplus
 extern "C" {

@@ -259,9 +259,8 @@ TC_EC_result TC_ECDSA_sign_digest_external_random(TC_EC_curve curve, TC_approval
 /* Sign with the deterministic nonce generation procedure from RFC 6979
  * section 3.2. options.hash identifies the hash that produced digest, whose
  * length must match that hash. candidate_attempts bounds the RFC 6979 retry
- * sequence for the negligible r = 0, s = 0, or out-of-range cases. This API
- * uses the enabled internal hash implementation and does not require HMAC to
- * be exposed as a public feature. private_key, public_key, digest, signature,
+ * sequence for the negligible r = 0, s = 0, or out-of-range cases. It uses
+ * the internal HMAC core, so TC_ENABLE_HMAC may stay 0. private_key, public_key, digest, signature,
  * workspace and work must be disjoint as documented for the external-random
  * API. The same key, digest and options always produce the same signature.
  *

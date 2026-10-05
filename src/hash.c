@@ -136,7 +136,7 @@ static tc_hash_view sha1_view(void* context)
   return TC_HASH_VIEW(ctx);
 }
 
-#if TC_ENABLE_HMAC
+#if TC_HMAC_CORE_ENABLED
 static tc_hmac_view hmac_sha1_view(void* context)
 {
   struct TC_HMAC_SHA1_ctx* ctx = (struct TC_HMAC_SHA1_ctx*)context;
@@ -282,7 +282,7 @@ static tc_hash_view sha256_view(void* context)
   return TC_HASH_VIEW(ctx);
 }
 
-#if TC_ENABLE_HMAC
+#if TC_HMAC_CORE_ENABLED
 static tc_hmac_view hmac_sha256_view(void* context)
 {
   struct TC_HMAC_SHA256_ctx* ctx = (struct TC_HMAC_SHA256_ctx*)context;
@@ -328,7 +328,7 @@ static tc_hash_view sha224_view(void* context)
   return TC_HASH_VIEW(ctx);
 }
 
-#if TC_ENABLE_HMAC
+#if TC_HMAC_CORE_ENABLED
 static tc_hmac_view hmac_sha224_view(void* context)
 {
   struct TC_HMAC_SHA224_ctx* ctx = (struct TC_HMAC_SHA224_ctx*)context;

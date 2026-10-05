@@ -735,106 +735,42 @@ TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_b
 void (*tc_test_ecdsa_fault)(uint8_t* signature, size_t length);
 #endif
 
-#if TC_HASH_CORE_ENABLED
+#if TC_HMAC_CORE_ENABLED
+/* RFC 6979 section 3.2 HMAC_DRBG state: K and V, one digest each. */
 typedef struct {
   const tc_hash_algorithm_info* hash;
   size_t digest_length;
-  size_t block_length;
+  TC_HMAC_context hmac;
   uint8_t key[TC_HASH_CORE_MAX_DIGEST];
   uint8_t value[TC_HASH_CORE_MAX_DIGEST];
   uint8_t generated;
 } tc_rfc6979;
 
-static TC_status tc_ecdsa_hmac(const tc_hash_algorithm_info* hash, size_t block_length,
-                               const uint8_t* key, size_t key_length, const TC_bytes* parts,
-                               size_t part_count, uint8_t* tag)
+/* Write HMAC_K(parts) into output, which may alias K or V. */
+static TC_status tc_rfc6979_hmac(tc_rfc6979* state, const TC_bytes* parts, size_t count,
+                                 uint8_t* output)
 {
-  TC_hash_context context;
-  uint8_t block[TC_HASH_CORE_MAX_BLOCK], inner[TC_HASH_CORE_MAX_DIGEST];
-  const size_t digest_length = tc_hash_core_digest_bytes(hash);
-  if (key_length > block_length)
-    return TC_ERROR;
-  memset(block, 0x36, block_length);
-  for (size_t i = 0; i < key_length; ++i)
-    block[i] ^= key[i];
-  TC_status status = tc_hash_core_init(hash, &context);
-  if (status == TC_OK)
-    status = tc_hash_core_update(hash, &context, block, block_length);
-  for (size_t i = 0; status == TC_OK && i < part_count; ++i)
-    status = tc_hash_core_update(hash, &context, parts[i].data, parts[i].length);
-  if (status == TC_OK)
-    status = tc_hash_core_final(hash, &context, inner);
-  memset(block, 0x5c, block_length);
-  for (size_t i = 0; i < key_length; ++i)
-    block[i] ^= key[i];
-  if (status == TC_OK)
-    status = tc_hash_core_init(hash, &context);
-  if (status == TC_OK)
-    status = tc_hash_core_update(hash, &context, block, block_length);
-  if (status == TC_OK)
-    status = tc_hash_core_update(hash, &context, inner, digest_length);
-  if (status == TC_OK)
-    status = tc_hash_core_final(hash, &context, tag);
-  tc_hash_core_clear(hash, &context);
-  TC_secure_zero(block, sizeof block);
-  TC_secure_zero(inner, sizeof inner);
-  return status;
+  return tc_hmac_core_parts(state->hash, &state->hmac, state->key, state->digest_length, parts,
+                            count, output);
 }
 
-static const uint8_t* tc_ecdsa_order(size_t bytes)
+/* V = HMAC_K(V). */
+static TC_status tc_rfc6979_next(tc_rfc6979* state)
 {
-#if TC_EC_ENABLE_P192
-  if (bytes == 24)
-    return &params_192[1][0];
-#endif
-#if TC_EC_ENABLE_P256
-  if (bytes == 32)
-    return &params_256[1][0];
-#endif
-#if TC_EC_ENABLE_P384
-  if (bytes == 48)
-    return &params_384[1][0];
-#endif
-  return NULL;
+  return tc_rfc6979_hmac(state, &(TC_bytes){state->value, state->digest_length}, 1, state->value);
 }
 
-static void tc_ecdsa_bits2octets(uint8_t* output, size_t width, TC_bytes digest)
-{
-  const uint8_t* order = tc_ecdsa_order(width);
-  memset(output, 0, width);
-  if (digest.length >= width)
-    memcpy(output, digest.data, width);
-  else
-    memcpy(output + width - digest.length, digest.data, digest.length);
-  uint8_t reduced[TC_EC_MAX_BYTES];
-  unsigned borrow = 0;
-  for (size_t i = width; i > 0; --i) {
-    const unsigned a = output[i - 1], b = EC_BYTE(order + i - 1) + borrow;
-    reduced[i - 1] = (uint8_t)(a - b);
-    borrow = a < b;
-  }
-  const uint8_t use_reduced = (uint8_t)(borrow - 1u);
-  for (size_t i = 0; i < width; ++i)
-    output[i] = (uint8_t)((reduced[i] & use_reduced) | (output[i] & (uint8_t)~use_reduced));
-  TC_secure_zero(reduced, sizeof reduced);
-}
-
+/* Steps d through g of RFC 6979 section 3.2, or the retry update in step h.3
+ * when private_key is empty: K = HMAC_K(V || separator || x || h1), then
+ * V = HMAC_K(V). */
 static TC_status tc_rfc6979_reseed(tc_rfc6979* state, uint8_t separator, TC_bytes private_key,
                                    TC_bytes reduced_digest)
 {
   const TC_bytes parts[] = {
       {state->value, state->digest_length}, {&separator, 1}, private_key, reduced_digest};
-  uint8_t next[TC_HASH_CORE_MAX_DIGEST];
-  TC_status status = tc_ecdsa_hmac(state->hash, state->block_length, state->key,
-                                   state->digest_length, parts, private_key.data ? 4 : 2, next);
+  TC_status status = tc_rfc6979_hmac(state, parts, private_key.data ? 4 : 2, state->key);
   if (status == TC_OK)
-    memcpy(state->key, next, state->digest_length);
-  if (status == TC_OK)
-    status = tc_ecdsa_hmac(state->hash, state->block_length, state->key, state->digest_length,
-                           &(TC_bytes){state->value, state->digest_length}, 1, next);
-  if (status == TC_OK)
-    memcpy(state->value, next, state->digest_length);
-  TC_secure_zero(next, sizeof next);
+    status = tc_rfc6979_next(state);
   return status;
 }
 
@@ -844,41 +780,45 @@ static TC_status tc_rfc6979_fill(void* context, uint8_t* output, size_t length)
   if (state->generated &&
       tc_rfc6979_reseed(state, 0, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}) != TC_OK)
     return TC_ERROR;
-  size_t written = 0;
-  uint8_t next[TC_HASH_CORE_MAX_DIGEST];
-  while (written < length) {
-    if (tc_ecdsa_hmac(state->hash, state->block_length, state->key, state->digest_length,
-                      &(TC_bytes){state->value, state->digest_length}, 1, next) != TC_OK) {
-      TC_secure_zero(next, sizeof next);
+  for (size_t written = 0; written < length;) {
+    if (tc_rfc6979_next(state) != TC_OK)
       return TC_ERROR;
-    }
-    memcpy(state->value, next, state->digest_length);
     const size_t take =
         length - written < state->digest_length ? length - written : state->digest_length;
     memcpy(output + written, state->value, take);
     written += take;
   }
   state->generated = 1;
-  TC_secure_zero(next, sizeof next);
   return TC_OK;
 }
 
-static TC_status tc_rfc6979_init(tc_rfc6979* state, TC_hash_algorithm algorithm,
-                                 TC_bytes private_key, TC_bytes digest, size_t width)
+/* RFC 6979 section 2.3.4 bits2octets(h1): the FIPS 186-5 digest scalar from
+ * digest_scalar as bytes octets. workspace is scratch and is wiped. */
+static void tc_rfc6979_digest_octets(size_t bytes, TC_bytes digest, uint8_t* output,
+                                     TC_ECDSA_workspace* workspace)
 {
-  const tc_hash_algorithm_info* hash = tc_hash_core_lookup(algorithm);
-  if (!hash || tc_hash_core_digest_bytes(hash) != digest.length)
-    return TC_ERROR;
+  ec_state s;
+  initialize(&s, &workspace->ec, bytes);
+  digest_scalar(&s, workspace->scalars[1], digest.data, digest.length);
+  tc_mp_to_be(output, workspace->scalars[1], bytes);
+  TC_secure_zero(workspace, sizeof *workspace);
+}
+
+/* Steps b through g of RFC 6979 section 3.2. The caller checked that hash
+ * produces digest.length bytes. */
+static TC_status tc_rfc6979_init(tc_rfc6979* state, const tc_hash_algorithm_info* hash,
+                                 TC_bytes private_key, TC_bytes digest, size_t bytes,
+                                 TC_ECDSA_workspace* workspace)
+{
   memset(state, 0, sizeof *state);
   state->hash = hash;
   state->digest_length = digest.length;
-  state->block_length = algorithm == TC_HASH_SHA384 || algorithm == TC_HASH_SHA512 ? 128u : 64u;
   memset(state->value, 1, state->digest_length);
   uint8_t reduced[TC_EC_MAX_BYTES];
-  tc_ecdsa_bits2octets(reduced, width, digest);
-  TC_status status = tc_rfc6979_reseed(state, 0, private_key, (TC_bytes){reduced, width});
+  tc_rfc6979_digest_octets(bytes, digest, reduced, workspace);
+  TC_status status = tc_rfc6979_reseed(state, 0, private_key, (TC_bytes){reduced, bytes});
   if (status == TC_OK)
-    status = tc_rfc6979_reseed(state, 1, private_key, (TC_bytes){reduced, width});
+    status = tc_rfc6979_reseed(state, 1, private_key, (TC_bytes){reduced, bytes});
   TC_secure_zero(reduced, sizeof reduced);
   return status;
 }
@@ -918,7 +858,7 @@ TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, const TC_ECDSA_sign_options
   const size_t bytes = protection_bytes(curve, options->approval);
   if (!bytes)
     return TC_EC_UNSUPPORTED;
-#if TC_HASH_CORE_ENABLED
+#if TC_HMAC_CORE_ENABLED
   const tc_hash_algorithm_info* hash = tc_hash_core_lookup(options->hash);
   if (!hash)
     return TC_EC_UNSUPPORTED;
@@ -927,7 +867,7 @@ TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, const TC_ECDSA_sign_options
   if (!options->candidate_attempts)
     return TC_EC_LIMIT;
   tc_rfc6979 state;
-  if (tc_rfc6979_init(&state, options->hash, private_key, digest, bytes) != TC_OK) {
+  if (tc_rfc6979_init(&state, hash, private_key, digest, bytes, workspace) != TC_OK) {
     TC_secure_zero(&state, sizeof state);
     return TC_EC_ERROR;
   }

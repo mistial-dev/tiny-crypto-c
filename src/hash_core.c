@@ -237,7 +237,7 @@ TC_status tc_hash_core_digest(const tc_hash_algorithm_info* stored, void* worksp
 /* HMAC (FIPS 198-1 / RFC 2104)                                              */
 /*****************************************************************************/
 
-#if TC_ENABLE_HMAC
+#if TC_HMAC_CORE_ENABLED
 
 /* Derive K0 into block. A key longer than one block is hashed with the inner
  * context, which saves a second hash context on the stack. HMAC setup
@@ -394,6 +394,9 @@ void tc_hmac_core_clear(const tc_hash_algorithm_info* stored, void* context)
   hmac = info->hmac_view(context);
   TC_secure_zero(hmac.context, hmac.size);
 }
+#endif /* TC_HMAC_CORE_ENABLED */
+
+#if TC_ENABLE_HMAC
 
 /* One-shot HMAC with the library-wide default or explicit short-tag policy. */
 TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* workspace, TC_bytes key,
