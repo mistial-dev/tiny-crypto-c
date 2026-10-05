@@ -6,9 +6,12 @@
 #define TC_AES_CCM_MIN_NONCE_LEN 7u
 #define TC_AES_CCM_MAX_NONCE_LEN 13u
 
-static int tc_aes_ccm_tag_length_is_valid(size_t tag_len)
+/* SP 800-38C A.1 permits tags of 4..16 even bytes. short_tag selects the
+ * lengths below TC_MIN_TAG_LEN, so each length has one entry point. */
+static int tc_aes_ccm_tag_length_allowed(size_t tag_len, int short_tag)
 {
-  return tag_len >= 4 && tag_len <= TC_AES_BLOCKLEN && (tag_len & 1u) == 0;
+  return tc_internal_tag_length_allowed(tag_len, TC_AES_BLOCKLEN, short_tag) && tag_len >= 4 &&
+         (tag_len & 1u) == 0;
 }
 
 static unsigned tc_aes_ccm_length_field_size(size_t nonce_len)
@@ -70,7 +73,8 @@ done:
 }
 
 /* Decrypt when expected_tag is set, otherwise encrypt and write output_tag.
- * Exactly one tag pointer is set. */
+ * Exactly one tag pointer is set. The policy wrappers have already checked
+ * tag_len with tc_aes_ccm_tag_length_allowed. */
 static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_bytes aad_span,
                                   TC_bytes input_span, TC_buffer output_span,
                                   const uint8_t* expected_tag, uint8_t* output_tag, size_t tag_len)
@@ -104,7 +108,6 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_by
   if (key == NULL || nonce == NULL || (expected_tag == NULL && output_tag == NULL) ||
       !tc_internal_span_valid(aad, aad_len) || !tc_aes_text_ok(input_span, output_span) ||
       nonce_len < TC_AES_CCM_MIN_NONCE_LEN || nonce_len > TC_AES_CCM_MAX_NONCE_LEN ||
-      !tc_aes_ccm_tag_length_is_valid(tag_len) ||
       !tc_aes_ccm_payload_length_is_valid(nonce_len, input_len) ||
       !tc_internal_ranges_disjoint(output, input_len,
                                    decrypt ? (const void*)expected_tag : (const void*)output_tag,
@@ -213,13 +216,11 @@ done:
   return status;
 }
 
-/* SP 800-38C A.1 permits tags of 4..16 even bytes. short_tag selects the
- * lengths below TC_MIN_TAG_LEN. */
 static TC_status tc_aes_ccm_encrypt_with_policy(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
                                                 TC_bytes plaintext, TC_buffer ciphertext,
                                                 TC_buffer tag, int short_tag)
 {
-  if (!tc_internal_tag_length_allowed(tag.capacity, TC_AES_BLOCKLEN, short_tag))
+  if (!tc_aes_ccm_tag_length_allowed(tag.capacity, short_tag))
     return TC_ERROR;
   return tc_aes_ccm_crypt(key, nonce, aad, plaintext, ciphertext, NULL, tag.data, tag.capacity);
 }
@@ -228,7 +229,7 @@ static TC_status tc_aes_ccm_decrypt_with_policy(const uint8_t* key, TC_bytes non
                                                 TC_bytes ciphertext, TC_bytes tag,
                                                 TC_buffer plaintext, int short_tag)
 {
-  if (tag.data == NULL || !tc_internal_tag_length_allowed(tag.length, TC_AES_BLOCKLEN, short_tag))
+  if (tag.data == NULL || !tc_aes_ccm_tag_length_allowed(tag.length, short_tag))
     return TC_ERROR;
   return tc_aes_ccm_crypt(key, nonce, aad, ciphertext, plaintext, tag.data, NULL, tag.length);
 }
