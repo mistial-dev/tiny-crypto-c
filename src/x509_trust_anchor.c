@@ -196,7 +196,7 @@ static TC_TLV_result trust_anchor_info(TC_bytes contents, const TC_TLV_limits* l
   result = TC_TLV_next(&reader, &element);
   if (result != TC_TLV_OK)
     return TC_TLV_INVALID;
-  if (tc_pki_tag(&element, 2)) {
+  if (tc_tlv_tag_is(&element, 2)) {
     uint32_t version;
     result = TC_DER_uint32(element.encoded, &version);
     if (result != TC_TLV_OK)
@@ -205,7 +205,7 @@ static TC_TLV_result trust_anchor_info(TC_bytes contents, const TC_TLV_limits* l
       return TC_TLV_INVALID; /* DEFAULT v1 is omitted in DER. */
     return TC_TLV_UNSUPPORTED;
   }
-  if (!tc_pki_tag(&element, 0x30))
+  if (!tc_tlv_tag_is(&element, 0x30))
     return TC_TLV_INVALID;
   spki = element.encoded;
   result = TC_X509_subject_public_key(spki, &out->trust.public_key);
@@ -233,7 +233,7 @@ static TC_TLV_result trust_anchor_info(TC_bytes contents, const TC_TLV_limits* l
     } else if (index == 2) {
       TC_TLV_element inner;
       result = TC_TLV_read(element.value, TC_TLV_DER, limits, &inner);
-      if (result != TC_TLV_OK || !tc_pki_tag(&inner, 0x30) ||
+      if (result != TC_TLV_OK || !tc_tlv_tag_is(&inner, 0x30) ||
           inner.encoded.length != element.value.length)
         return TC_TLV_INVALID;
       out->extensions = inner.value;
@@ -337,7 +337,7 @@ TC_TLV_result TC_X509_trust_anchor_next(TC_X509_trust_anchor_reader* reader,
   result = TC_TLV_next(&next, &choice);
   if (result != TC_TLV_OK)
     return result;
-  if (tc_pki_tag(&choice, 0x30)) {
+  if (tc_tlv_tag_is(&choice, 0x30)) {
 #if TC_TAF_ENABLE_CERTIFICATE
     TC_X509_certificate certificate;
     result = tc_x509_certificate_read(choice.encoded, 0x30, limits, workspace, &certificate);
@@ -348,7 +348,7 @@ TC_TLV_result TC_X509_trust_anchor_next(TC_X509_trust_anchor_reader* reader,
 #else
     return TC_TLV_UNSUPPORTED;
 #endif
-  } else if (tc_pki_tag(&choice, 0xa1)) {
+  } else if (tc_tlv_tag_is(&choice, 0xa1)) {
 #if TC_TAF_ENABLE_TBS_CERTIFICATE
     /* tbsCert [1] EXPLICIT TBSCertificate. */
     TC_X509_certificate certificate;
@@ -360,11 +360,11 @@ TC_TLV_result TC_X509_trust_anchor_next(TC_X509_trust_anchor_reader* reader,
 #else
     return TC_TLV_UNSUPPORTED;
 #endif
-  } else if (tc_pki_tag(&choice, 0xa2)) {
+  } else if (tc_tlv_tag_is(&choice, 0xa2)) {
 #if TC_TAF_ENABLE_TRUST_ANCHOR_INFO
     TC_TLV_element info;
     result = TC_TLV_read(choice.value, TC_TLV_DER, limits, &info);
-    if (result != TC_TLV_OK || !tc_pki_tag(&info, 0x30) ||
+    if (result != TC_TLV_OK || !tc_tlv_tag_is(&info, 0x30) ||
         info.encoded.length != choice.value.length)
       return TC_TLV_INVALID;
     result = trust_anchor_info(info.value, limits, workspace, &parsed);

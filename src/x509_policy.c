@@ -487,7 +487,7 @@ static TC_TLV_result qualifier_next(TC_TLV_reader* reader, TC_TLV_limits* budget
 static TC_TLV_result qualifier_contents(const TC_TLV_element* element, size_t depth,
                                         const TC_TLV_limits* budget, TC_TLV_reader* reader)
 {
-  if (!tc_pki_tag(element, 0x30))
+  if (!tc_tlv_tag_is(element, 0x30))
     return TC_TLV_INVALID;
   if (depth > budget->max_depth)
     return TC_TLV_LIMIT;
@@ -535,7 +535,7 @@ static TC_TLV_result user_notice(TC_bytes encoded, const TC_TLV_limits* limits, 
     return TC_TLV_OK;
   if (result != TC_TLV_OK)
     return result;
-  if (tc_pki_tag(&element, 0x30)) {
+  if (tc_tlv_tag_is(&element, 0x30)) {
     result = qualifier_contents(&element, 2, &budget, &reference);
     if (result != TC_TLV_OK)
       return result;
@@ -554,7 +554,7 @@ static TC_TLV_result user_notice(TC_bytes encoded, const TC_TLV_limits* limits, 
     if (!tc_pki_end(&reference))
       return TC_TLV_INVALID;
     while ((result = qualifier_next(&numbers, &budget, work, &element)) == TC_TLV_OK) {
-      if (!tc_pki_tag(&element, 2))
+      if (!tc_tlv_tag_is(&element, 2))
         return TC_TLV_INVALID;
       result = TC_DER_integer_contents(element.value);
       if (result != TC_TLV_OK)

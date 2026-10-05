@@ -111,11 +111,6 @@ static TC_status command_protect(TC_PIV_link* link, const TC_APDU_command* comma
                            (TC_PIV_SM_workspace*)link->sm_workspace);
 }
 
-static int tag_is(const TC_TLV_element* element, uint8_t tag)
-{
-  return element->header.tag_length == 1 && element->header.tag[0] == tag;
-}
-
 /* The DOs of a protected answer, borrowed from its data. */
 typedef struct {
   TC_bytes ciphertext, authenticated, mac;
@@ -134,7 +129,7 @@ static int response_read(TC_bytes data, uint8_t ins, response_fields* out)
   if (TC_TLV_reader_init(&reader, data, TC_TLV_ISO7816, &limits) != TC_TLV_OK ||
       TC_TLV_next(&reader, &element) != TC_TLV_OK)
     return 0;
-  if (tag_is(&element, CRYPTOGRAM)) {
+  if (tc_tlv_tag_is(&element, CRYPTOGRAM)) {
     const TC_bytes value = element.value;
     if (ins == TC_PIV_INS_VERIFY || value.length < 1 + BLOCK ||
         value.data[0] != PADDING_INDICATOR || (value.length - 1) % BLOCK)
@@ -143,11 +138,11 @@ static int response_read(TC_bytes data, uint8_t ins, response_fields* out)
     if (TC_TLV_next(&reader, &element) != TC_TLV_OK)
       return 0;
   }
-  if (!tag_is(&element, STATUS_OBJECT) || element.value.length != 2)
+  if (!tc_tlv_tag_is(&element, STATUS_OBJECT) || element.value.length != 2)
     return 0;
   out->sw = (uint16_t)((uint16_t)element.value.data[0] << 8 | element.value.data[1]);
   out->authenticated = (TC_bytes){data.data, reader.offset};
-  if (TC_TLV_next(&reader, &element) != TC_TLV_OK || !tag_is(&element, MAC_OBJECT) ||
+  if (TC_TLV_next(&reader, &element) != TC_TLV_OK || !tc_tlv_tag_is(&element, MAC_OBJECT) ||
       element.value.length != MAC_BYTES || reader.offset != data.length)
     return 0;
   out->mac = element.value;

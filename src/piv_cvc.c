@@ -85,7 +85,7 @@ TC_TLV_result TC_PIV_CVC_read(TC_bytes encoded, TC_PIV_CVC* out)
     return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, 0x7f21) || element.encoded.length != encoded.length)
+  if (!tc_tlv_tag_is(&element, 0x7f21) || element.encoded.length != encoded.length)
     return TC_TLV_INVALID;
   memset(&cvc, 0, sizeof cvc);
   cvc.signed_data.data = element.value.data;

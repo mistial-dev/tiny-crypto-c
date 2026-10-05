@@ -287,7 +287,7 @@ static TC_TLV_result smtp_utf8(TC_bytes contents, const TC_TLV_limits* limits, s
     return TC_TLV_INVALID;
   if (oid.value.length != sizeof smtp_oid || memcmp(oid.value.data, smtp_oid, sizeof smtp_oid))
     return TC_TLV_END;
-  if (!tc_pki_tag(&value, 0x0c))
+  if (!tc_tlv_tag_is(&value, 0x0c))
     return TC_TLV_INVALID;
   *mailbox = value.value;
   return TC_TLV_OK;
@@ -762,7 +762,7 @@ TC_TLV_result tc_x509_certificate_names_check_san(const TC_X509_certificate* cer
           result = TC_TLV_read(attribute.value, TC_TLV_DER, limits, &value);
           if (result != TC_TLV_OK)
             return result;
-          if (!tc_pki_tag(&value, 0x16))
+          if (!tc_tlv_tag_is(&value, 0x16))
             return TC_TLV_INVALID;
           name.type = 1;
           name.value = value.value;

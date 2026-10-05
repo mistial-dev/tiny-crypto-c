@@ -32,7 +32,7 @@ static TC_TLV_result search_subject(TC_bytes encoded, const TC_TLV_limits* limit
   result = TC_TLV_read(encoded, TC_TLV_DER, limits, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, 0x30) || element.encoded.length != encoded.length)
+  if (!tc_tlv_tag_is(&element, 0x30) || element.encoded.length != encoded.length)
     return TC_TLV_INVALID;
   if ((result = TC_TLV_reader_init(&outer, element.value, TC_TLV_DER, limits)) != TC_TLV_OK ||
       (result = tc_pki_field(&outer, 0x30, &element)) != TC_TLV_OK ||
@@ -40,9 +40,9 @@ static TC_TLV_result search_subject(TC_bytes encoded, const TC_TLV_limits* limit
       (result = TC_TLV_next(&tbs, &element)) != TC_TLV_OK)
     return result;
   /* Skip the optional version, then serialNumber. */
-  if (tc_pki_tag(&element, 0xa0) && (result = TC_TLV_next(&tbs, &element)) != TC_TLV_OK)
+  if (tc_tlv_tag_is(&element, 0xa0) && (result = TC_TLV_next(&tbs, &element)) != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, 2))
+  if (!tc_tlv_tag_is(&element, 2))
     return TC_TLV_INVALID;
   /* signature, issuer, validity, subject. */
   for (unsigned field = 0; field < 4; ++field)

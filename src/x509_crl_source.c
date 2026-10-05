@@ -4,10 +4,11 @@
 #if TC_ENABLE_X509_REVOCATION
 #include "x509_crl_source_internal.h"
 #include "internal.h"
+#include "tlv_internal.h"
 
 static int source_tag(const tc_source_der_element* field, uint8_t tag)
 {
-  return field->header.tag_length == 1 && field->header.tag[0] == tag;
+  return tc_tlv_tag_bytes_is(field->header.tag, field->header.tag_length, tag);
 }
 
 static tc_source_span source_span(const tc_source_der_element* field)

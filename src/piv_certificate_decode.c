@@ -29,7 +29,7 @@ static int der_sequence(TC_bytes certificate)
   static const TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 1, 1};
   TC_TLV_element element;
   return TC_TLV_read(certificate, TC_TLV_DER, &limits, &element) == TC_TLV_OK &&
-         tc_pki_tag(&element, 0x30) && element.header.constructed &&
+         tc_tlv_tag_is(&element, 0x30) && element.header.constructed &&
          element.encoded.length == certificate.length;
 }
 

@@ -95,7 +95,7 @@ static TC_TLV_result entry_issuer_directory_name(TC_bytes names, TC_bytes query,
     result = tc_pki_tree_next(&reader, tree, &element);
     if (result != TC_TLV_OK)
       return result;
-    if (!tc_pki_tag(&element, DIRECTORY_NAME))
+    if (!tc_tlv_tag_is(&element, DIRECTORY_NAME))
       continue;
     if (!query.data) {
       *found = 1;

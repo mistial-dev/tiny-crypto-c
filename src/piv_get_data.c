@@ -34,12 +34,6 @@ static int tag_valid(TC_bytes tag)
          parsed.tag_length == tag.length;
 }
 
-static int tag_equal(const TC_TLV_element* element, TC_bytes tag)
-{
-  return element->header.tag_length == tag.length &&
-         memcmp(element->header.tag, tag.data, tag.length) == 0;
-}
-
 /* PIV answers: 7E and 7F61 return their own DO (Part 2 3.1.2), every other
  * tag a 53 container whose only empty form is 53 00 (Part 1 4.1.1). */
 static TC_TLV_result piv_frame(TC_bytes data, TC_bytes tag, const TC_TLV_limits* limits,
@@ -62,7 +56,8 @@ static TC_TLV_result piv_frame(TC_bytes data, TC_bytes tag, const TC_TLV_limits*
   const TC_TLV_result result = TC_TLV_read(data, TC_TLV_ISO7816, limits, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tag_equal(&element, tag) || element.encoded.length != data.length || !element.value.length)
+  if (!tc_tlv_tag_matches(&element, tag) || element.encoded.length != data.length ||
+      !element.value.length)
     return TC_TLV_INVALID;
   out->encoded = element.encoded;
   out->value = element.value;
@@ -91,11 +86,11 @@ static TC_TLV_result twic_frame(TC_bytes data, uint16_t sw, TC_bytes tag,
   const TC_TLV_result result = TC_TLV_read(data, TC_TLV_ISO7816, limits, &element);
   if (result != TC_TLV_OK)
     return result;
-  const int container = element.header.tag_length == 1 && element.header.tag[0] == CONTAINER;
+  const int container = tc_tlv_tag_is(&element, CONTAINER);
   const int framed = sw == TC_PIV_SW_END_OF_OBJECT_VALUE
                          ? padding_only(data, element.encoded.length)
                          : element.encoded.length == data.length;
-  if ((!container && !tag_equal(&element, tag)) || !framed)
+  if ((!container && !tc_tlv_tag_matches(&element, tag)) || !framed)
     return TC_TLV_INVALID;
   out->encoded = element.encoded;
   out->value = element.value;

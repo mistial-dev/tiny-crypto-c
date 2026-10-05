@@ -8,6 +8,7 @@
 #if TC_ENABLE_PIV_CARD_CHECK
 #include "internal.h"
 #include "piv_card_check_internal.h"
+#include "tlv_internal.h"
 #include <tiny_crypto/cms.h>
 #include <tiny_crypto/piv_chuid.h>
 #include <tiny_crypto/piv_cms.h>
@@ -89,7 +90,7 @@ static void cms_add(target_list* list, TC_bytes cms)
       !read_ok(list, TC_TLV_reader_init(&reader, set.value, TC_TLV_BER, list->limits)))
     return;
   while (list->result == TC_PIV_OK && TC_TLV_next(&reader, &certificate) == TC_TLV_OK)
-    if (certificate.header.tag_length == 1 && certificate.header.tag[0] == CERTIFICATE_TAG)
+    if (tc_tlv_tag_is(&certificate, CERTIFICATE_TAG))
       certificate_add(list, certificate.encoded);
 }
 

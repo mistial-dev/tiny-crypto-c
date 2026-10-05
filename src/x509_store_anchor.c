@@ -81,7 +81,7 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
     case TC_PKI_EXT_CERTIFICATE_POLICIES: {
       TC_TLV_element value;
       result = TC_TLV_read(extension.value, TC_TLV_DER, limits, &value);
-      if (result != TC_TLV_OK || !tc_pki_tag(&value, 0x30) ||
+      if (result != TC_TLV_OK || !tc_tlv_tag_is(&value, 0x30) ||
           value.encoded.length != extension.value.length)
         return TC_TLV_INVALID;
       /* Checked after the loop, which owns the OID scratch until then. */

@@ -52,7 +52,7 @@ static TC_TLV_result bit_group_read(TC_bytes encoded, TC_PIV_bit_group* out)
   TC_TLV_result result = TC_TLV_read(encoded, TC_TLV_ISO7816, &tc_piv_object_limits, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, GROUP_TAG) || element.encoded.length != encoded.length)
+  if (!tc_tlv_tag_is(&element, GROUP_TAG) || element.encoded.length != encoded.length)
     return TC_TLV_INVALID;
   result = group_read(element.value, &parsed);
   if (result != TC_TLV_OK)

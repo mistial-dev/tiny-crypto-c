@@ -128,8 +128,8 @@ TC_TLV_result tc_x509_time_value(const TC_TLV_element* element, TC_X509_time* ou
   TC_X509_time parsed;
   const uint8_t* p = element->value.data;
   unsigned parts[7] = {0}, i, digits;
-  int generalized = tc_pki_tag(element, 0x18);
-  if (!generalized && !tc_pki_tag(element, 0x17))
+  int generalized = tc_tlv_tag_is(element, 0x18);
+  if (!generalized && !tc_tlv_tag_is(element, 0x17))
     return TC_TLV_INVALID;
   digits = generalized ? 14 : 12;
   if (element->value.length != digits + 1 || p[digits] != 'Z')

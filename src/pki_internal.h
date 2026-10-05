@@ -5,6 +5,7 @@
 #include <tiny_crypto/der.h>
 #include <tiny_crypto/x509.h>
 #include "internal.h"
+#include "tlv_internal.h"
 #include <string.h>
 
 /* Final arc of the RFC 5280 id-ce extensions (2.5.29.n), as returned by
@@ -32,20 +33,13 @@ enum {
   TC_PKI_EXT_INHIBIT_ANY_POLICY = 54
 };
 
-static inline int tc_pki_tag(const TC_TLV_element* element, unsigned tag)
-{
-  return tag <= 255 ? element->header.tag_length == 1 && element->header.tag[0] == tag
-                    : element->header.tag_length == 2 && element->header.tag[0] == (tag >> 8) &&
-                          element->header.tag[1] == (tag & 255);
-}
-
 static inline TC_TLV_result tc_pki_next(TC_TLV_reader* reader, unsigned tag,
                                         TC_TLV_element* element)
 {
   TC_TLV_result result = TC_TLV_next(reader, element);
   if (result != TC_TLV_OK)
     return result;
-  return tc_pki_tag(element, tag) ? TC_TLV_OK : TC_TLV_INVALID;
+  return tc_tlv_tag_is(element, tag) ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
 /* Read a required child with the given tag. A missing (END) or truncated
@@ -129,7 +123,7 @@ static inline TC_TLV_result tc_pki_value_open(TC_TLV_reader* reader, TC_bytes va
     return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, tag) || !element.header.constructed || !tc_pki_end(&outer) ||
+  if (!tc_tlv_tag_is(&element, tag) || !element.header.constructed || !tc_pki_end(&outer) ||
       (!allow_empty && !element.value.length))
     return TC_TLV_INVALID;
   /* The outer element stays charged to the returned reader. */
@@ -156,7 +150,7 @@ static inline TC_TLV_result tc_pki_null(TC_bytes encoded, TC_TLV_profile profile
   result = TC_TLV_read(encoded, profile, &limits, &element);
   if (result != TC_TLV_OK)
     return result;
-  return tc_pki_tag(&element, 5) && !element.value.length &&
+  return tc_tlv_tag_is(&element, 5) && !element.value.length &&
                  element.encoded.length == encoded.length
              ? TC_TLV_OK
              : TC_TLV_INVALID;

@@ -108,7 +108,7 @@ static inline TC_TLV_result tc_pki_tree_field(TC_TLV_reader* reader, unsigned ta
   TC_TLV_result result = tc_pki_tree_next(reader, workspace, out);
   if (result != TC_TLV_OK)
     return result == TC_TLV_END ? TC_TLV_INVALID : result;
-  return tc_pki_tag(out, tag) ? TC_TLV_OK : TC_TLV_INVALID;
+  return tc_tlv_tag_is(out, tag) ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
 static inline TC_TLV_result tc_pki_tree_open(TC_bytes input, unsigned tag, TC_TLV_profile profile,
@@ -120,7 +120,8 @@ static inline TC_TLV_result tc_pki_tree_open(TC_bytes input, unsigned tag, TC_TL
   TC_TLV_result result = tc_pki_tree_read(input, profile, limits, workspace, &outer);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&outer, tag) || !outer.header.constructed || outer.encoded.length != input.length)
+  if (!tc_tlv_tag_is(&outer, tag) || !outer.header.constructed ||
+      outer.encoded.length != input.length)
     return TC_TLV_INVALID;
   return TC_TLV_reader_init(out, outer.value, profile, limits);
 }
@@ -201,7 +202,7 @@ static inline TC_TLV_result tc_pki_tree_attribute(TC_TLV_reader* reader,
   result = tc_pki_tree_next(&next, workspace, &attribute);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&attribute, 0x30))
+  if (!tc_tlv_tag_is(&attribute, 0x30))
     return TC_TLV_INVALID;
   result = TC_TLV_reader_init(&fields, attribute.value, reader->profile, &reader->limits);
   if (result != TC_TLV_OK)

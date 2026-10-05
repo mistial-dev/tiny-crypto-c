@@ -18,7 +18,7 @@ static TC_TLV_result eac_outer(TC_bytes encoded, const TC_TLV_limits* limits, un
     return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(element, tag) || element->encoded.length != encoded.length)
+  if (!tc_tlv_tag_is(element, tag) || element->encoded.length != encoded.length)
     return TC_TLV_INVALID;
   return TC_TLV_OK;
 }
@@ -75,7 +75,7 @@ static TC_TLV_result key_contents(TC_bytes contents, int standalone, TC_EAC_CVC_
     key.hash_bits = hashes[id - 1];
     if (TC_TLV_next(&reader, &element) != TC_TLV_OK)
       return TC_TLV_INVALID;
-    if (tc_pki_tag(&element, 0x81)) {
+    if (tc_tlv_tag_is(&element, 0x81)) {
       key.has_domain = 1;
       key.p = element.value;
       if (!uint_value(key.p, 0))
@@ -97,7 +97,7 @@ static TC_TLV_result key_contents(TC_bytes contents, int standalone, TC_EAC_CVC_
       if (TC_TLV_next(&reader, &element) != TC_TLV_OK)
         return TC_TLV_INVALID;
     }
-    if (!tc_pki_tag(&element, 0x86))
+    if (!tc_tlv_tag_is(&element, 0x86))
       return TC_TLV_INVALID;
     key.point = element.value;
     if (key.point.length < 3 || !(key.point.length & 1) || key.point.data[0] != 4 ||
@@ -178,7 +178,7 @@ TC_TLV_result TC_EAC_CVC_extensions_init(TC_TLV_reader* reader, TC_bytes encoded
   result = TC_TLV_read(encoded, TC_TLV_DER, limits, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, 0x65) || element.encoded.length != encoded.length ||
+  if (!tc_tlv_tag_is(&element, 0x65) || element.encoded.length != encoded.length ||
       !element.value.length)
     return TC_TLV_INVALID;
   return TC_TLV_reader_init(reader, element.value, TC_TLV_DER, limits);
@@ -195,7 +195,7 @@ TC_TLV_result TC_EAC_CVC_extension_next(TC_TLV_reader* reader, TC_EAC_CVC_extens
   result = TC_TLV_next(&next, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, 0x73))
+  if (!tc_tlv_tag_is(&element, 0x73))
     return TC_TLV_INVALID;
   result = TC_TLV_reader_init(&inner, element.value, TC_TLV_DER, &next.limits);
   if (result != TC_TLV_OK)

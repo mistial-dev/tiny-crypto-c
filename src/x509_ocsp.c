@@ -58,7 +58,7 @@ static int oid_is(TC_bytes oid, const uint8_t* expected, size_t length)
 
 static TC_TLV_result time_value(const TC_TLV_element* element, TC_X509_time* out)
 {
-  return tc_pki_tag(element, 0x18) ? tc_x509_time_value(element, out) : TC_TLV_INVALID;
+  return tc_tlv_tag_is(element, 0x18) ? tc_x509_time_value(element, out) : TC_TLV_INVALID;
 }
 
 static TC_hash_algorithm hash_algorithm(TC_bytes oid)
@@ -154,7 +154,7 @@ static TC_TLV_result ocsp_extension(void* context, const TC_X509_extension* exte
     return extension->critical ? TC_TLV_UNSUPPORTED : TC_TLV_OK;
   if (!state->allow_nonce || extension->critical ||
       TC_TLV_read(extension->value, TC_TLV_DER, state->limits, &value) != TC_TLV_OK ||
-      !tc_pki_tag(&value, 4) || value.encoded.length != extension->value.length ||
+      !tc_tlv_tag_is(&value, 4) || value.encoded.length != extension->value.length ||
       !value.value.length || value.value.length > 128)
     return TC_TLV_INVALID;
   state->nonce = value.value;
@@ -245,7 +245,7 @@ static TC_TLV_result single_response(TC_bytes encoded, const TC_X509_certificate
     TC_TLV_reader probe = reader;
     if (TC_TLV_next(&probe, &field) != TC_TLV_OK)
       return TC_TLV_INVALID;
-    if (tc_pki_tag(&field, 0xa0)) {
+    if (tc_tlv_tag_is(&field, 0xa0)) {
       reader = probe;
       if (contents_reader(field.value, request->parsing, &date) != TC_TLV_OK ||
           tc_pki_field(&date, 0x18, &field) != TC_TLV_OK || !tc_pki_end(&date) ||
@@ -292,7 +292,7 @@ static TC_TLV_result response_data(TC_bytes encoded, const TC_X509_certificate* 
   TC_TLV_reader probe = reader;
   if (TC_TLV_next(&probe, &field) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  if (tc_pki_tag(&field, 0xa0)) {
+  if (tc_tlv_tag_is(&field, 0xa0)) {
     TC_TLV_reader version;
     if (contents_reader(field.value, request->parsing, &version) != TC_TLV_OK ||
         tc_pki_field(&version, 2, &field) != TC_TLV_OK || !tc_pki_end(&version) ||
@@ -304,7 +304,7 @@ static TC_TLV_result response_data(TC_bytes encoded, const TC_X509_certificate* 
   reader = probe;
   if (field.header.tag_length != 1)
     return TC_TLV_INVALID;
-  if (tc_pki_tag(&field, 0xa1)) {
+  if (tc_tlv_tag_is(&field, 0xa1)) {
     TC_TLV_reader name;
     TC_TLV_element value;
     if (contents_reader(field.value, request->parsing, &name) != TC_TLV_OK ||
@@ -312,7 +312,7 @@ static TC_TLV_result response_data(TC_bytes encoded, const TC_X509_certificate* 
       return TC_TLV_INVALID;
     parsed->responder = value.encoded;
     parsed->responder_by_key = 0;
-  } else if (tc_pki_tag(&field, 0xa2)) {
+  } else if (tc_tlv_tag_is(&field, 0xa2)) {
     TC_TLV_reader key;
     TC_TLV_element value;
     if (contents_reader(field.value, request->parsing, &key) != TC_TLV_OK ||
@@ -331,7 +331,7 @@ static TC_TLV_result response_data(TC_bytes encoded, const TC_X509_certificate* 
   while ((status = TC_TLV_next(&responses, &field)) == TC_TLV_OK) {
     if (++count > request->max_responses)
       return TC_TLV_LIMIT;
-    if (!tc_pki_tag(&field, 0x30))
+    if (!tc_tlv_tag_is(&field, 0x30))
       return TC_TLV_INVALID;
     status = single_response(field.encoded, certificate, request, workspace, work, parsed);
     if (status != TC_TLV_OK)
@@ -626,7 +626,7 @@ static TC_TLV_result authorize_response(ocsp_response* response,
     if (status != TC_TLV_OK)
       return status;
     while (!search.certificate.data && (status = TC_TLV_next(&embedded, &element)) == TC_TLV_OK) {
-      if (!tc_pki_tag(&element, 0x30))
+      if (!tc_tlv_tag_is(&element, 0x30))
         return TC_TLV_INVALID;
       status = try_candidate(element.encoded, response, request, above, workspace, work, &search);
       if (status != TC_TLV_OK)

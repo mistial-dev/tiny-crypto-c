@@ -54,7 +54,7 @@ static TC_TLV_result read_container(TC_bytes input, TC_PIV_certificate_profile p
   if (result != TC_TLV_OK)
     return result;
   /* SP 800-73-5 Part 1 Table 43 places the intermediate CVC before FE. */
-  if (profile == TC_PIV_CERTIFICATE_SM_SIGNER && tc_pki_tag(&element, INTERMEDIATE_TAG)) {
+  if (profile == TC_PIV_CERTIFICATE_SM_SIGNER && tc_tlv_tag_is(&element, INTERMEDIATE_TAG)) {
     if (!element.value.length)
       return TC_TLV_INVALID;
     if (element.value.length > INTERMEDIATE_MAX)
@@ -66,7 +66,7 @@ static TC_TLV_result read_container(TC_bytes input, TC_PIV_certificate_profile p
   }
   /* SP 800-73-4 Part 1 Tables 10, 15-17 and 20-39 and SP 800-73-5 Part 1
    * Tables 21-40 allow a historic MSCUID of at most 38 bytes before FE. */
-  if (profile == TC_PIV_CERTIFICATE_SLOT && tc_pki_tag(&element, MSCUID_TAG)) {
+  if (profile == TC_PIV_CERTIFICATE_SLOT && tc_tlv_tag_is(&element, MSCUID_TAG)) {
     if (!element.value.length || element.value.length > MSCUID_MAX)
       return TC_TLV_INVALID;
     out->mscuid = element.value;
@@ -74,7 +74,8 @@ static TC_TLV_result read_container(TC_bytes input, TC_PIV_certificate_profile p
     if (result != TC_TLV_OK)
       return result;
   }
-  return tc_pki_tag(&element, ERROR_DETECTION_TAG) && !element.value.length && tc_pki_end(&reader)
+  return tc_tlv_tag_is(&element, ERROR_DETECTION_TAG) && !element.value.length &&
+                 tc_pki_end(&reader)
              ? TC_TLV_OK
              : TC_TLV_INVALID;
 }

@@ -79,11 +79,11 @@ static inline TC_TLV_result tc_pki_distribution_name_read(TC_bytes encoded,
   if (result != TC_TLV_OK)
     return result;
   if (element.encoded.length != encoded.length ||
-      (!tc_pki_tag(&element, FULL_NAME) && !tc_pki_tag(&element, RELATIVE_NAME)))
+      (!tc_tlv_tag_is(&element, FULL_NAME) && !tc_tlv_tag_is(&element, RELATIVE_NAME)))
     return TC_TLV_INVALID;
   parsed.encoded = element.encoded;
   parsed.contents = element.value;
-  parsed.relative = tc_pki_tag(&element, RELATIVE_NAME);
+  parsed.relative = tc_tlv_tag_is(&element, RELATIVE_NAME);
   if (!parsed.relative) {
     result = tc_pki_general_names_contents_check(parsed.contents, limits, tree);
   } else {
