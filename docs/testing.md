@@ -145,6 +145,10 @@ tests call the library directly.
 - Writable objects passed by pointer are restored after each repeated call.
   Span contents are left alone, because an argument error must leave outputs
   unchanged.
+- The wrappers reach `<stdint.h>`, which fixes the C library's feature-test
+  macros. A source that defines one, such as `_POSIX_C_SOURCE`, before its
+  first include gets the same definition on the command line. A source that
+  defines one macro with two values is compiled without the wrappers.
 - `tc_skip_null_guard` keeps one test executable on direct calls when the
   repeated calls would change library state the test counts, such as a fault
   injection counter.

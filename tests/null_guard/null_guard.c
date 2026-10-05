@@ -14,7 +14,17 @@
 #endif
 #endif
 #ifdef TC_NULL_GUARD_ASAN
+/* The ASan runtime of GCC and Clang provides this function. Some toolchains
+ * ship it without the interface header. */
+#if defined(__has_include)
+#if __has_include(<sanitizer/asan_interface.h>)
 #include <sanitizer/asan_interface.h>
+#define TC_NULL_GUARD_ASAN_HEADER 1
+#endif
+#endif
+#ifndef TC_NULL_GUARD_ASAN_HEADER
+void* __asan_region_is_poisoned(void* begin, size_t size);
+#endif
 #endif
 
 /* Distinct cases seen by this process, keyed by "function parameter". */
