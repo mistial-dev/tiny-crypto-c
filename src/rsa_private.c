@@ -186,7 +186,8 @@ TC_RSA_result TC_RSA_derive_crt(const TC_RSA_private_key* key, const TC_RSA_crt_
 
 int TC_RSA_exponent_in_fips_range(TC_bytes exponent)
 {
-  return tc_rsa_exponent_fips(exponent.data, exponent.length);
+  return tc_internal_span_valid(exponent.data, exponent.length) &&
+         tc_rsa_exponent_fips(exponent.data, exponent.length);
 }
 
 TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,

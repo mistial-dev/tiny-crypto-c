@@ -480,7 +480,8 @@ TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,
                                           const TC_RSA_workspace* workspace,
                                           TC_RSA_execution* execution);
 /* 1 when a big-endian magnitude is odd and 2^16 < e < 2^256 (FIPS 186-5
- * A.1.1), otherwise 0. Leading zero octets are ignored. Charges no work. */
+ * A.1.1), otherwise 0. Leading zero octets are ignored. A NULL span with a
+ * nonzero length returns 0. Charges no work. */
 int TC_RSA_exponent_in_fips_range(TC_bytes exponent);
 
 /* Check CRT components against an already validated, unchanged private key
