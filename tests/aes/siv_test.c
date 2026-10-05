@@ -488,6 +488,25 @@ TC_TEST(test_siv_api)
                                         (TC_buffer){buf, sizeof(pt)}),
                      ==, TC_OK);
     munit_assert_memory_equal(sizeof(pt), buf, pt);
+
+    /* The AD descriptor array itself inside the text output is rejected as
+     * well: decryption would overwrite the descriptors before S2V reads
+     * them. */
+    {
+      union {
+        uint8_t bytes[sizeof(pt)];
+        TC_bytes ad[sizeof(pt) / sizeof(TC_bytes)];
+      } arena;
+      munit_assert_size(sizeof arena.ad / sizeof *arena.ad, >=, 1);
+      arena.ad[0] = ad_outside;
+      memcpy(saved, arena.bytes, sizeof(pt));
+      munit_assert_int(TC_AES_SIV_decrypt((TC_bytes){key, TC_AES_SIV_KEYLEN}, arena.ad, 1,
+                                          (TC_bytes){v, TC_AES_BLOCKLEN},
+                                          (TC_bytes){ct, sizeof(pt)},
+                                          (TC_buffer){arena.bytes, sizeof(pt)}),
+                       ==, TC_ERROR);
+      munit_assert_memory_equal(sizeof(pt), arena.bytes, saved);
+    }
   }
 
   /* v fully after ciphertext (disjoint) is OK */

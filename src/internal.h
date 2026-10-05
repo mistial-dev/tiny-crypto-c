@@ -73,6 +73,25 @@ static inline int tc_internal_span_valid(const void* data, size_t length)
   return data != NULL || length == 0;
 }
 
+/* An array of count input spans is usable when the array is present or
+ * empty, its byte size fits size_t, every span is valid, and the array and
+ * every span are disjoint from output. An empty output skips the overlap
+ * checks. Callers that write output before reading every part need this, so
+ * that writing output cannot change a part or its descriptor. */
+static inline int tc_internal_parts_valid(const TC_bytes* parts, size_t count, const void* output,
+                                          size_t output_length)
+{
+  size_t i;
+  if ((count != 0 && parts == NULL) || count > SIZE_MAX / sizeof *parts ||
+      !tc_internal_ranges_disjoint(parts, count * sizeof *parts, output, output_length))
+    return 0;
+  for (i = 0; i < count; ++i)
+    if (!tc_internal_span_valid(parts[i].data, parts[i].length) ||
+        !tc_internal_ranges_disjoint(parts[i].data, parts[i].length, output, output_length))
+      return 0;
+  return 1;
+}
+
 static inline uint32_t tc_internal_load_be32(const uint8_t* src)
 {
 #if (defined(__GNUC__) || defined(__clang__)) && defined(__BYTE_ORDER__) &&                        \

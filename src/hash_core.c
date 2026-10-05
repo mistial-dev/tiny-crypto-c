@@ -182,11 +182,8 @@ TC_status tc_hash_core_update_parts(const tc_hash_algorithm_info* stored, void* 
                                     const TC_bytes* parts, size_t count)
 {
   TC_status status = TC_OK;
-  if (context == NULL || (count != 0 && parts == NULL))
+  if (context == NULL || !tc_internal_parts_valid(parts, count, NULL, 0))
     return TC_ERROR;
-  for (size_t i = 0; i < count; ++i)
-    if (!tc_internal_span_valid(parts[i].data, parts[i].length))
-      return TC_ERROR;
   for (size_t i = 0; status == TC_OK && i < count; ++i)
     status = tc_hash_core_update(stored, context, parts[i].data, parts[i].length);
   return status;
