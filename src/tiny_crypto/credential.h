@@ -283,6 +283,7 @@ TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_r
                                               size_t* work, TC_PIV_security_report* out);
 #endif
 
+#if TC_ENABLE_TWIC
 enum { TC_TWIC_UNSIGNED_CHUID_CONTAINER = 0x3002 };
 
 typedef struct {
@@ -313,6 +314,7 @@ typedef struct {
 TC_credential_status
 TC_TWIC_unsigned_CHUID_validate(const TC_TWIC_unsigned_CHUID_validation_request* request,
                                 const TC_validation_context* context, size_t* work);
+#endif
 #endif
 
 #if TC_ENABLE_CREDENTIAL

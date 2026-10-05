@@ -26,6 +26,8 @@ Use the primitives in firmware that needs bounded AES, hashing, MACs, key
 derivation, or caller-seeded random-bit generation. The optional credential
 modules support PIV and TWIC reader workflows: parsing card data, checking
 CMS signatures and X.509 paths, applying credential policy, and checking CRLs.
+TWIC Legacy and NEXGEN cards need `TINY_CRYPTO_ENABLE_TWIC`, which adds the
+TWIC rules held in the `twic_*` sources to the PIV modules.
 Feature gates let a small device link only the algorithms its application uses.
 See the [credential reader guide](docs/credential-reader.md) and
 [API guide](docs/api.md) for the supported workflows and buffer requirements.
@@ -235,21 +237,21 @@ each dependency that `config.h` requires.
 | Option                                  | Default | micro | mini | desktop | Purpose                                           |
 | --------------------------------------- | ------- | ----- | ---- | ------- | ------------------------------------------------- |
 | `TINY_CRYPTO_ENABLE_APDU`               | OFF     | OFF   | OFF  | ON      | ISO/IEC 7816-4 APDU encoding and exchange         |
-| `TINY_CRYPTO_ENABLE_PIV_COMMAND`        | OFF     | OFF   | OFF  | ON      | PIV and TWIC card commands, requires APDU and TLV |
-| `TINY_CRYPTO_ENABLE_PIV_OIDS`           | OFF     | OFF   | OFF  | ON      | PIV and TWIC identifier classification            |
+| `TINY_CRYPTO_ENABLE_PIV_COMMAND`        | OFF     | OFF   | OFF  | ON      | PIV card commands, requires APDU and TLV          |
+| `TINY_CRYPTO_ENABLE_PIV_OIDS`           | OFF     | OFF   | OFF  | ON      | PIV identifier classification                     |
 | `TINY_CRYPTO_ENABLE_CMS`                | OFF     | OFF   | OFF  | ON      | CMS parsing and signer verification, requires BER |
 | `TINY_CRYPTO_ENABLE_CMS_VALIDATION`     | OFF     | OFF   | OFF  | ON      | CMS signer paths and revocation                   |
-| `TINY_CRYPTO_ENABLE_PIV_OBJECTS`        | OFF     | OFF   | OFF  | ON      | PIV and TWIC object readers                       |
-| `TINY_CRYPTO_ENABLE_CREDENTIAL`         | OFF     | OFF   | OFF  | ON      | Composed PIV and TWIC credential validation       |
+| `TINY_CRYPTO_ENABLE_PIV_OBJECTS`        | OFF     | OFF   | OFF  | ON      | PIV object readers                                |
+| `TINY_CRYPTO_ENABLE_CREDENTIAL`         | OFF     | OFF   | OFF  | ON      | Composed PIV credential validation                |
 | `TINY_CRYPTO_ENABLE_PIV_CHUID`          | OFF     | OFF   | OFF  | ON      | PIV CHUID reader                                  |
 | `TINY_CRYPTO_ENABLE_PIV_CVC`            | OFF     | OFF   | OFF  | ON      | PIV secure-messaging CVC reader                   |
 | `TINY_CRYPTO_ENABLE_EAC_CVC`            | OFF     | OFF   | OFF  | ON      | BSI TR-03110 EAC CVC reader                       |
 | `TINY_CRYPTO_ENABLE_PIV_SM`             | OFF     | OFF   | OFF  | ON      | Client-side PIV secure messaging                  |
 | `TINY_CRYPTO_ENABLE_PIV_SM_APDU`        | OFF     | OFF   | OFF  | ON      | PIV SM framing, requires PIV command, SM and CVC  |
 | `TINY_CRYPTO_ENABLE_PIV_VCI`            | OFF     | OFF   | OFF  | ON      | PIV VCI, requires SM framing and PIV objects      |
-| `TINY_CRYPTO_ENABLE_PIV_CATALOG`        | OFF     | OFF   | OFF  | ON      | PIV and TWIC catalogs and card inventory          |
-| `TINY_CRYPTO_ENABLE_PIV_KEY_PROOF`      | OFF     | OFF   | OFF  | ON      | PIV and TWIC card key proofs                      |
-| `TINY_CRYPTO_ENABLE_PIV_CARD_CHECK`     | OFF     | OFF   | OFF  | ON      | Composed PIV and TWIC card check report           |
+| `TINY_CRYPTO_ENABLE_PIV_CATALOG`        | OFF     | OFF   | OFF  | ON      | PIV catalogs and card inventory                   |
+| `TINY_CRYPTO_ENABLE_PIV_KEY_PROOF`      | OFF     | OFF   | OFF  | ON      | PIV card key proofs                               |
+| `TINY_CRYPTO_ENABLE_PIV_CARD_CHECK`     | OFF     | OFF   | OFF  | ON      | Composed PIV card check report                    |
 | `TINY_CRYPTO_PIV_SM_ENABLE_CS2`         | ON      | ON    | ON   | ON      | Cipher suite 2 (P-256, AES-128)                   |
 | `TINY_CRYPTO_PIV_SM_ENABLE_CS7`         | ON      | ON    | ON   | ON      | Cipher suite 7 (P-384, AES-256)                   |
 | `TINY_CRYPTO_ENABLE_FASCN`              | OFF     | OFF   | OFF  | ON      | FASC-N readers and writers                        |

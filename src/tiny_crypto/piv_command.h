@@ -50,7 +50,8 @@ typedef TC_result TC_PIV_result;
  * pairing-code rules depend on it (SP 800-73-5 Part 1 Table 4). */
 typedef enum { TC_PIV_CONTACT, TC_PIV_CONTACTLESS } TC_PIV_interface;
 
-/* Card application. NONE means no application is selected on the link. */
+/* Card application. NONE means no application is selected on the link. TWIC
+ * requires TC_ENABLE_TWIC. */
 typedef enum {
   TC_PIV_APPLICATION_NONE,
   TC_PIV_APPLICATION_PIV,
@@ -177,7 +178,7 @@ void TC_PIV_link_clear(TC_PIV_link* link);
 /* Accept a TWIC application version 01 with a sub-version other than 01
  * (Legacy) and 03 (NEXGEN) as TC_TWIC_LEGACY_CARD. TWIC Part 3 v4 Appendix
  * D.3 states that version 01 is backward compatible with the Legacy data
- * model and leaves the decision to the reader. */
+ * model and leaves the decision to the reader. Requires TC_ENABLE_TWIC. */
 enum { TC_PIV_SELECT_TWIC_SUBVERSION_COMPATIBLE = 1u << 0 };
 
 /* Application property template of a selected application.

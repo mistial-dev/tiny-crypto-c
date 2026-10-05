@@ -50,7 +50,9 @@ OCSP is outside the target because RFC 6960 section 4.2.1 byKey responder IDs ne
 
 ## twic
 
-`piv` plus the TWIC Legacy and NEXGEN additions from TWIC Part 2 v5: SHA-1 and RSA-1024
+`piv` plus the TWIC Legacy and NEXGEN additions from TWIC Part 2 v5. `TINY_CRYPTO_ENABLE_TWIC`
+adds the TWIC application, card profiles and their rules to the PIV modules, with the
+NEXGEN UUID helpers. The target also enables SHA-1 and RSA-1024
 for Legacy TWIC signatures and key proofs (section 3.3.4), the TWIC Privacy Key and its
 AAMVA barcode fields (section 4.9), private-object encryption with AES-128 ECB, and the
 canceled card list reader (TWIC Part 4).

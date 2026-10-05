@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
 typedef enum { TC_PIV_CHUID_CONTENTS, TC_PIV_CHUID_CONTAINER } TC_PIV_CHUID_encoding;
+/* The TWIC profiles require TC_ENABLE_TWIC. */
 typedef enum {
   TC_CHUID_PROFILE_PIV,
   TC_CHUID_PROFILE_TWIC_SIGNED,

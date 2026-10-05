@@ -37,6 +37,7 @@ typedef struct {
 TC_TLV_result TC_PIV_fingerprint_read(TC_bytes input, TC_PIV_fingerprint_record* out);
 #endif
 
+/* The TWIC profile requires TC_ENABLE_TWIC. */
 typedef enum { TC_PIV_FACE_PROFILE_PIV, TC_PIV_FACE_PROFILE_TWIC } TC_PIV_face_profile;
 
 typedef struct {
