@@ -20,13 +20,6 @@
 #if TC_ENABLE_KDF
 #include "hash_core_internal.h"
 
-/* A later PRF block may reread each input after output bytes are written. */
-static inline int tc_kdf_output_disjoint(const uint8_t* output, size_t output_len,
-                                         const uint8_t* input, size_t input_len)
-{
-  return input_len == 0 || tc_internal_ranges_disjoint(output, output_len, input, input_len);
-}
-
 #define TC_KDF_HAVE_CMAC (TC_KBKDF_HAVE_AES_CMAC || TC_KBKDF_HAVE_DES_CMAC)
 
 #if TC_KDF_HAVE_CMAC
@@ -286,9 +279,10 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, TC_bytes 
       out == NULL || out_len == 0 || !tc_internal_span_valid(in1, in1_len) ||
       !tc_internal_span_valid(in2, in2_len))
     return TC_ERROR;
-  if (!tc_kdf_output_disjoint(out, out_len, key, key_len) ||
-      !tc_kdf_output_disjoint(out, out_len, in1, in1_len) ||
-      !tc_kdf_output_disjoint(out, out_len, in2, in2_len))
+  /* A later PRF block rereads each input after output bytes are written. */
+  if (!tc_internal_ranges_disjoint(out, out_len, key, key_len) ||
+      !tc_internal_ranges_disjoint(out, out_len, in1, in1_len) ||
+      !tc_internal_ranges_disjoint(out, out_len, in2, in2_len))
     return TC_ERROR;
 
   /* Read params once: output may share storage with them. ctr_slot is the
@@ -430,8 +424,8 @@ TC_status TC_KBKDF_fixed_input(TC_bytes label_span, TC_bytes context_span, size_
   needed = TC_KBKDF_FIXED_INPUT_LEN(label_len, context_len);
   if (output.capacity < needed)
     return TC_ERROR;
-  if (!tc_kdf_output_disjoint(buf, needed, label, label_len) ||
-      !tc_kdf_output_disjoint(buf, needed, context, context_len))
+  if (!tc_internal_ranges_disjoint(buf, needed, label, label_len) ||
+      !tc_internal_ranges_disjoint(buf, needed, context, context_len))
     return TC_ERROR;
   if (label_len != 0 && memchr(label, 0, label_len) != NULL)
     return TC_ERROR;
