@@ -437,6 +437,19 @@ static void check_profile(const char* profile)
   munit_assert_int(
       TC_X509_path_build(card, &source, &options, &storage.path.validation, &search, &found), ==,
       TC_X509_PATH_ERROR);
+  /* A TrustAnchorInfo without certPath has no name and is unusable for X.509
+   * paths, as is a record without a name. The search skips either one and
+   * still finds the usable anchor after it. */
+  for (int unusable = 0; unusable < 2; ++unusable) {
+    options_anchor[0] = anchor;
+    options_anchor[0].trust.name = (TC_bytes){NULL, 0};
+    options_anchor[0].x509_unusable = unusable;
+    options_anchor[1] = anchor;
+    munit_assert_int(
+        TC_X509_path_build(card, &source, &options, &storage.path.validation, &search, &found), ==,
+        TC_X509_PATH_VALID);
+    munit_assert_size(found.anchor_index, ==, 1);
+  }
 }
 
 TC_TEST(anchor_constraints)

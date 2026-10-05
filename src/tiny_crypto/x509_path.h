@@ -237,8 +237,9 @@ typedef struct {
  * spent.
  * Returns VALID with out written. ERROR for NULL arguments, unknown flags, a
  * source with a NULL candidate or anchor callback and a nonzero count, overlap,
- * a callback that returns an empty record or an argument error found while
- * searching.
+ * a callback that returns an empty candidate or an argument error found while
+ * searching. An anchor that is x509_unusable or has no name is skipped and
+ * counts as an INVALID candidate.
  * LIMIT when max_work, search capacity or a path bound runs out, or when
  * that was the most severe candidate failure. UNSUPPORTED and INVALID
  * report the most severe failure among the attempted candidates. out changes
