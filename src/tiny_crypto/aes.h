@@ -100,7 +100,8 @@ TC_status TC_AES_init(struct TC_AES_ctx* ctx, TC_bytes key);
 #endif
 #if TC_ENABLE_AES && TC_AES_CAVP
 /* Test-only single-block hooks used by the AESAVS harness. They return
- * TC_ERROR, leaving block unchanged, when the key cannot be scheduled. */
+ * TC_ERROR, leaving block unchanged, when the key cannot be scheduled or
+ * block is not TC_AES_BLOCKLEN bytes of storage. */
 TC_status TC_AES_CAVP_encrypt_block(TC_bytes key, TC_buffer block);
 TC_status TC_AES_CAVP_decrypt_block(TC_bytes key, TC_buffer block);
 #endif

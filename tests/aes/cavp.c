@@ -862,6 +862,7 @@ TC_TEST_SHARED(test_cavp)
 #endif
   /* A missing key fails and leaves the block unchanged. */
   {
+    static const uint8_t zero_key[TC_AES_KEYLEN] = {0};
     uint8_t block[TC_AES_BLOCKLEN] = {1, 2, 3}, saved[TC_AES_BLOCKLEN];
     memcpy(saved, block, sizeof block);
     munit_assert_int(TC_AES_CAVP_encrypt_block((TC_bytes){NULL, TC_AES_KEYLEN},
@@ -871,6 +872,13 @@ TC_TEST_SHARED(test_cavp)
                                                (TC_buffer){block, TC_AES_BLOCKLEN}),
                      ==, TC_ERROR);
     munit_assert_memory_equal(sizeof block, block, saved);
+    /* NULL block storage with a block length is an argument error. */
+    munit_assert_int(TC_AES_CAVP_encrypt_block((TC_bytes){zero_key, TC_AES_KEYLEN},
+                                               (TC_buffer){NULL, TC_AES_BLOCKLEN}),
+                     ==, TC_ERROR);
+    munit_assert_int(TC_AES_CAVP_decrypt_block((TC_bytes){zero_key, TC_AES_KEYLEN},
+                                               (TC_buffer){NULL, TC_AES_BLOCKLEN}),
+                     ==, TC_ERROR);
   }
   return cavp_run_all() ? MUNIT_OK : MUNIT_FAIL;
 }
