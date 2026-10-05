@@ -8,6 +8,7 @@
 #if TC_ENABLE_PIV_CARD_CHECK
 #include "internal.h"
 #include "piv_card_check_internal.h"
+#include "twic_card_check_internal.h"
 #include "tlv_internal.h"
 #include <tiny_crypto/cms.h>
 #include <tiny_crypto/piv_chuid.h>
@@ -121,7 +122,7 @@ static TC_bytes object_cms(const TC_PIV_object* object, TC_PIV_application_id ap
   case TC_PIV_KIND_CHUID: {
     /* The PIV application of a TWIC card keeps the SP 800-73-2 key map. */
     TC_PIV_CHUID chuid;
-    const TC_PIV_CHUID_profile profile = application == TC_PIV_APPLICATION_TWIC
+    const TC_PIV_CHUID_profile profile = tc_twic_application(application)
                                              ? TC_CHUID_PROFILE_TWIC_SIGNED
                                              : TC_CHUID_PROFILE_PIV_SP800_73_4;
     return TC_PIV_CHUID_read(object->encoded, TC_PIV_CHUID_CONTAINER, profile, &chuid) == TC_TLV_OK
@@ -198,8 +199,8 @@ TC_PIV_result TC_PIV_card_crl_targets(const TC_PIV_inventory* inventory,
       continue;
     if (object->info->kind == TC_PIV_KIND_CERTIFICATE)
       container_add(&list, object,
-                    application == TC_PIV_APPLICATION_TWIC ? TC_PIV_CERTIFICATE_TWIC
-                                                           : TC_PIV_CERTIFICATE_SLOT);
+                    tc_twic_application(application) ? TC_PIV_CERTIFICATE_TWIC
+                                                     : TC_PIV_CERTIFICATE_SLOT);
     else if (object->info->kind == TC_PIV_KIND_SM_SIGNER)
       container_add(&list, object, TC_PIV_CERTIFICATE_SM_SIGNER);
     else

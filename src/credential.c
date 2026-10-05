@@ -18,6 +18,7 @@
 #include "credential_session_internal.h"
 #include "credential_status_internal.h"
 #include "credential_policy_internal.h"
+#include "piv_identifiers_internal.h"
 #include "x509_time_internal.h"
 
 /* SP 800-76-2 section 9.3: a biometric signed with the CHUID key omits the
@@ -68,21 +69,6 @@ static TC_PIV_CHUID_profile card_chuid_profile(TC_PIV_card_profile profile)
 #endif
   (void)profile;
   return TC_CHUID_PROFILE_PIV;
-}
-
-/* A TWIC reader binds the CHUID to the certificate identifiers under its
- * own policy (TWIC Part 3 v4 4.4.4). */
-static TC_TLV_result chuid_identifiers_match(int reader_policy,
-                                             const TC_PIV_card_identifiers* identifiers,
-                                             const TC_PIV_CHUID* chuid, size_t* work, int* matched)
-{
-#if TC_ENABLE_TWIC
-  if (reader_policy)
-    return TC_TWIC_card_identifiers_match(identifiers, chuid->fascn, chuid->card_uuid, work,
-                                          matched);
-#endif
-  (void)reader_policy;
-  return TC_PIV_card_identifiers_match(identifiers, chuid->fascn, chuid->card_uuid, work, matched);
 }
 
 TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request* request,
@@ -137,7 +123,10 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
     return tc_validation_status(parsed);
   if (!current)
     return TC_CREDENTIAL_INVALID;
-  parsed = chuid_identifiers_match(reader_policy, request->card, &chuid, work, &matched);
+  /* A TWIC reader binds the CHUID to the certificate identifiers under its
+   * own policy (TWIC Part 3 v4 4.4.4), where the card UUID may be absent. */
+  parsed = tc_piv_identifiers_match(request->card, chuid.fascn, chuid.card_uuid, reader_policy,
+                                    work, &matched);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   if (!matched)

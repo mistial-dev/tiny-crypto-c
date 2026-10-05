@@ -7,6 +7,7 @@
 #include <tiny_crypto/piv_card_check.h>
 #if TC_ENABLE_PIV_CARD_CHECK
 #include "piv_card_check_internal.h"
+#include "twic_card_check_internal.h"
 #include <tiny_crypto/piv_card_objects.h>
 #include <tiny_crypto/piv_discovery.h>
 #include <tiny_crypto/piv_printed.h>
@@ -83,7 +84,7 @@ static uint16_t mapped_container(const TC_PIV_security_object* object, size_t in
  * encrypted in DFC109, so its digest needs the TWIC Privacy Key. */
 static int printed_encrypted(const tc_piv_check_run* run, uint16_t container)
 {
-  return container == 0x3001 && run->report->application == TC_PIV_APPLICATION_TWIC;
+  return container == 0x3001 && tc_twic_application(run->report->application);
 }
 
 static void digest_check(tc_piv_check_run* run, uint16_t container, int authenticated)
@@ -186,7 +187,7 @@ static void biometric_check(tc_piv_check_run* run, uint8_t kind, TC_PIV_CBEFF_fo
   TC_PIV_check check = tc_piv_check_make(TC_PIV_CHECK_BIOMETRIC, object->info->container, 0);
   /* Iris records are unsupported. The TWIC application encrypts its
    * biometrics with the TWIC Privacy Key (TWIC Part 2 v5 4.7). */
-  if (format == TC_PIV_CBEFF_IRIS_IMAGE || report->application == TC_PIV_APPLICATION_TWIC)
+  if (format == TC_PIV_CBEFF_IRIS_IMAGE || tc_twic_application(report->application))
     tc_piv_check_not_checkable(&check, TC_PIV_REASON_UNSUPPORTED);
   else if (object->state != TC_PIV_OBJECT_PRESENT)
     tc_piv_check_unread(run, &check, object, 0);
@@ -238,7 +239,7 @@ void tc_piv_check_printed(tc_piv_check_run* run)
     return;
   const uint16_t container = object->info->container;
   TC_PIV_check check = tc_piv_check_make(TC_PIV_CHECK_PRINTED_EXPIRATION, container, 0);
-  if (report->application == TC_PIV_APPLICATION_TWIC)
+  if (tc_twic_application(report->application))
     tc_piv_check_not_checkable(&check, TC_PIV_REASON_UNSUPPORTED);
   else if (object->state != TC_PIV_OBJECT_PRESENT)
     tc_piv_check_unread(run, &check, object, 0);

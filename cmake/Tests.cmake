@@ -907,7 +907,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   set(tc_native_card_sources ${tc_piv_command_sources} src/piv_sm_apdu.c
     src/piv_sm_key_request.c src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c
     src/twic_discovery.c src/piv_catalog.c src/twic_catalog.c src/piv_inventory.c src/piv_key_policy.c src/twic_key_policy.c src/piv_key_proof.c
-    src/piv_card_check.c src/piv_card_check_certificates.c src/piv_card_check_signed.c
+    src/piv_card_check.c src/twic_card_check.c src/piv_card_check_certificates.c src/piv_card_check_signed.c
     src/piv_card_check_keys.c src/piv_card_check_report.c src/piv_card_crl_targets.c src/inflate_tree.c src/inflate_bits.c src/inflate_tables.c src/inflate.c src/gzip.c
     src/gzip_api.c src/piv_certificate_decode.c src/piv_bit_group.c src/piv_ccc.c
     src/piv_key_history.c src/piv_pairing_code.c src/piv_card_objects_internal.c)

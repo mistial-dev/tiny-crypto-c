@@ -8,6 +8,7 @@
 #if TC_ENABLE_PIV_CARD_CHECK
 #include "internal.h"
 #include "piv_card_check_internal.h"
+#include "twic_card_check_internal.h"
 #include <string.h>
 
 static int context_complete(const TC_validation_context* context)
@@ -21,16 +22,17 @@ static int buffer_valid(TC_buffer buffer)
   return buffer.data || !buffer.capacity;
 }
 
-/* The credential profile fits the inventory application: the TWIC
- * application keeps its SELECT profile, and the PIV application takes the
- * PIV profile or a TWIC profile for a TWIC card. */
+/* The credential profile fits the inventory application: the PIV profile
+ * reads the PIV application. tc_twic_check_profile_fits covers TWIC. */
 static int profile_fits(TC_PIV_card_profile profile, const TC_PIV_inventory* inventory)
 {
-  if (profile != TC_PIV_CARD && profile != TC_TWIC_LEGACY_CARD && profile != TC_TWIC_NEXGEN_CARD)
-    return 0;
-  if (inventory->link.application == TC_PIV_APPLICATION_TWIC)
-    return profile == inventory->link.profile;
-  return inventory->link.application == TC_PIV_APPLICATION_PIV;
+  if (profile == TC_PIV_CARD)
+    return inventory->link.application == TC_PIV_APPLICATION_PIV;
+#if TC_ENABLE_TWIC
+  return tc_twic_check_profile_fits(profile, inventory);
+#else
+  return 0;
+#endif
 }
 
 static int piv_card_chuid_valid(TC_PIV_CHUID_profile chuid)
@@ -43,15 +45,18 @@ TC_TLV_result TC_PIV_card_chuid_profile(TC_PIV_application_id application,
                                         TC_PIV_CHUID_profile piv_card_chuid,
                                         TC_PIV_CHUID_profile* out)
 {
-  if (!out || !piv_card_chuid_valid(piv_card_chuid) ||
-      (profile != TC_PIV_CARD && profile != TC_TWIC_LEGACY_CARD && profile != TC_TWIC_NEXGEN_CARD))
+  if (!out || !piv_card_chuid_valid(piv_card_chuid))
     return TC_TLV_ARGUMENT;
-  if (application == TC_PIV_APPLICATION_PIV)
-    *out = profile == TC_PIV_CARD ? piv_card_chuid : TC_CHUID_PROFILE_PIV_SP800_73_4;
-  else if (application == TC_PIV_APPLICATION_TWIC && profile != TC_PIV_CARD)
-    *out = TC_CHUID_PROFILE_TWIC_SIGNED;
-  else
+  if (profile != TC_PIV_CARD) {
+#if TC_ENABLE_TWIC
+    return tc_twic_card_chuid_profile(application, profile, out);
+#else
     return TC_TLV_ARGUMENT;
+#endif
+  }
+  if (application != TC_PIV_APPLICATION_PIV)
+    return TC_TLV_ARGUMENT;
+  *out = piv_card_chuid;
   return TC_TLV_OK;
 }
 
