@@ -121,10 +121,8 @@ the operation. Unsupported or oversized entries fail. Parsed CRL metadata and se
 held through the final time check, which repeats the card path's revocation check.
 
 After the card proof, the command reads the CHUID from the PIV application on Legacy TWIC and the
-TWIC application on NEXGEN, into its own 16 KiB locked buffer. Validation binds its FASC-N and GUID
-to the card certificate and checks the signature, content-signing usage (either registered purpose
-OID), trust, revocation and expiration. Expiration is inclusive through the stated UTC date.
-Unsigned CHUIDs fail.
+TWIC application on NEXGEN, into its own 16 KiB locked buffer, and runs [CHUID
+validation](cms.md#validate-a-chuid-against-a-card-certificate). Unsigned CHUIDs fail.
 
 - `--chuid-ber` selects [TWIC BER attribute compatibility](cms.md). DER is the default.
 - `--cms-rsa-parameters allow-absent` accepts RSA signatures that omit the NULL algorithm
@@ -143,11 +141,10 @@ keep it outside the repository and readable only by the reader application. The 
 
 The TPK loads into locked memory before the reader opens. After card-key and CHUID authentication,
 the command reads the protected fingerprint object from the TWIC application, plus the protected
-facial image on NEXGEN. It keeps each stored response and decrypts a copy of its `BC` value (see
-[TWIC barcodes and privacy keys](twic-barcode.md)). It checks each CBEFF format and record, binds
-the header and signed identifiers to the CHUID, and validates each biometric signature, signer path
-and revocation. An omitted signing certificate selects the CHUID signer. The parser uses the
-version-3 CBEFF header of SP 800-76-1 and SP 800-76-2 and requires a signed entryUUID by default.
+facial image on NEXGEN. It keeps each stored response, decrypts a copy of its `BC` value (see [TWIC
+barcodes and privacy keys](twic-barcode.md)) and runs [biometric
+validation](cms.md#validate-a-biometric-object) on it. The parser uses the version-3 CBEFF header of
+SP 800-76-1 and SP 800-76-2 and requires a signed entryUUID by default.
 
 `--fips201-1-biometric-signature` selects the FIPS 201-1 section 4.4.2 signature profile that the
 older TWIC biometric specification references. It permits an absent signed entryUUID. A present
@@ -179,13 +176,12 @@ absent (`6A82` or `6A88`). The command fails when a required object is missing, 
 or exceeds 16 KiB, or the signed hash list differs from the inventory. Decrypting and interpreting
 the remaining NEXGEN objects is left to the application.
 
-A locked pool holds the 12 NEXGEN catalog objects plus one more answer. Phases share scratch
-storage in sequence, while encoded objects and decrypted records keep separate buffers. The present
-stored objects borrow the pool and go to `TC_PIV_security_validate` with the complete `53` answer
-of the Security Object ([validating an inventory](lds.md#validating-an-inventory)). The certificate,
-Discovery Object and TWIC Privacy Key are outside the signed map. The command validates the signed
-CHUID against the card before selecting its signer, binds the unsigned CHUID (container `3002`)
-with `TC_TWIC_unsigned_CHUID_validate`, and clears the pool with `TC_PIV_inventory_clear`.
+A locked pool holds the 12 NEXGEN catalog objects plus one more answer. Phases share scratch storage
+in sequence, while encoded objects and decrypted records keep separate buffers. The present stored
+objects borrow the pool for [inventory validation](lds.md#validating-an-inventory) with the complete
+`53` answer of the Security Object, including the unsigned CHUID in container `3002`. The
+certificate, Discovery Object and TWIC Privacy Key are outside the signed map. Cleanup clears the
+pool with `TC_PIV_inventory_clear`.
 
 ## Inspect both applications
 
@@ -241,6 +237,8 @@ buffer, so keep that buffer unchanged while using it.
 - NEXGEN requires the Appendix D namespace and a UUID card number matching the FASC-N agency,
   system and credential fields. Use it for the TWIC application's certificate.
 - Legacy TWIC permits an absent or nil UUID. An absent UUID matches a nil CHUID GUID.
+- `TC_TWIC_card_identifiers_read` applies the TWIC reader policy (Part 3 section 4.4.4), where
+  the UUID may be absent under either TWIC profile and a present one follows the rules above.
 
 Pass the borrowed 25-byte `fascn` to `TC_TWIC_CCL_contains`, or compare the identifiers with a
 CHUID's FASC-N and GUID through `TC_PIV_card_identifiers_match`. Check both its status and its
@@ -273,11 +271,11 @@ reader transaction and snapshot until the call returns, then release the snapsho
 lock. Apply the application's transaction duration and clock policy before acting on a result.
 
 `EXAMPLE_TWIC_AUTHENTICATED` reports active-card authentication at that instant. Other results
-distinguish cancellation, stale or unavailable status, invalid credentials, unsupported
-algorithms, resource limits, transport failure and API or provider errors. With content-signer
-inputs, the command adds `TC_PIV_CHUID_validate`, and its accepted identifiers and signer feed the
-Security Object and biometric checks. The caller-owned `ExampleTWICWorkspace` is cleared after
-processing. Keep it off a small task stack, disjoint from request data and provider scratch.
+distinguish cancellation, stale or unavailable status, invalid credentials, unsupported algorithms,
+resource limits, transport failure and API or provider errors. With content-signer inputs, the
+command adds the signed CHUID and its dependent checks. The caller-owned `ExampleTWICWorkspace` is
+cleared after processing. Keep it off a small task stack, disjoint from request data and provider
+scratch.
 
 ### Provisioned inputs
 

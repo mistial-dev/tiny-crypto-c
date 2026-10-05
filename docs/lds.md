@@ -73,34 +73,68 @@ CHUID's content-signing usage, path and revocation policy. Parse the authenticat
 
 ## Validating an inventory
 
-`TC_PIV_security_validate` in `<tiny_crypto/credential.h>` composes these steps with signer path
-and revocation validation. Its `TC_PIV_security_validation_request` holds the Security Object, the
-`TC_PIV_CHUID_report` from `TC_PIV_CHUID_validate`, the card profile and expiration, and a complete
-array of `TC_PIV_security_data` records. The CHUID report supplies the signer certificate, and its
-profile and time must equal the request profile and the context's evaluation time. Each record
-pairs a container ID with the ordered spans to hash. The operation rejects missing, extra and
-repeated containers, unequal mapping and LDS group sets, and digest mismatches.
+`<tiny_crypto/credential.h>` composes these steps with signer path and revocation validation. Each
+request takes the `TC_PIV_CHUID_report` from `TC_PIV_CHUID_validate` ([CHUID
+validation](cms.md#validate-a-chuid-against-a-card-certificate)), which supplies the signer
+certificate. Its profile and time must equal the request profile and the context's evaluation time.
+Supply the shared `TC_validation_context` and a `TC_PIV_security_validation_workspace` whose
+`content` buffer receives the decoded LDS content. Size it for the largest LDSSecurityObject the
+application accepts.
 
-Supply the shared `TC_validation_context` and a `TC_PIV_security_validation_workspace` with a
-bounded LDS content buffer. For a partial inventory, such as objects read without the PIN,
-`TC_PIV_security_authenticate` authenticates the Security Object into a `TC_PIV_security_map`, and
-`TC_PIV_security_digest_check` checks one `TC_PIV_security_data` record at a time against it. Keep
-the request, object data, trust source, CRLs, policy and work counter separate from mutable
-scratch. Accept only `TC_CREDENTIAL_VALID`. The application selects the required inventory and the
-exact hash inputs, including any framing or decryption
-([inventory hash inputs](credential-validation.md#inventory-hash-inputs)).
+`TC_PIV_security_validate` checks a complete inventory: an array of `TC_PIV_security_data` records,
+each pairing a container ID with the ordered spans to hash. It rejects missing, extra and repeated
+containers, unequal mapping and LDS group sets, and digest mismatches. The returned
+`TC_PIV_security_report` borrows the inventory descriptors and their bytes and survives reuse of the
+validation arena.
+
+For a partial inventory, such as objects read without the PIN, `TC_PIV_security_authenticate`
+authenticates the Security Object once into a `TC_PIV_security_map` that holds the container map,
+the signed LDS digests and the parsing limits. The map borrows the Security Object bytes and the
+workspace `content` buffer, and survives reuse of the validation arena.
+`TC_PIV_security_digest_check` then checks one object at a time:
+
+- `TC_CREDENTIAL_VALID`: the digest matches.
+- `TC_CREDENTIAL_INVALID`: the digest differs.
+- `TC_CREDENTIAL_UNAVAILABLE`: the container is outside the signed map, so the issuer signed no
+  digest for it.
+
+```c
+#include <tiny_crypto/credential.h>
+
+/* Authenticate the Security Object into map, then check each object that was
+ * read. results[i] receives the status of objects[i]. */
+TC_credential_status check_read_objects(const TC_PIV_security_signature_request* request,
+    const TC_validation_context* context,
+    const TC_PIV_security_validation_workspace* lds,
+    const TC_PIV_security_data* objects, size_t count,
+    size_t* work, TC_PIV_security_map* map, TC_credential_status* results)
+{
+    TC_credential_status status =
+        TC_PIV_security_authenticate(request, context, lds, work, map);
+    if (status != TC_CREDENTIAL_VALID) return status;
+    for (size_t i = 0; i < count; ++i) {
+        results[i] = TC_PIV_security_digest_check(map, &objects[i], work);
+        if (results[i] == TC_CREDENTIAL_LIMIT || results[i] == TC_CREDENTIAL_ERROR)
+            return results[i];
+    }
+    return TC_CREDENTIAL_VALID;
+}
+```
+
+A `TC_CREDENTIAL_VALID` return here means the Security Object is authentic, and each `results` entry
+decides its own object. Read `revocation_checked` in the map or report before relying on the
+signer's revocation status.
+
+Keep the request, object data, trust source, CRLs, policy and work counter separate from mutable
+scratch, and share one work counter across the sequence. Accept only `TC_CREDENTIAL_VALID`. The
+application selects the required inventory and the exact hash inputs ([inventory hash
+inputs](credential-validation.md#inventory-hash-inputs)).
 
 ## TWIC objects
 
-TWIC support requires `TC_ENABLE_TWIC`. The TWIC unsigned CHUID is a separate object.
-`TC_TWIC_unsigned_CHUID_validate` takes the `TC_PIV_security_report` in the request's `security`
-field. It requires container `0x3002` in the validated inventory, compares its exact ordered parts
-with the supplied CHUID, and binds the authenticated FASC-N, GUID and expiration to the card
-certificate. `TC_PIV_CHUID_validate` requires a signed CHUID.
-
-The
-[TSA reader/card specification, section 11.3 note 4](https://www.ports.org/files/PDFs/TWIC%20Reader%20Hardware%20%26%20Card%20Application%20Specification.pdf)
-defines TWIC hashes over stored object contents, which the section 11.5.2 GET DATA response wraps
-in `53`. Hash the response's value bytes with the inner field tags and lengths, including the
-CHUID's `FE 00`. Hash encrypted fields in their stored form. Privacy-key decryption needs separate
-working storage while the encrypted bytes are still needed for validation.
+TWIC support requires `TC_ENABLE_TWIC`. The unsigned TWIC CHUID in container `0x3002` is
+authenticated through the inventory. Pass a successful `TC_PIV_security_report` as the `security`
+field of `TC_TWIC_unsigned_CHUID_validate`, with the same profile and evaluation time. It requires
+container `0x3002` in the validated inventory and compares its exact ordered parts with the supplied
+CHUID. The CHUID must be current, and its identifiers must match the card certificate under TWIC
+reader rules. `TC_PIV_CHUID_validate` accepts signed CHUIDs only.

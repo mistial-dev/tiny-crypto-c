@@ -67,9 +67,16 @@ printed information or each biometric modality. Missing required evidence return
 
 `TC_PIV_security_data.parts` selects the bytes hashed for each container. Choose them before the
 check and keep them fixed for the decision. The library hashes the supplied spans as given, with no
-decryption or fallback, and a mismatch fails. Both forms exclude the outer GET DATA `53` wrapper:
+decryption or fallback, and a mismatch fails.
 
-- Encrypted biometric objects use their stored `BC` field, including its tag and length.
+The [TSA reader/card specification, section 11.3 note
+4](https://www.ports.org/files/PDFs/TWIC%20Reader%20Hardware%20%26%20Card%20Application%20Specification.pdf)
+defines TWIC hashes over stored object contents, which the section 11.5.2 GET DATA response wraps in
+`53`. Hash the response's value bytes with the inner field tags and lengths, including the CHUID's
+`FE 00`, and leave out the `53` wrapper:
+
+- Encrypted fields, such as a biometric object's `BC` field with its tag and length, are hashed in
+  their stored form. Decrypt into separate storage, since validation still needs the stored bytes.
 - Under a printed-plaintext policy, container `0x3001` uses the decrypted printed-information TLVs.
   Keep that buffer stable until inventory validation ends, then wipe it.
 

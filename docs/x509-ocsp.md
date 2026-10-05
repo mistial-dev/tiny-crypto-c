@@ -121,16 +121,15 @@ RFC 6960 section 4.2.2.2 allows two signers:
 
 `TC_X509_ocsp_response_verify` holds only the issuer name and key and treats the issuer as a bare
 trust anchor, so a delegate is checked without the anchor's CertPathControls or constraints from
-certificates above the issuer. `TC_X509_path_check_revocation` validates each delegate at the end of
-the validated path under the selected store anchor, so the anchor's names, policy set, policy flags
-and `x509_unusable` gate apply, with every upstream constraint (RFC 5937 section 3.1, RFC 5914
-section 2.5).
+certificates above the issuer. [Path revocation](x509-revocation.md#ocsp-evidence) validates each
+delegate under the selected anchor's names, policy set, policy flags and `x509_unusable` gate, with
+every upstream constraint (RFC 5937 section 3.1, RFC 5914 section 2.5).
 
 For a delegate, `responder_certificate` borrows its DER from the response or the store record, and
 `responder_nocheck` reports `id-pkix-ocsp-nocheck`. Without nocheck, the caller establishes the
-delegate's own revocation status before relying on the result (RFC 6960 section 4.2.2.2.1).
-`TC_X509_path_check_revocation` does this with the CRL index. For an issuer-signed response,
-`responder_certificate` is empty and `responder_nocheck` is zero.
+delegate's own revocation status before relying on the result (RFC 6960 section 4.2.2.2.1). [Path
+revocation](x509-revocation.md#ocsp-evidence) does this with the CRL index. For an issuer-signed
+response, `responder_certificate` is empty and `responder_nocheck` is zero.
 
 ## Results
 
@@ -175,9 +174,8 @@ Keep the response, certificate, store records and issuer bytes unchanged during 
 - CertIDs use SHA-1 or SHA-256.
 - The module has no transport, cache or response pre-fetching.
 - The low-level verify checks a delegate below the bare issuer and leaves the revocation check of a
-  delegate without nocheck to the caller. `TC_X509_path_check_revocation` adds the anchor's path
-  controls, upstream constraints and the delegate revocation check.
-- `TC_X509_path_check_revocation` verifies responses without a nonce.
+  delegate without nocheck to the caller, as described under [responder
+  authorization](#responder-authorization).
 
 ## Testing
 

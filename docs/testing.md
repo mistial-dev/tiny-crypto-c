@@ -163,6 +163,26 @@ CMake consumers from an installation. The archives must contain the public sourc
 supported examples, and exclude external corpora. Size limits catch accidental repository-wide
 exports. `library.properties` supports direct Arduino source imports and build testing.
 
+## PIV test fixtures
+
+The secure messaging link tests run against the card model in `tests/support/sm_card.c`, covering
+every session-loss case. `test_sm_primitives_corpus` replays the recorded NIST SD 33 exchanges of
+`tests/vectors/piv/sm_captures` byte for byte through the link, `test_piv_sm_synthetic` replays
+generated sessions, and `fuzz_piv_apdu` checks the session-loss rule on raw and authenticated
+answers.
+
+### SD 33 test cards
+
+The SD 33 root is unavailable, so the tests pin the issuing CAs of `tests/vectors/x509/ocsp/sd33`.
+Card 2 has its card certificates and CHUID signer under the RSA 3072 CA and its secure messaging
+signer under the ECC P-384 CA. Card 4 has all of them under the ECC P-256 CA. A pinned issuing CA
+signs its own CRLs, and the revocation engine accepts it as CRL signer with an empty path when its
+certificate is current and permits cRLSign (RFC 5280 section 6.3.3 (f),
+[revocation](x509-revocation.md)). The vendored CRLs in
+`tests/vectors/x509/crl/sd33` expire on 2026-10-01 and the OCSP responses on 2026-09-30, so the
+tests evaluate at 2026-09-29T18:00:00Z. Later live runs find no current evidence and need
+`TC_VALIDATION_REVOCATION_WHEN_AVAILABLE`.
+
 ## Hardware tests
 
 Hardware tests are opt-in and carry the `hardware` CTest label. Configure

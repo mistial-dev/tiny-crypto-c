@@ -112,60 +112,12 @@ the card's CVC chain. Secure-messaging key confirmation completes session setup.
 
 ### Signed card objects
 
-1. Validate the card certificate and read its identifiers.
-1. Pass the identifiers and card expiration to `TC_PIV_CHUID_validate`
-   ([CHUID validation](cms.md#validate-a-chuid-against-a-card-certificate)).
-1. Pass the returned `TC_PIV_CHUID_report` as the `chuid` field of biometric and Security Object
-   requests, with the same card profile and evaluation time.
-1. Pass a successful `TC_PIV_security_report` as the `security` field of
-   `TC_TWIC_unsigned_CHUID_validate` to check container 3002.
-
-`TC_PIV_security_validate` requires the complete inventory of signed containers. For a partial
-inventory, such as objects read without the PIN, authenticate the Security Object once with
-`TC_PIV_security_authenticate`. It returns a `TC_PIV_security_map` with the container map, the
-signed LDS digests and the parsing limits. Then check each object read with
-`TC_PIV_security_digest_check`:
-
-- `TC_CREDENTIAL_VALID`: the digest matches.
-- `TC_CREDENTIAL_INVALID`: the digest differs.
-- `TC_CREDENTIAL_UNAVAILABLE`: the container is outside the signed map, so the issuer signed no
-  digest for it.
-
-The map borrows the Security Object bytes and the LDS scratch in its workspace, and survives reuse
-of the validation arena.
-
-```c
-#include <tiny_crypto/credential.h>
-
-/* Authenticate the Security Object into map, then check each object that was
- * read. results[i] receives the status of objects[i]. */
-TC_credential_status check_read_objects(const TC_PIV_security_signature_request* request,
-    const TC_validation_context* context,
-    const TC_PIV_security_validation_workspace* lds,
-    const TC_PIV_security_data* objects, size_t count,
-    size_t* work, TC_PIV_security_map* map, TC_credential_status* results)
-{
-    TC_credential_status status =
-        TC_PIV_security_authenticate(request, context, lds, work, map);
-    if (status != TC_CREDENTIAL_VALID) return status;
-    for (size_t i = 0; i < count; ++i) {
-        results[i] = TC_PIV_security_digest_check(map, &objects[i], work);
-        if (results[i] == TC_CREDENTIAL_LIMIT || results[i] == TC_CREDENTIAL_ERROR)
-            return results[i];
-    }
-    return TC_CREDENTIAL_VALID;
-}
-```
-
-A `TC_CREDENTIAL_VALID` return here means the Security Object is authentic. Each `results` entry
-decides its own object. Read `map->revocation_checked` before relying on the signer's revocation
-status.
-
-CHUID and Security Object results borrow the original buffers and inventory descriptors. Keep those
-buffers unchanged while using the results. Encrypted biometric entries hash their stored ciphertext
-for the inventory. TWIC printed information can require decrypted TLVs. Select the representation
-the card profile requires and retain those bytes through validation. See
-[inventory hash inputs](credential-validation.md#inventory-hash-inputs).
+`TC_PIV_CHUID_validate` authenticates the signed CHUID against the validated card certificate, and
+its `TC_PIV_CHUID_report` feeds the biometric and Security Object validators. [CHUID
+validation](cms.md#validate-a-chuid-against-a-card-certificate) gives the order of the checks, and
+[validating an inventory](lds.md#validating-an-inventory) covers complete and partial Security
+Object inventories and the unsigned TWIC CHUID. Results borrow the original buffers and inventory
+descriptors, so keep those unchanged while using them.
 
 Share one remaining-work counter across the sequence. Accept only `TC_CREDENTIAL_VALID`, and handle
 invalid signatures, revocation, unavailable evidence, unsupported algorithms and exhausted limits
@@ -173,11 +125,9 @@ explicitly.
 
 ## TWIC example
 
-[credential_workflow.c](../examples/credential_workflow.c) composes public APIs over caller-provided
-objects, held trust and CRL sources, a held CCL snapshot and a fresh card-proof callback. Card
-commands stay in the reader example. The [composition walkthrough](credential-validation.md)
-documents its policy sequence, borrowed lifetimes and final recheck.
-
+[Composing PIV and TWIC validation](credential-validation.md) walks through
+[credential_workflow.c](../examples/credential_workflow.c), which composes these validators over
+retained objects, held trust and CRL sources, a held CCL snapshot and a fresh card-proof callback.
 The result covers the requested checks at the supplied evaluation time. Recheck time-sensitive
-evidence before a later access decision. Release held snapshots and wipe plaintext and key material
-on every exit path.
+evidence before a later access decision, and release held snapshots and wipe plaintext and key
+material on every exit path.

@@ -5,71 +5,57 @@
 # PIV card commands
 
 Enable `TINY_CRYPTO_ENABLE_PIV_COMMAND=ON` and include `<tiny_crypto/piv_command.h>`. The module
-sends SELECT, GET DATA and VERIFY from SP 800-73-5 Part 2 and TWIC Part 2 v5 section 5 over the
-[APDU channel](apdu.md). It checks the answers, tracks the link state that access rules depend on
-and gives status words their PIV or TWIC meaning. It needs the APDU codec and the TLV readers and
-allocates nothing. I/O, reader selection and PIN entry stay with the application.
-
-The TWIC application and the TWIC card profiles require `TC_ENABLE_TWIC` (CMake
-`TINY_CRYPTO_ENABLE_TWIC`). The `twic` and `full` [application targets](targets.md) enable it, and
-the `piv` target leaves it out.
+sends SELECT, GET DATA and VERIFY (SP 800-73-5 Part 2, TWIC Part 2 v5 section 5) over the
+[APDU channel](apdu.md), checks the answers and tracks the link state that access rules depend on.
+It allocates nothing. The application owns I/O, reader selection and PIN entry. TWIC support needs
+`TC_ENABLE_TWIC` (CMake `TINY_CRYPTO_ENABLE_TWIC`), which the `twic` and `full`
+[application targets](targets.md) enable.
 
 ## Link
 
 A `TC_PIV_link` is one card session over a transport. `TC_PIV_link_init` takes
 `TC_PIV_link_options`:
 
-- `channel`: the [APDU channel options](apdu.md#channel). The exchange budget covers every command
-  of the session, including GET RESPONSE steps. The card limits may start at 0, because
-  `TC_PIV_select` applies the limits the card reports.
-- `interface`: `TC_PIV_CONTACT` or `TC_PIV_CONTACTLESS`. The application states it, because the
-  PIN rules depend on it.
-- `response_ne`: Ne for GET DATA. 0 selects 256, the Le `00` of Part 2 section 3.1.2. An EXTENDED
+- `channel`: the [APDU channel options](apdu.md#channel). One exchange budget covers the session,
+  GET RESPONSE steps included. Card limits may start at 0, since `TC_PIV_select` applies the
+  card's own.
+- `interface`: `TC_PIV_CONTACT` or `TC_PIV_CONTACTLESS`. The PIN rules depend on it.
+- `response_ne`: Ne for GET DATA. 0 selects 256 (Le `00`, Part 2 section 3.1.2), and an EXTENDED
   link may request up to 65536.
 
 The link borrows the command scratch until `TC_PIV_link_clear`, and the channel wipes it after
-every transmit. SHORT links need `TC_APDU_SHORT_COMMAND_MAX_BYTES` (261) bytes. EXTENDED links
-need `TC_PIV_EXTENDED_SCRATCH_BYTES`, or the card limit when smaller. That holds the larger of one
-command of `TC_PIV_COMMAND_MAX_NC` data bytes and the plain secure messaging key request of
-`TC_PIV_SM_KEY_REQUEST_BYTES` (80 for CS2, 112 for CS7). `TC_PIV_COMMAND_MAX_NC` is the largest
-command a link protects: 32 bytes, or the key proof template size with
-`TINY_CRYPTO_ENABLE_PIV_KEY_PROOF`.
+every transmit. A SHORT link needs `TC_APDU_SHORT_COMMAND_MAX_BYTES` (261) bytes. An EXTENDED link
+needs `TC_PIV_EXTENDED_SCRATCH_BYTES`, or the card limit when smaller. That covers one command of
+`TC_PIV_COMMAND_MAX_NC` data bytes (32, or the key proof template size with
+`TINY_CRYPTO_ENABLE_PIV_KEY_PROOF`) and the plain key request of `TC_PIV_SM_KEY_REQUEST_BYTES`.
 
-`TC_PIV_link_info_get` reports the interface, application, profile and announced secure messaging
-suite, and whether the link is secured, has lost its session, has the VCI or has a verified PIN.
-`TC_PIV_link_status` returns the status word of the last command the card completed.
-`TC_PIV_link_clear` wipes the scratch and the link. Call it on every exit path.
+`TC_PIV_link_info_get` reports the interface, application, profile, announced secure messaging
+suite and the secured, session-lost, VCI and PIN flags. `TC_PIV_link_status` returns the status
+word of the last command the card completed. `TC_PIV_link_clear` wipes the scratch and the link.
+Call it on every exit path.
 
-Every function returns a `TC_PIV_result`. The first six values follow `TC_APDU_result`.
-`TC_PIV_CARD_STATUS` means the card completed the command with a status other than success, held
-in `TC_PIV_link_status`. `TC_PIV_REFUSED` means a safety or state rule stopped the command before
-it was sent. A transport failure stops the link, and every later command returns `TC_PIV_ERROR`
-until `TC_PIV_link_init`.
+Results follow `TC_APDU_result`, plus `TC_PIV_CARD_STATUS` for a card answer other than success
+(see `TC_PIV_link_status`) and `TC_PIV_REFUSED` for a command a safety or state rule stopped before
+sending. After a transport failure every command returns `TC_PIV_ERROR` until `TC_PIV_link_init`.
 
 ## SELECT and the application property template
 
 `TC_PIV_select` selects the PIV application by its complete AID or the TWIC application by its
-9-byte AID prefix (TWIC Part 2 v5 section 5.1, TWIC Part 3 v4 Appendix D.3), with Le `00`. SELECT
-is always plain (Part 2 section 4.2). `TC_PIV_select` checks the answer with
-`TC_PIV_application_read`:
+9-byte AID prefix (TWIC Part 2 v5 section 5.1, TWIC Part 3 v4 Appendix D.3), with Le `00` and
+always in plaintext (Part 2 section 4.2). `TC_PIV_application_read` checks the answer:
 
-- The data field starts with one `61` template. DO `7F66` may follow once with two nonzero `02`
-  sizes, the card's largest command and response APDUs (ISO/IEC 7816-4 section 12.8.1). Each size
-  is an unsigned big-endian count, because TWIC NEXGEN cards send 32769 as `02 02 80 01`. Other
+- One `61` template holds the complete AID and two version bytes in `4F`, a `79` with a nonempty
+  `4F`, and at most one each of `50`, `5F50` and `AC` (Part 2 Tables 3 and 4, section 3.1.1, TWIC
+  Part 2 v5 section 5.1.1). A YubiKey answer with only the PIX in `4F` is `TC_PIV_INVALID`.
+- `AC` lists `06 01 00` exactly once and at most one secure messaging suite, `27` or `2E`
+  (Part 2 Table 5), returned in `sm_suite`.
+- An optional DO `7F66` gives the card's largest command and response APDUs (ISO/IEC 7816-4
+  section 12.8.1), including the 32769 that TWIC NEXGEN cards send as `02 02 80 01`. Other
   top-level DOs are skipped.
-- Inside `61`: one `4F` with the expected AID prefix and two version bytes, one `79` holding a
-  nonempty `4F`, and at most one each of `50`, `5F50` and `AC` (Part 2 Tables 3 and 4). Part 2
-  section 3.1.1 and TWIC Part 2 v5 section 5.1.1 require the complete AID in `4F`. An answer whose
-  `4F` holds only the PIX `00 00 10 00 01 00`, with the RID in `79`, is `TC_PIV_INVALID`. A
-  YubiKey answers in that form.
-- In `AC` each `80` holds one algorithm identifier, `06 01 00` appears exactly once, and at most
-  one of the secure messaging suites `27` and `2E` is listed (Part 2 Table 5). The suite is
-  returned in `sm_suite`.
-- PIV version `01 00` is `TC_PIV_CARD`. TWIC version `01 01` is `TC_TWIC_LEGACY_CARD` and `01 03`
-  is `TC_TWIC_NEXGEN_CARD` (TWIC Part 2 v5 section 4.1). TWIC Part 3 v4 Appendix D.3 makes any
-  sub-version of version `01` backward compatible with the Legacy data model and leaves the
-  decision to the reader. `TC_PIV_SELECT_TWIC_SUBVERSION_COMPATIBLE` accepts another sub-version
-  as Legacy. Without the flag it is `TC_PIV_UNSUPPORTED`.
+- PIV version `01 00` is `TC_PIV_CARD`. TWIC `01 01` is `TC_TWIC_LEGACY_CARD` and `01 03`
+  `TC_TWIC_NEXGEN_CARD` (TWIC Part 2 v5 section 4.1). Another TWIC `01` sub-version is
+  `TC_PIV_UNSUPPORTED`, or Legacy with `TC_PIV_SELECT_TWIC_SUBVERSION_COMPATIBLE` (TWIC Part 3 v4
+  Appendix D.3).
 
 The link follows the card's selection state (Part 2 sections 2.4.2 and 3.1.1):
 
@@ -80,21 +66,19 @@ The link follows the card's selection state (Part 2 sections 2.4.2 and 3.1.1):
 | Card status such as `6A82`                 | kept        | kept                          |
 | Transport failure for another application  | none        | cleared                       |
 
-A `9000` with a malformed template for another application leaves no application selected,
-because the card has left the previous one. A successful SELECT records the application and
-profile, applies the `7F66` limits to the channel and sets the
-[GET RESPONSE flags](apdu.md#get-response-flags): plain CLA `00` for PIV (Part 2 sections 4.2.6
-and A.4.1), plus Le `FF` after `61 00` for TWIC (TWIC Part 2 v5 section 5.2 note 3a, Appendix E).
+A `9000` with a malformed template for another application leaves no application selected. A
+successful SELECT applies the `7F66` limits and the application's
+[GET RESPONSE flags](apdu.md#get-response-flags) (Part 2 sections 4.2.6 and A.4.1, TWIC Part 2 v5
+section 5.2 note 3a and Appendix E).
 
 ## GET DATA
 
-`TC_PIV_get_data` reads one data object by a tag of 1 to 3 bytes (Part 2 section 3.1.2). The
-answer to `9000` or `6282` must be exactly one TLV spanning the data field. `out->encoded` is that
-TLV and `out->value` its value, both borrowed from the response buffer. `out->status` records
-`6282`, the end of the object before Le bytes (ISO/IEC 7816-4 Table 7). On the TWIC application a
-`6282` answer may end with `00` or `FF` padding after the TLV (TWIC Part 2 v5 section 5.2, ISO/IEC
-7816-4:2020 section 8.1.3), and `out->encoded` excludes it. PIV answers and `9000` answers keep
-exact framing.
+`TC_PIV_get_data` reads one data object by a tag of 1 to 3 bytes (Part 2 section 3.1.2). A
+`9000` or `6282` answer must be exactly one TLV. `out->encoded` is that TLV and `out->value` its
+value, both borrowed from the response buffer. `out->status` records `6282`, the end of the object
+before Le bytes (ISO/IEC 7816-4 Table 7). Only a TWIC `6282` answer may end with `00` or `FF`
+padding (TWIC Part 2 v5 section 5.2, ISO/IEC 7816-4:2020 section 8.1.3), which `out->encoded`
+excludes.
 
 | Answer                      | PIV application                     | TWIC application   |
 | --------------------------- | ----------------------------------- | ------------------ |
@@ -105,35 +89,31 @@ exact framing.
 | `TAG 02 80 00`, constructed | invalid                             | empty object       |
 | `9000` without data         | invalid                             | `TC_PIV_FORM_NONE` |
 
-The TWIC rows come from TWIC Part 2 v5 sections 3.3.6 and 4.5. Other statuses return
-`TC_PIV_CARD_STATUS`, such as `6982` before the PIN, `6A81` for a contactless denial or `6A82` for
-a missing object.
+The TWIC rows follow TWIC Part 2 v5 sections 3.3.6 and 4.5. Other statuses, such as `6982`,
+`6A81` or `6A82`, return `TC_PIV_CARD_STATUS`.
 
 ## VERIFY
 
 `TC_PIV_verify_status` sends VERIFY without data (Part 2 section 3.2.1) for the PIV PIN `80`, the
-Global PIN `00` or the pairing code `98`. `9000` reports the reference verified and `63CX` reports
-X further tries. The pairing code has no counter (Part 2 footnote 7), so `6300` reports neither.
-The link keeps one PIN flag for `80` and `00`. `9000` sets it, and any other answer for either
-reference clears it, because the card then holds that reference FALSE (Part 2 section 3.2.1.1).
+Global PIN `00` or the pairing code `98`. `9000` means verified and `63CX` reports X tries left.
+The pairing code has no counter (Part 2 footnote 7). One link PIN flag covers `80` and `00`:
+`9000` sets it and any other answer clears it (Part 2 section 3.2.1.1).
 
 `TC_PIV_pin_verify` verifies the PIN or Global PIN once:
 
 1. It queries the counter. A verified reference returns `TC_PIV_OK` with `submitted` 0.
-1. It sends the PIN only when the query reported at least `minimum_retries` tries. The floor is
-   at least 2, which keeps the last tries unspent. A lower count or an answer without a count
-   returns `TC_PIV_REFUSED`.
-1. The PIN is 6 to 8 ASCII digits, padded with `FF` to 8 bytes (Part 2 section 2.4.3). The padded
-   copy lives in a stack array and the command scratch, and both are wiped. A failed submission
-   returns `TC_PIV_CARD_STATUS` with `63CX`, `6983` or `6A80` and is never retried.
+1. It sends the PIN only when the query reported at least `minimum_retries` tries (2 or more).
+   Otherwise it returns `TC_PIV_REFUSED`.
+1. The PIN is 6 to 8 ASCII digits, padded with `FF` to 8 bytes (Part 2 section 2.4.3), and every
+   copy is wiped. A failed submission returns `TC_PIV_CARD_STATUS` with `63CX`, `6983` or `6A80`
+   and is never retried.
 
-The card rejects VERIFY for `80` and `00` outside the contact interface and the VCI, and for `98`
-on contactless without secure messaging (Part 2 section 3.2.1). The library refuses those commands
-before sending, so a PIN never crosses the contactless interface in plaintext (Part 1 Table 4).
-The VCI requires a secured link, and a secured link sends GET DATA and VERIFY under
+The library refuses VERIFY of `80` and `00` outside the contact interface and the VCI, and of
+`98` on contactless without secure messaging, so a PIN never crosses the contactless interface in
+plaintext (Part 1 Table 4, Part 2 section 3.2.1). The VCI requires a link under
 [secure messaging](piv-sm.md#secure-messaging-on-a-card-link). On contactless the card may answer
-`6983` at an issuer-defined intermediate retry value. The TWIC application defines no VERIFY, so
-both functions return `TC_PIV_UNSUPPORTED` there.
+`6983` at an issuer-defined intermediate retry value. On the TWIC application, which defines no
+VERIFY, both functions return `TC_PIV_UNSUPPORTED`.
 
 ## Status words
 
@@ -144,10 +124,9 @@ VERIFY writes X to `retries`.
 
 ## Card object readers
 
-`TINY_CRYPTO_ENABLE_PIV_OBJECTS` adds readers for the objects that drive the card session. Pass
-them the `encoded` span of a `TC_PIV_data_object`. Each checks one complete object against its
-table, returns views borrowed from the input, charges no work and writes output only on
-`TC_TLV_OK`.
+`TINY_CRYPTO_ENABLE_PIV_OBJECTS` adds readers that take the `encoded` span of a
+`TC_PIV_data_object`, check it against its table, return borrowed views, charge no work and write
+output only on `TC_TLV_OK`.
 
 | Object                    | Tag      | Header                             | Reader                      |
 | ------------------------- | -------- | ---------------------------------- | --------------------------- |
@@ -163,21 +142,19 @@ table, returns views borrowed from the input, charges no work and writes output 
   TWIC card, where the PIV application reports `40 00` or `04 00` and the TWIC application `00 00`
   under a TWIC AID (TWIC Part 2 v5 sections 4.2 and 4.7.5). `TC_PIV_discovery_pin_reference`
   returns `00` when the Global PIN is enabled and preferred, and `80` otherwise. Integrity comes
-  from the Security Object or from a read under secure messaging. `TC_PIV_discovery_get` in
-  `<tiny_crypto/piv_vci.h>` reads the object over the link and records that in `secured`
+  from the Security Object or a secured read with `TC_PIV_discovery_get`
   ([virtual contact interface](piv-sm.md#virtual-contact-interface)).
 - The CCC, Key History and Pairing Code readers take `TC_PIV_CONTAINER` for the `53` object or
   `TC_PIV_CONTENTS` for its value. The CCC follows Part 1 Table 9 and accepts the optional `E3`
-  and `B4` elements of SP 800-73-4 Part 1 Table 8 found on older cards. Key History checks the
-  counts and the `http://<DNS name>/<SHA-256 hex>` URL of Part 1 section 3.3.3, at most 118 bytes.
-- The BIT group holds 0 to 2 finger templates of at most 28 bytes. A nonempty group requires the
-  Discovery OCC bit (Part 1 section 3.3.6), so compare the two objects after reading both.
-- The pairing code is PIN-gated secret material (Part 1 Table 2). The returned span borrows the
-  response buffer, so wipe that buffer when done.
-- `TC_PIV_certificate_decode` reads a certificate container and returns one DER certificate. A
-  plain certificate borrows the container. A GZIP certificate, such as the SD 33 SMCS object with
-  CertInfo `01`, is decoded into the caller's `der` buffer and needs `TINY_CRYPTO_ENABLE_GZIP`.
-  Every failure after the argument checks wipes `der`.
+  and `B4` elements of SP 800-73-4 Part 1 Table 8. Key History checks the counts and the
+  `http://<DNS name>/<SHA-256 hex>` URL of Part 1 section 3.3.3, at most 118 bytes.
+- The BIT group holds 0 to 2 finger templates of at most 28 bytes. Compare a nonempty group with
+  the Discovery OCC bit it requires (Part 1 section 3.3.6).
+- The pairing code is PIN-gated secret material (Part 1 Table 2). Wipe the response buffer it
+  borrows when done.
+- `TC_PIV_certificate_decode` returns one DER certificate, borrowed from the container or, for
+  GZIP (CertInfo `01`, needs `TINY_CRYPTO_ENABLE_GZIP`), decoded into `der`. Every failure after
+  the argument checks wipes `der`.
 
 ```c
 #include <tiny_crypto/piv_card_objects.h>
@@ -211,10 +188,9 @@ int inspect_objects(const TC_PIV_data_object* discovery_object,
 
 ## Catalog and inventory
 
-`TINY_CRYPTO_ENABLE_PIV_CATALOG` adds `<tiny_crypto/piv_catalog.h>` and needs only the card
-commands. `TC_PIV_catalog_count`, `TC_PIV_catalog_at` and `TC_PIV_catalog_find` return constant
-`TC_PIV_object_info` entries: tag, container ID, object kind, access rule per interface, presence
-requirement, key reference, capacity and the `TC_PIV_OBJECT_SECRET` flag.
+`TINY_CRYPTO_ENABLE_PIV_CATALOG` adds `<tiny_crypto/piv_catalog.h>`. `TC_PIV_catalog_count`,
+`TC_PIV_catalog_at` and `TC_PIV_catalog_find` return constant `TC_PIV_object_info` entries with
+each object's tag, access rule per interface, presence, capacity and `TC_PIV_OBJECT_SECRET` flag.
 
 | Application | Profile               | Catalog                                                  |
 | ----------- | --------------------- | -------------------------------------------------------- |
@@ -222,15 +198,13 @@ requirement, key reference, capacity and the `TC_PIV_OBJECT_SECRET` flag.
 | TWIC        | `TC_TWIC_LEGACY_CARD` | `5FC102`, `5FC104`, `DFC101`, `DFC103`, `DFC10F`         |
 | TWIC        | `TC_TWIC_NEXGEN_CARD` | the 12 readable objects of TWIC Part 2 v5 section 4.5    |
 
-The Pairing Code container `5FC123` needs the PIN, and the VCI on contactless (Part 1 Table 2).
-The TWIC Privacy Key container `DFC101` reads on contact only (TWIC Part 2 v5 section 4.5). Both
-are secret. On the TWIC application `DFC001`, `DFC002` and `DFC121` are optional and every other
-entry is mandatory. Keys and the TWIC E-stickers are outside the catalogs.
+The secret entries are the Pairing Code `5FC123`, which needs the PIN and on contactless the VCI
+(Part 1 Table 2), and the TWIC Privacy Key `DFC101`, contact only (TWIC Part 2 v5 section 4.5). On
+the TWIC application only `DFC001`, `DFC002` and `DFC121` are optional. Keys and the TWIC
+E-stickers are outside the catalogs.
 
-`TC_PIV_inventory_read` reads the catalog of the selected application and profile into one caller
-pool. It checks each rule against the link state before sending anything. `PIN` needs a verified
-PIN, `VCI` needs the virtual contact interface, and OCC is never available. Each object gets a
-state:
+`TC_PIV_inventory_read` reads the selected application's catalog into one caller pool. It checks
+each access rule against the link state before sending, and OCC is never available:
 
 | State        | Meaning                                                                  |
 | ------------ | ------------------------------------------------------------------------ |
@@ -242,24 +216,21 @@ state:
 | `OVERSIZED`  | the answer exceeded its pool region, and the plain link stayed usable    |
 | `SKIPPED`    | the pairing code without `TC_PIV_INVENTORY_PAIRING_CODE`                 |
 
-Any other outcome aborts the read and wipes the object array and the pool bytes offered to the
-card. That covers malformed answers, other card statuses, transport failures, an exhausted
-exchange budget and every secure messaging failure. Under secure messaging an oversized answer
-ends the session, so it aborts too.
+Any other outcome aborts the read and wipes the object array and the offered pool bytes. That
+includes card statuses outside the table, malformed answers, transport failures, an exhausted
+exchange budget and every secure messaging failure, an oversized secured answer included.
 
-Set `objects` and `capacity` before the call. The array needs `TC_PIV_catalog_count` entries, and
-a smaller array returns `TC_PIV_LIMIT` before anything is sent. Answers arrive at the next free
-pool byte. A secured read decrypts in place, so the value stays behind its secure messaging
-header. `max_object_bytes` in the plan caps one object at `TC_PIV_RESPONSE_BYTES(max_object_bytes)`
-pool bytes. A read goes out only when its region can take one full answer of Ne bytes, or 256
-under secure messaging, bounded by the card's DO `7F66` response limit. A smaller region is
-`OVERSIZED`. `TC_PIV_INVENTORY_POOL_BYTES` covers every PIV object at its Table 8 capacity. Those
-capacities are floors, so treat it as a starting point. SD 33 card 2 needs about 25 KiB. Work
-costs one unit per catalog entry and one per kept pool byte.
+Set `objects` and `capacity` (at least `TC_PIV_catalog_count`, else `TC_PIV_LIMIT` before sending)
+before the call. `max_object_bytes` in the plan caps one object at
+`TC_PIV_RESPONSE_BYTES(max_object_bytes)` pool bytes. A read goes out only when its region holds
+one full answer of Ne bytes, or 256 under secure messaging, bounded by the card's `7F66` limit.
+`TC_PIV_INVENTORY_POOL_BYTES` covers every PIV object at its Table 8 capacity. Those capacities are
+floors, and SD 33 card 2 needs about 25 KiB. Work costs one unit per catalog entry and one per kept
+pool byte.
 
 The entries borrow the pool until `TC_PIV_inventory_clear`, which wipes the used bytes and the
-array. The pool holds PIN-gated data and possibly the pairing code or the TWIC Privacy Key, so
-clear it on every exit path. The inventory records the link state it used in `link`.
+array. The pool may hold PIN-gated and secret data, so clear it on every exit path. `link` records
+the link state the read used.
 
 ```c
 #include <tiny_crypto/piv_catalog.h>
@@ -290,11 +261,9 @@ TC_PIV_result read_inventory(TC_PIV_link* link, TC_PIV_object* objects, uint8_t*
 
 ## Key proofs
 
-`TINY_CRYPTO_ENABLE_PIV_KEY_PROOF` adds `<tiny_crypto/piv_key_proof.h>` and needs the card
-commands, key challenges and the X.509 reader. `TC_PIV_key_prove` has a card key sign a fresh
-challenge and verifies the signature under the key of its certificate. It proves possession of the
-key only, so validate the certificate path, revocation and identifiers first.
-
+`TINY_CRYPTO_ENABLE_PIV_KEY_PROOF` adds `<tiny_crypto/piv_key_proof.h>`. `TC_PIV_key_prove` has a
+card key sign a fresh challenge and verifies the signature under its certificate's key. It proves
+possession only, so validate the certificate path, revocation and identifiers first.
 `TC_PIV_key_parameters_select` applies the `TC_PIV_key_policy` before anything is sent or drawn:
 
 | Key                | Identifier (SP 800-78-5 Table 9) | Profiles                                       |
@@ -305,16 +274,12 @@ key only, so validate the certificate path, revocation and identifiers first.
 | P-256 with SHA-256 | `11`                             | `TC_PIV_CARD` and `TC_TWIC_LEGACY_CARD`        |
 | P-384 with SHA-384 | `14`                             | `TC_PIV_CARD` and `TC_TWIC_LEGACY_CARD`        |
 
-The certificate must assert digitalSignature in keyUsage, and an RSA key needs an exponent of
-65537 to 2^256 - 1 (SP 800-78-5 section 3.1). The Table 10 end date of RSA-2048 uses the policy
-time. TWIC profiles follow the TWIC reader policy, and `TC_TWIC_NEXGEN_CARD` accepts only the
-RSA-2048 key `9E07` (TWIC Part 2 v5 sections 4.5 and 5.3). RSA challenges use SHA-256 with
-PKCS #1 v1.5, or PSS with MGF1 and a 32-byte salt.
-
-The command is GENERAL AUTHENTICATE with `7C {82 00, 81 L challenge}` in the order of SP 800-73-5
-Part 2 Appendix A.4.1 and the link's Le, `00` on a SHORT link. The channel chains a template above
-255 bytes, sent as `1C` fragments on a secured link. The answer must be exactly
-`7C {82 L signature}`.
+The certificate must assert digitalSignature, and an RSA exponent must be 65537 to 2^256 - 1
+(SP 800-78-5 section 3.1). The RSA-2048 end date of Table 10 uses the policy time.
+`TC_TWIC_NEXGEN_CARD` accepts only the RSA-2048 key `9E07` (TWIC Part 2 v5 sections 4.5 and 5.3).
+RSA challenges use SHA-256 with PKCS #1 v1.5, or PSS with MGF1 and a 32-byte salt. The command is
+GENERAL AUTHENTICATE (Part 2 Appendix A.4.1), chained above 255 bytes, and the answer must be
+exactly `7C {82 L signature}`.
 
 | Key  | Application  | Contact    | Contactless        |
 | ---- | ------------ | ---------- | ------------------ |
@@ -322,24 +287,19 @@ Part 2 Appendix A.4.1 and the link's Le, `00` on a SHORT link. The channel chain
 | `9C` | PIV          | PIN Always | VCI and PIN Always |
 | `9E` | PIV and TWIC | Always     | Always             |
 
-The link refuses `9A` and `9C` on contactless without the VCI before sending (Part 1 Table 5).
-The card enforces the PIN and answers `6982`, returned as `TC_PIV_CARD_STATUS`. `9C` is PIN
-Always, and `TC_PIV_pin_verify` submits the PIN only while the card reports it unverified, so prove
-`9C` directly after the PIN submission of the card session.
+The link refuses `9A` and `9C` on contactless without the VCI (Part 1 Table 5). The card enforces
+the PIN and answers `6982` (`TC_PIV_CARD_STATUS`). `TC_PIV_pin_verify` skips a reference the card
+reports verified, so prove `9C` directly after the session's PIN submission.
 
-The TWIC application proves only `9E`, only on NEXGEN cards and under the profile of its SELECT
-(TWIC Part 2 v5 section 5.3). The Legacy TWIC application returns `TC_PIV_UNSUPPORTED` before
-sending. Section 5.3 names `9A` in its prose and `9E` in its command syntax. The library follows
-the syntax table and TWIC Part 3 v4 section 4.4.4. A TWIC Legacy card proves its card key on its
-PIV application, which reports `TC_PIV_CARD`, so the request names `TC_TWIC_LEGACY_CARD`. The key
-management key, retired keys and symmetric keys are outside this module.
+The TWIC application proves `9E` on NEXGEN cards only, under its SELECT profile (TWIC Part 2 v5
+section 5.3), and returns `TC_PIV_UNSUPPORTED` on Legacy cards. A TWIC Legacy card proves its card
+key on its PIV application, with `TC_TWIC_LEGACY_CARD` in the request.
 
 `TC_PIV_key_proof_workspace` holds the challenge, the request and the answer. Argument errors,
-refusals, the Legacy TWIC application and a provider without `verify_digest` leave it unchanged.
-Every other return wipes it. The certificate, its key bytes, the request and the provider must lie
-outside the link and its scratch buffers, because every exchange rewrites them. Work covers the
-challenge and the signature verification. The exchange budget covers the chain fragments and the
-GET RESPONSE steps.
+refusals, the Legacy TWIC application and a provider without `verify_digest` leave it unchanged,
+and every other return wipes it. Keep the certificate, its key bytes, the request and the provider
+outside the link buffers, which every exchange rewrites. Work covers the challenge and the
+signature check.
 
 ```c
 #include <tiny_crypto/piv_key_proof.h>
@@ -361,8 +321,6 @@ TC_PIV_result prove_card_authentication(TC_PIV_link* link, const TC_X509_certifi
   return TC_PIV_key_prove(link, &request, random, provider, workspace, &work);
 }
 ```
-
-`tiny_crypto::piv_key_prove` in `<tiny_crypto/piv_key_proof.hpp>` takes a `PIVLink`.
 
 ## Example
 
@@ -401,32 +359,29 @@ TC_PIV_result read_chuid(TC_APDU_transport transport, TC_PIV_interface interface
 ```
 
 The C++11 class `tiny_crypto::PIVLink` in `<tiny_crypto/piv_command.hpp>` owns a link and clears
-it on destruction. `piv_application_read` and `piv_status_classify` wrap the free functions.
+it on destruction, and `piv_application_read` and `piv_status_classify` wrap the free functions.
 `tiny_crypto::PIVInventory` in `<tiny_crypto/piv_catalog.hpp>` clears its inventory on
-destruction.
+destruction. `tiny_crypto::piv_key_prove` in `<tiny_crypto/piv_key_proof.hpp>` takes a `PIVLink`.
 
 ## Limits
 
 - The template reader accepts at most 4096 bytes, 64 elements and 4 nesting levels. The card
-  object readers accept one level and at most 16 elements.
-- The card object readers check structure only. Authenticate the objects with the Security Object
-  ([LDS security objects](lds.md)) before relying on them.
-- CHANGE REFERENCE DATA, RESET RETRY COUNTER, PUT DATA, GENERATE ASYMMETRIC KEY PAIR and OCC
-  VERIFY (`96`, `97`) are outside the library.
-- The response buffer holds the whole answer and SW1 SW2. `TC_PIV_RESPONSE_BYTES(nr)` sizes a
-  buffer for nr data bytes on any link.
-- Two TWIC NEXGEN behaviours follow the specification text and await confirmation on a NEXGEN
-  card: the `9E` key of TWIC Part 2 v5 section 5.3, and a TWIC AID in the Discovery Object of the
-  PIV application (section 4.7.5).
+  object readers accept one level and at most 16 elements, and check structure only. Authenticate
+  the objects with the Security Object ([LDS security objects](lds.md)) before relying on them.
+- CHANGE REFERENCE DATA, RESET RETRY COUNTER, PUT DATA, GENERATE ASYMMETRIC KEY PAIR, OCC VERIFY
+  (`96`, `97`), the key management key, retired keys and symmetric keys are outside the library.
+- The response buffer holds the whole answer and SW1 SW2. `TC_PIV_RESPONSE_BYTES(nr)` sizes it for
+  nr data bytes on any link.
+- Two TWIC NEXGEN behaviours await confirmation on a NEXGEN card. TWIC Part 2 v5 section 5.3
+  names `9A` in its prose and `9E` in its syntax, and the library proves `9E` (TWIC Part 3 v4
+  section 4.4.4). Section 4.7.5 places a TWIC AID in the PIV application's Discovery Object.
 
 ## Resource use
 
-The card commands keep no mutable static state. The caller owns the link, the command scratch and
-every response buffer. `sizeof(TC_PIV_link)` is 40 bytes on AVR, and a SHORT
-link needs 261 bytes of command scratch. The `apdu_piv_read` profile of `tests/budgets/avr.json`
-measures a plain SELECT, a GET DATA of the CHUID and a VERIFY query on an ATmega2560 with avr-gcc
-7.3.0 at `-Os`. Its static RAM counts the link, the command scratch and a response buffer for a
-CHUID at its Part 1 Table 8 capacity of 2881 bytes:
+The card commands keep no mutable static state. `sizeof(TC_PIV_link)` is 40 bytes on AVR. The
+`apdu_piv_read` profile of `tests/budgets/avr.json` measures a plain SELECT, a CHUID GET DATA and a
+VERIFY query on an ATmega2560 (avr-gcc 7.3.0, `-Os`). Static RAM counts the link, 261 bytes of
+SHORT scratch and a response buffer for a CHUID at its Part 1 Table 8 capacity of 2881 bytes:
 
 | Resource   | Budget      | Largest parts                                          |
 | ---------- | ----------- | ------------------------------------------------------ |
@@ -434,6 +389,5 @@ CHUID at its Part 1 Table 8 capacity of 2881 bytes:
 | Static RAM | 3400 bytes  | 2900-byte CHUID response, scratch, link and AID tables |
 | Stack      | 560 bytes   | SELECT through the template reader and TLV walk        |
 
-The catalog, the inventory and the key proofs are larger and target ESP32-class and desktop
-devices. They build for AVR in the compile checks
-([AVR builds and budgets](testing.md#avr-builds-and-budgets)).
+The catalog, the inventory and the key proofs target ESP32-class and desktop devices. They build
+for AVR in the compile checks ([AVR builds and budgets](testing.md#avr-builds-and-budgets)).
