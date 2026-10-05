@@ -39,6 +39,43 @@ static inline TC_RSA_result tc_rsa_sample_blinding(const tc_mp_word* modulus, si
   return TC_RSA_LIMIT;
 }
 
+/* Blinding steps over the Montgomery field mod n (RFC 8017 section 5.1.2,
+ * note 1). Every operand is a Montgomery residue and one is R mod n.
+ * blind_input sets out = c * blind^e. out is disjoint from blind, one and
+ * temporary, and may equal c. */
+static inline void tc_rsa_blind_input(tc_mp_word* out, const tc_mp_word* c, const tc_mp_word* blind,
+                                      TC_bytes exponent, const tc_mp_word* one,
+                                      const tc_mp_modulus* field, tc_mp_word* temporary)
+{
+  tc_mp_power(out, blind, exponent, one, field, temporary);
+  tc_mp_montgomery(out, c, out, field);
+}
+
+/* Unblind value with inverse, check value^e == c before publication, and
+ * write value as length big-endian bytes. check and temporary are n-limb
+ * scratch, disjoint from the other operands. A failed check leaves output
+ * unchanged and reports TC_RSA_ERROR. */
+static inline TC_RSA_result tc_rsa_unblind_verify(tc_mp_word* value, const tc_mp_word* inverse,
+                                                  const tc_mp_word* c, TC_bytes exponent,
+                                                  const tc_mp_word* one, const tc_mp_modulus* field,
+                                                  tc_mp_word* check, tc_mp_word* temporary,
+                                                  uint8_t* output)
+{
+  const size_t n = field->n;
+  tc_mp_montgomery(value, value, inverse, field);
+  tc_mp_power(check, value, exponent, one, field, temporary);
+  tc_mp_word difference = 0;
+  for (size_t i = 0; i < n; ++i)
+    difference |= check[i] ^ c[i];
+  if (difference)
+    return TC_RSA_ERROR;
+  memset(check, 0, n * sizeof *check);
+  check[0] = 1;
+  tc_mp_montgomery(value, value, check, field);
+  tc_mp_to_be(output, value, n * sizeof *value);
+  return TC_RSA_OK;
+}
+
 static inline int tc_rsa_private_exponent_check(const tc_mp_word* d, const tc_mp_word* modulus,
                                                 size_t n, tc_mp_word* temporary)
 {
@@ -304,23 +341,10 @@ static inline TC_RSA_result tc_rsa_private_operation_magnitude(const TC_RSA_publ
   tc_mp_montgomery(blind, blind, r2, &field);
   tc_mp_montgomery(inverse, inverse, r2, &field);
   tc_mp_montgomery(c, c, r2, &field);
-  tc_mp_power(result, blind, (TC_bytes){exponent, exponent_length}, one, &field, temporary);
-  tc_mp_montgomery(blind, c, result, &field);
-  tc_mp_power_padded(result, blind, d, length, one, &field, temporary);
-  tc_mp_montgomery(result, result, inverse, &field);
-  /* Verify in Montgomery form before converting or publishing the result. */
-  tc_mp_power(blind, result, (TC_bytes){exponent, exponent_length}, one, &field, temporary);
-  tc_mp_word difference = 0;
-  for (size_t i = 0; i < n; ++i)
-    difference |= blind[i] ^ c[i];
-  if (difference) {
-    status = TC_RSA_ERROR;
-    goto cleanup;
-  }
-  memset(one, 0, length);
-  one[0] = 1;
-  tc_mp_montgomery(result, result, one, &field);
-  tc_mp_to_be(output, result, length);
+  const TC_bytes e = {exponent, exponent_length};
+  tc_rsa_blind_input(result, c, blind, e, one, &field, temporary);
+  tc_mp_power_padded(blind, result, d, length, one, &field, temporary);
+  status = tc_rsa_unblind_verify(blind, inverse, c, e, one, &field, result, temporary, output);
 cleanup:
   TC_secure_zero(scratch, required * sizeof *scratch);
   return status;
@@ -488,8 +512,8 @@ static inline TC_RSA_result tc_rsa_crt_private_operation(const tc_rsa_private_vi
   tc_mp_montgomery(results, results, residues, &field);
   tc_mp_montgomery(blind, blind, residues, &field);
   tc_mp_montgomery(c, c, residues, &field);
-  tc_mp_power(value, blind, (TC_bytes){exponent, exponent_length}, results, &field, temporary);
-  tc_mp_montgomery(value, c, value, &field);
+  const TC_bytes e = {exponent, exponent_length};
+  tc_rsa_blind_input(value, c, blind, e, results, &field, temporary);
   /* The encoded input remains available for the final fault check. Keep R² in
    * c while residues is reused for the two prime fields. */
   memcpy(c, residues, length);
@@ -549,30 +573,19 @@ static inline TC_RSA_result tc_rsa_crt_private_operation(const tc_rsa_private_vi
     carry >>= TC_MP_WORD_BITS;
   }
 
-  /* Unblind modulo n and verify with the public exponent before publication. */
+  /* Unblind modulo n and verify with the public exponent before publication.
+   * c holds R^2 mod n: convert value, inverse and the input back into
+   * Montgomery form. p and q are no longer needed, so factors holds the
+   * input. */
   memset(results, 0, length);
   results[0] = 1;
   tc_mp_montgomery(results, results, c, &field);
   tc_mp_montgomery(value, value, c, &field);
   tc_mp_montgomery(inverse, inverse, c, &field);
-  tc_mp_montgomery(value, value, inverse, &field);
-  tc_mp_power(residues, value, (TC_bytes){exponent, exponent_length}, results, &field, temporary);
-  memset(temporary, 0, length);
-  temporary[0] = 1;
-  tc_mp_montgomery(residues, residues, temporary, &field);
-  tc_mp_to_be((uint8_t*)temporary, residues, length);
-  uint8_t difference = 0;
-  for (size_t i = 0; i < length; ++i)
-    difference |= ((uint8_t*)temporary)[i] ^ input[i];
-  if (difference) {
-    status = TC_RSA_ERROR;
-    goto cleanup;
-  }
-  memset(temporary, 0, length);
-  temporary[0] = 1;
-  tc_mp_montgomery(value, value, temporary, &field);
-  tc_mp_to_be(output, value, length);
-  status = TC_RSA_OK;
+  tc_mp_from_be(factors, input, length);
+  tc_mp_montgomery(factors, factors, c, &field);
+  status = tc_rsa_unblind_verify(value, inverse, factors, e, results, &field, residues, temporary,
+                                 output);
 cleanup:
   TC_secure_zero(scratch, required * sizeof *scratch);
   return status;
