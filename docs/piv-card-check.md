@@ -348,8 +348,9 @@ which clears its PIN status. `--anchor-sha256` pins the preceding anchor,
 `--ocsp 9a|9c|9d|9e FILE` supplies the OCSP response of one slot, `--at` sets
 the evaluation time as `YYYY-MM-DDTHH:MM:SSZ`, `--min-retries` sets the PIN
 retry floor of `TC_PIV_pin_verify` from 2 to 15 with a default of 3,
-`--extended` selects extended length, `--chuid-sp800-73-4` selects `TC_CHUID_PROFILE_PIV_SP800_73_4` and
-`--dump-dir` writes each present object to a directory only its owner can read.
+`--extended` selects extended length, `--chuid-sp800-73-4` selects
+`TC_CHUID_PROFILE_PIV_SP800_73_4` and `--dump-dir` writes each present object
+to a directory only its owner can read.
 `TC_PIV_HARDWARE_GUARD=1` installs the transmit guard of the
 [PIV card hardware tests](testing.md#piv-card-hardware-tests). Only the
 `test_piv_inspect_live` build provides that guard, so another build exits
