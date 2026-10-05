@@ -14,8 +14,15 @@
 #define PROFILE_BIT(profile) (1u << (profile))
 #define SP800_73_4_PROFILE PROFILE_BIT(TC_CHUID_PROFILE_PIV_SP800_73_4)
 #define PIV_PROFILES (PROFILE_BIT(TC_CHUID_PROFILE_PIV) | SP800_73_4_PROFILE)
-#define SIGNED_PROFILES (PIV_PROFILES | PROFILE_BIT(TC_CHUID_PROFILE_TWIC_SIGNED))
-#define ALL_PROFILES (SIGNED_PROFILES | PROFILE_BIT(TC_CHUID_PROFILE_TWIC_UNSIGNED))
+#if TC_ENABLE_TWIC
+#define TWIC_SIGNED_PROFILE PROFILE_BIT(TC_CHUID_PROFILE_TWIC_SIGNED)
+#define TWIC_UNSIGNED_PROFILE PROFILE_BIT(TC_CHUID_PROFILE_TWIC_UNSIGNED)
+#else
+#define TWIC_SIGNED_PROFILE 0u
+#define TWIC_UNSIGNED_PROFILE 0u
+#endif
+#define SIGNED_PROFILES (PIV_PROFILES | TWIC_SIGNED_PROFILE)
+#define ALL_PROFILES (SIGNED_PROFILES | TWIC_UNSIGNED_PROFILE)
 
 enum {
   BUFFER_LENGTH_TAG = 0xee,
@@ -177,9 +184,8 @@ TC_TLV_result TC_PIV_CHUID_read(TC_bytes encoded, TC_PIV_CHUID_encoding encoding
   TC_PIV_CHUID chuid;
   TC_bytes contents = encoded;
   TC_TLV_result result;
-  if (!out || (!encoded.data && encoded.length) ||
-      (profile != TC_CHUID_PROFILE_PIV && profile != TC_CHUID_PROFILE_TWIC_SIGNED &&
-       profile != TC_CHUID_PROFILE_TWIC_UNSIGNED && profile != TC_CHUID_PROFILE_PIV_SP800_73_4) ||
+  if (!out || (!encoded.data && encoded.length) || (unsigned)profile >= 8 ||
+      !(PROFILE_BIT(profile) & ALL_PROFILES) ||
       (encoding != TC_PIV_CHUID_CONTENTS && encoding != TC_PIV_CHUID_CONTAINER) ||
       !tc_internal_ranges_disjoint(encoded.data, encoded.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
