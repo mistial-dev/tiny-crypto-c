@@ -252,6 +252,80 @@ TC_TEST(wrong_length_without_le)
   return MUNIT_OK;
 }
 
+/* Run command where the last scripted answer carries length data bytes and
+ * status sw, after count earlier steps. */
+static TC_APDU_result over_answer(const tc_script_step* earlier, size_t count,
+                                  const char* command_hex, size_t length, const char* sw,
+                                  const TC_APDU_command* command, TC_APDU_length_format format,
+                                  size_t max_response_bytes)
+{
+  static char body[2 * 600 + 5];
+  static tc_script_step steps[4];
+  munit_assert_size(count, <, 4);
+  if (count)
+    memcpy(steps, earlier, count * sizeof *earlier);
+  memcpy(body, repeat(0x66, length), 2 * length + 1);
+  strcat(body, sw);
+  steps[count] = (tc_script_step){command_hex, body, {0}, {0}, TC_OK, 0};
+  const TC_APDU_channel_options options = {format, 0, 16, 0, max_response_bytes};
+  TC_APDU_channel channel = start_options(steps, count + 1, &options);
+  TC_APDU_response out;
+  memset(&out, 0x5a, sizeof out);
+  const TC_APDU_response before = out;
+  const TC_APDU_result result = run(&channel, command, sizeof response_bytes, &out);
+  if (result != TC_APDU_OK) {
+    munit_assert_memory_equal(sizeof out, &out, &before);
+    munit_assert_true(tc_test_all_zero(response_bytes, sizeof response_bytes));
+  }
+  assert_script_done();
+  return result;
+}
+
+/* The response data field holds at most Ne bytes, the Ne encoded in the Le
+ * field of that step (ISO/IEC 7816-4:2020 5.1 Table 1). */
+TC_TEST(response_ne_bound)
+{
+  const TC_APDU_command le16 = get_data(0x00, 16), le256 = get_data(0x00, 256),
+                        le300 = get_data(0x00, 300);
+  const tc_script_step more10[] = {{NULL, "6110", {0}, {0}, TC_OK, 0}};
+  const tc_script_step more00[] = {{NULL, "6100", {0}, {0}, TC_OK, 0}};
+  const tc_script_step wrong05[] = {{NULL, "6c05", {0}, {0}, TC_OK, 0}};
+  for (size_t extra = 0; extra < 2; ++extra) {
+    const TC_APDU_result expected = extra ? TC_APDU_INVALID : TC_APDU_OK;
+    /* Short Le 10, and Le 00 for 256 bytes. */
+    munit_assert_int(
+        over_answer(NULL, 0, "00cb3fff055c035fc10210", 16 + extra, "9000", &le16, TC_APDU_SHORT, 0),
+        ==, expected);
+    munit_assert_int(over_answer(NULL, 0, "00cb3fff055c035fc10200", 256 + extra, "9000", &le256,
+                                 TC_APDU_SHORT, 0),
+                     ==, expected);
+    /* Extended Le 012C, and Ne lowered to the card's response limit. */
+    munit_assert_int(over_answer(NULL, 0, "00cb3fff0000055c035fc102012c", 300 + extra, "9000",
+                                 &le300, TC_APDU_EXTENDED, 0),
+                     ==, expected);
+    munit_assert_int(over_answer(NULL, 0, "00cb3fff055c035fc10212", 18 + extra, "9000", &le256,
+                                 TC_APDU_SHORT, 20),
+                     ==, expected);
+    /* GET RESPONSE takes Ne from SW2, and SW2 00 gives 256. */
+    munit_assert_int(
+        over_answer(more10, 1, "00c0000010", 16 + extra, "9000", &le256, TC_APDU_SHORT, 0), ==,
+        expected);
+    munit_assert_int(
+        over_answer(more00, 1, "00c0000000", 256 + extra, "9000", &le256, TC_APDU_SHORT, 0), ==,
+        expected);
+    /* A 6CXX resend takes Ne from SW2. */
+    munit_assert_int(over_answer(wrong05, 1, "00cb3fff055c035fc10205", 5 + extra, "9000", &le256,
+                                 TC_APDU_SHORT, 0),
+                     ==, expected);
+  }
+  /* Without Le, Ne is 0 and the answer carries no data. */
+  const TC_APDU_command no_le = get_data(0x00, 0);
+  munit_assert_int(
+      over_answer(NULL, 0, "00cb3fff055c035fc102", 1, "9000", &no_le, TC_APDU_SHORT, 0), ==,
+      TC_APDU_INVALID);
+  return MUNIT_OK;
+}
+
 /* A chain that the scratch, the card limit or the budget cannot carry to its
  * last fragment returns LIMIT before its first transmit (5.3.3). */
 TC_TEST(chain_preflight)
@@ -314,11 +388,11 @@ TC_TEST(command_chaining)
   /* 510 bytes: two full fragments. Logical channel 3 stays in every CLA. */
   static char second[HEX_BYTES];
   snprintf(first, sizeof first, "13dbffffff%s", repeat(0x66, 255));
-  snprintf(second, sizeof second, "03dbffffff%s", repeat(0x66, 255));
+  snprintf(second, sizeof second, "03dbffffff%s00", repeat(0x66, 255));
   const tc_script_step two[] = {{first, "9000", {0}, {0}, TC_OK, 0},
                                 {second, "01029000", {0}, {0}, TC_OK, 0}};
   channel = start(two, 2, TC_APDU_SHORT, 0);
-  command = (TC_APDU_command){{data_bytes, 510}, 0, 0x03, 0xdb, 0xff, 0xff};
+  command = (TC_APDU_command){{data_bytes, 510}, 256, 0x03, 0xdb, 0xff, 0xff};
   munit_assert_int(run(&channel, &command, 64, &out), ==, TC_APDU_OK);
   munit_assert_size(out.data.length, ==, 2);
   assert_script_done();
@@ -355,24 +429,24 @@ TC_TEST(chain_answers)
   return MUNIT_OK;
 }
 
-/* A short response buffer returns LIMIT, wipes it and keeps the channel. The
- * card may return more than Ne bytes (TWIC Part 2 v5 5.2 note 2). */
+/* A short response buffer returns LIMIT, wipes it and keeps the channel. */
 TC_TEST(capacity_limit)
 {
-  static char overdelivered[80];
-  memcpy(overdelivered, repeat(0x21, 10), 21);
-  strcat(overdelivered, "9000");
+  static char answer[80];
+  memcpy(answer, repeat(0x21, 10), 21);
+  strcat(answer, "9000");
   static char chunk[80];
   memcpy(chunk, repeat(0x22, 16), 33);
   strcat(chunk, "6110");
-  const tc_script_step steps[] = {{"00cb3fff055c035fc10204", overdelivered, {0}, {0}, TC_OK, 0},
-                                  {NULL, chunk, {0}, {0}, TC_OK, 0},
+  const tc_script_step steps[] = {{"00cb3fff055c035fc1020a", answer, {0}, {0}, TC_OK, 0},
+                                  {"00cb3fff055c035fc10210", chunk, {0}, {0}, TC_OK, 0},
                                   {"00a4040000", "9000", {0}, {0}, TC_OK, 0}};
   TC_APDU_channel channel = start(steps, 3, TC_APDU_SHORT, 0);
-  TC_APDU_command command = get_data(0x00, 4);
+  TC_APDU_command command = get_data(0x00, 10);
   TC_APDU_response out;
   munit_assert_int(run(&channel, &command, 20, &out), ==, TC_APDU_OK);
   munit_assert_size(out.data.length, ==, 10);
+  command = get_data(0x00, 16);
   /* 16 bytes arrive with 61 10, and 16 + 2 more do not fit in 20. */
   munit_assert_int(run(&channel, &command, 20, &out), ==, TC_APDU_LIMIT);
   munit_assert_true(tc_test_all_zero(response_bytes, 20));
@@ -602,6 +676,7 @@ int main(int argc, char** argv)
       {"/wrong-length-reported", wrong_length_reported, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/wrong-length-without-le", wrong_length_without_le, NULL, NULL, MUNIT_TEST_OPTION_NONE,
        NULL},
+      {"/response-ne-bound", response_ne_bound, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/chain-preflight", chain_preflight, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/command-chaining", command_chaining, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/chain-answers", chain_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

@@ -107,6 +107,14 @@ section 5.3.4, TWIC Part 2 v5 Appendix E). A TWIC NEXGEN card answers Le `FF`
 after `61 00` with 255 bytes and `9000` and drops the rest of the object, so
 TWIC Part 2 v5 section 5.2 note 3a does not describe its GET RESPONSE.
 
+### Response length
+
+Each answer carries at most the Ne encoded in its step (ISO/IEC 7816-4:2020
+section 5.1 Table 1). Short Le `00` is 256, extended `0000` is 65536, a GET
+RESPONSE step takes Ne from SW2 and a 6CXX resend from the corrected Le. A step
+without Le expects no data. A longer answer returns `TC_APDU_INVALID` and wipes
+the buffer.
+
 ## Example
 
 ```c

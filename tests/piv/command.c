@@ -636,6 +636,21 @@ TC_TEST(get_data_twic)
   return MUNIT_OK;
 }
 
+/* An answer above Ne is INVALID (ISO/IEC 7816-4:2020 5.1 Table 1). */
+TC_TEST(get_data_above_ne)
+{
+  const tc_script_step steps[] = {STEP(TWIC_SELECT, TWIC_APT("1") "9000"),
+                                  STEP("00CB3FFF055C03DFC10104", "DFC10103AABBCC 9000")};
+  const TC_PIV_link_options options = {{TC_APDU_SHORT, 0, 32, 0, 0}, TC_PIV_CONTACT, 4};
+  TC_PIV_link link;
+  link_start_options(&link, steps, 2, &options);
+  select_application(&link, TC_PIV_APPLICATION_TWIC);
+  TC_PIV_data_object out;
+  munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_INVALID);
+  assert_script_done();
+  return MUNIT_OK;
+}
+
 /* Response chaining through the channel: 6CXX correction and GET RESPONSE
  * with CLA 00 and Le = SW2 (ported from the example card reader). */
 TC_TEST(get_data_chained)
@@ -1262,6 +1277,7 @@ int main(int argc, char** argv)
       {"/application/twic", application_twic, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/get-data/piv", get_data_piv, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/get-data/twic", get_data_twic, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/get-data/above-ne", get_data_above_ne, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/get-data/chained", get_data_chained, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/get-data/extended", get_data_extended, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/get-data/arguments", get_data_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

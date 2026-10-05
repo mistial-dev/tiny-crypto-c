@@ -190,8 +190,8 @@ typedef struct {
 TC_APDU_result TC_APDU_channel_init(TC_APDU_channel* channel, TC_APDU_transport transport,
                                     const TC_APDU_channel_options* options, TC_buffer scratch);
 
-/* Tighten the card limits (ISO/IEC 7816-4 12.8.1) and replace the
- * GET RESPONSE flags. A zero limit keeps the current one. A nonzero limit
+/* Tighten the card limits (ISO/IEC 7816-4 12.8.1) and replace the channel
+ * flags. A zero limit keeps the current one. A nonzero limit
  * replaces it only when smaller or when none was set.
  *
  * TC_APDU_ARGUMENT  NULL or cleared channel, an unknown flag, or a nonzero
@@ -219,8 +219,10 @@ TC_APDU_result TC_APDU_channel_restrict(TC_APDU_channel* channel, size_t max_com
  * under SM, end the exchange with TC_APDU_OK, that status and the data
  * collected before it. A command without Le, such as VERIFY, is sent once.
  *
- * A card may return more bytes than Ne up to the offered capacity (TWIC Part 2
- * v5 5.2 note 2). Each transmit offers the remaining response capacity. A
+ * Each answer carries at most the Ne encoded in its step: short Le 00 is 256,
+ * extended 0000 is 65536 and a step without Le is 0 (5.1 Table 1). A longer
+ * answer is INVALID. Each
+ * transmit offers the remaining response capacity. A
  * GET RESPONSE or corrected step needs room for its Le and SW1 SW2. When the
  * channel has max_response_bytes, Ne above max_response_bytes - 2 is lowered
  * to that value. An encoded fragment above max_command_bytes or the scratch

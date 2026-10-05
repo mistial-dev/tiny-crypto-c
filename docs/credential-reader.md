@@ -66,6 +66,9 @@ requests each object within the supplied buffer limit and follows `61xx` with
 GET RESPONSE. A `6282` end-of-object warning is accepted only with a complete
 `53` envelope. Truncated objects fail even when the card returns `9000`.
 
+An answer longer than the Le of its command is malformed (ISO/IEC 7816-4:2020
+section 5.1 Table 1).
+
 Use `--piv-certificate-envelope` when the TWIC application's card-authentication
 certificate uses the PIV `70`, `71`, empty `FE` envelope. The default TWIC
 envelope contains `70` and `71`. This option selects container framing.

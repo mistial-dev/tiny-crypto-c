@@ -49,7 +49,7 @@ typedef struct {
   const uint8_t* plain_command;
   size_t plain_command_length;
   const uint8_t* plain_answer;
-  size_t plain_answer_length;
+  size_t plain_answer_length, plain_offset;
 } replay_transport;
 
 static const char* transcript_path;
@@ -61,17 +61,34 @@ static TC_status replay_transmit(void* context, TC_bytes command, TC_buffer resp
                                  size_t* length)
 {
   replay_transport* replay = context;
-  if (replay->plain_command) {
-    /* SELECT or key establishment: one exchange. */
-    const int same = command.length == replay->plain_command_length &&
-                     !memcmp(command.data, replay->plain_command, command.length);
+  if (replay->plain_answer) {
+    /* SELECT or key establishment: the answer data in chunks of at most Ne
+     * bytes, Le 00 for 256, then 61XX and GET RESPONSE (ISO/IEC 7816-4:2020
+     * 5.1 Table 1 and 5.3.4). */
+    static const uint8_t get_response[] = {0x00, 0xc0, 0x00, 0x00};
+    const int same = replay->plain_command
+                         ? command.length == replay->plain_command_length &&
+                               !memcmp(command.data, replay->plain_command, command.length)
+                         : command.length == 5 && !memcmp(command.data, get_response, 4);
+    const size_t ne = replay->plain_command || !command.data[4] ? 256 : command.data[4];
+    const size_t remaining = replay->plain_answer_length - 2 - replay->plain_offset;
+    const size_t count = remaining < ne ? remaining : ne;
     replay->plain_command = NULL;
-    if (!same || replay->plain_answer_length > response.capacity) {
+    if (!same || count + 2 > response.capacity) {
       replay->mismatch = 1;
       return TC_ERROR;
     }
-    memcpy(response.data, replay->plain_answer, replay->plain_answer_length);
-    *length = replay->plain_answer_length;
+    memcpy(response.data, replay->plain_answer + replay->plain_offset, count);
+    replay->plain_offset += count;
+    if (remaining > count) {
+      const size_t after = remaining - count;
+      response.data[count] = 0x61;
+      response.data[count + 1] = (uint8_t)(after >= 256 ? 0 : after);
+    } else {
+      memcpy(response.data + count, replay->plain_answer + replay->plain_answer_length - 2, 2);
+      replay->plain_answer = NULL;
+    }
+    *length = count + 2;
     return TC_OK;
   }
   if (replay->next >= replay->count) {
@@ -149,11 +166,13 @@ static void replay_select(replay_state* state, char* const* fields)
   transport.plain_command_length = command_length;
   transport.plain_answer = state->answer;
   transport.plain_answer_length = answer_length;
+  transport.plain_offset = 0;
   munit_assert_int(TC_PIV_select(&state->link, TC_PIV_APPLICATION_PIV, 0,
                                  (TC_buffer){state->response, sizeof state->response},
                                  &application),
                    ==, TC_PIV_OK);
   munit_assert_size(transport.mismatch, ==, 0);
+  munit_assert_null(transport.plain_answer);
 }
 
 static void replay_begin(replay_state* state, char* const* fields)
@@ -181,12 +200,14 @@ static void replay_finish(replay_state* state, char* const* fields)
   transport.plain_command_length = state->key_command_length;
   transport.plain_answer = state->answer;
   transport.plain_answer_length = length;
+  transport.plain_offset = 0;
   munit_assert_int(TC_PIV_SM_key_request(&state->link, &state->session, state->suite, state->host,
                                          (TC_random_source){recorded_random, NULL},
                                          (TC_buffer){state->response, sizeof state->response},
                                          &peer, &state->workspace),
                    ==, TC_PIV_OK);
   munit_assert_size(transport.mismatch, ==, 0);
+  munit_assert_null(transport.plain_answer);
   munit_assert_int(TC_PIV_CVC_read(peer.certificate, &cvc), ==, TC_TLV_OK);
   munit_assert_int(TC_PIV_SM_finish(&state->session, &peer, cvc.public_key, &state->workspace), ==,
                    TC_OK);
