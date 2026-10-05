@@ -160,10 +160,16 @@ void tc_rsa_storage_workspace(tc_rsa_storage* storage, const TC_RSA_workspace* w
   TC_PKI_PLAN_WRITE(&storage->plan, workspace->words, workspace->capacity);
 }
 
+void tc_rsa_storage_begin_without_workspace(tc_rsa_storage* storage)
+{
+  storage->workspace = NULL;
+  tc_pki_storage_plan_begin(&storage->plan, storage->writes, TC_RSA_STORAGE_WRITES, SIZE_MAX);
+}
+
 void tc_rsa_storage_begin(tc_rsa_storage* storage, const TC_RSA_workspace* workspace)
 {
+  tc_rsa_storage_begin_without_workspace(storage);
   storage->workspace = workspace;
-  tc_pki_storage_plan_begin(&storage->plan, storage->writes, TC_RSA_STORAGE_WRITES, SIZE_MAX);
   tc_rsa_storage_workspace(storage, workspace);
 }
 
@@ -183,7 +189,9 @@ void tc_rsa_storage_output(tc_rsa_storage* storage, TC_buffer output)
 void tc_rsa_storage_seal(tc_rsa_storage* storage)
 {
   tc_pki_storage_plan_seal(&storage->plan);
-  tc_rsa_storage_input(storage, storage->workspace, sizeof *storage->workspace);
+  /* begin failed the plan for a NULL workspace, so NULL here means none. */
+  if (storage->workspace)
+    tc_rsa_storage_input(storage, storage->workspace, sizeof *storage->workspace);
 }
 
 void tc_rsa_storage_input(tc_rsa_storage* storage, const void* data, size_t size)

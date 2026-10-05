@@ -214,7 +214,8 @@ TC_RSA_result tc_rsa_private_view_init(const TC_RSA_private_key* key, const TC_R
 
 /* One storage preflight per public entry:
  *
- *   1. begin records the workspace limbs and checks their alignment.
+ *   1. begin records the workspace limbs and checks their alignment. An
+ *      encoding call without limb scratch uses begin_without_workspace.
  *   2. write, output and workspace record every other range the call
  *      modifies: outputs, length objects, work counters and caches.
  *   3. seal checks the writes against each other and then treats the
@@ -234,6 +235,7 @@ typedef struct {
 } tc_rsa_storage;
 
 void tc_rsa_storage_begin(tc_rsa_storage* storage, const TC_RSA_workspace* workspace);
+void tc_rsa_storage_begin_without_workspace(tc_rsa_storage* storage);
 /* A second aligned limb array, such as a prepared-key cache. */
 void tc_rsa_storage_workspace(tc_rsa_storage* storage, const TC_RSA_workspace* workspace);
 void tc_rsa_storage_write(tc_rsa_storage* storage, const void* data, size_t size);
