@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-/* TWIC rules for the PIV object readers. */
+/* TWIC Discovery Object PIN policies. */
 #include <tiny_crypto/piv_discovery.h>
 #if TC_ENABLE_TWIC && TC_ENABLE_PIV_OBJECTS
 #include "twic_card_objects_internal.h"

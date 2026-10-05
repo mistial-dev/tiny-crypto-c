@@ -6,8 +6,8 @@
 #include "internal.h"
 #include "pki_internal.h"
 #include "piv_container_internal.h"
-#include <string.h>
-#include <tiny_crypto/piv_printed.h>
+#include "piv_printed_internal.h"
+#include "twic_card_objects_internal.h"
 
 enum {
   PRINTED_NAME_TAG = 0x01,
@@ -22,13 +22,10 @@ enum {
   PRINTED_AFFILIATION_MAX = 20,
   PRINTED_DATE_LENGTH = 9,
   PRINTED_SERIAL_MAX = 20,
-  PRINTED_ISSUER_LENGTH = 15,
-  TWIC_SERIAL_LENGTH = 8,
-  TWIC_ISSUER_LENGTH = 8,
-  TWIC_CONTENTS_MAX = 200
+  PRINTED_ISSUER_LENGTH = 15
 };
 
-static int printable(TC_bytes value, size_t maximum, int empty)
+int tc_piv_printed_text(TC_bytes value, size_t maximum, int empty)
 {
   if (value.length > maximum || (!empty && !value.length))
     return 0;
@@ -38,25 +35,13 @@ static int printable(TC_bytes value, size_t maximum, int empty)
   return 1;
 }
 
-static int twic_issuer(TC_bytes value)
-{
-  static const uint8_t prefix[] = {'7', '0', '9', '9'};
-  return value.length == TWIC_ISSUER_LENGTH && tc_credential_digits(value.data, value.length) &&
-         !memcmp(value.data, prefix, sizeof prefix);
-}
-
-/* SP 800-73-5 Part 1 Table 15 encodes PIV expiration as YYYYMMMDD. TWIC
- * NEXGEN/Legacy Part 2 section 4.7.2 uses DDMMMYYYY. Month names are upper
- * case in both. */
-static int printed_date(TC_bytes value, TC_PIV_printed_profile profile, TC_X509_time* out)
+/* SP 800-73-5 Part 1 Table 15 encodes the expiration as YYYYMMMDD with an
+ * upper-case month name. */
+static int piv_date(TC_bytes value, TC_X509_time* out)
 {
   size_t year, day;
   unsigned month;
-  if (value.length != PRINTED_DATE_LENGTH)
-    return 0;
-  if (profile == TC_PIV_PRINTED_PROFILE_TWIC)
-    return tc_credential_day_month_year(value.data, 0, out);
-  if (!tc_credential_decimal(value.data, 4, 9999, &year) ||
+  if (value.length != PRINTED_DATE_LENGTH || !tc_credential_decimal(value.data, 4, 9999, &year) ||
       !tc_credential_decimal(value.data + 7, 2, 31, &day))
     return 0;
   month = tc_credential_month3(value.data + 4, 0);
@@ -66,6 +51,30 @@ static int printed_date(TC_bytes value, TC_PIV_printed_profile profile, TC_X509_
   return 1;
 }
 
+static int piv_serial(TC_bytes value)
+{
+  return tc_piv_printed_text(value, PRINTED_SERIAL_MAX, 0);
+}
+
+static int piv_issuer(TC_bytes value)
+{
+  return value.length == PRINTED_ISSUER_LENGTH &&
+         tc_piv_printed_text(value, PRINTED_ISSUER_LENGTH, 0);
+}
+
+static const tc_piv_printed_rules piv_rules = {SIZE_MAX, piv_date, piv_serial, piv_issuer, 0, 1};
+
+static const tc_piv_printed_rules* printed_rules(TC_PIV_printed_profile profile)
+{
+  if (profile == TC_PIV_PRINTED_PROFILE_PIV)
+    return &piv_rules;
+#if TC_ENABLE_TWIC
+  if (profile == TC_PIV_PRINTED_PROFILE_TWIC)
+    return &tc_twic_printed_rules;
+#endif
+  return NULL;
+}
+
 static TC_TLV_result text_field(TC_TLV_reader* reader, unsigned tag, size_t maximum, int empty,
                                 TC_bytes* out)
 {
@@ -73,7 +82,7 @@ static TC_TLV_result text_field(TC_TLV_reader* reader, unsigned tag, size_t maxi
   TC_TLV_result result = tc_pki_field(reader, tag, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!printable(element.value, maximum, empty))
+  if (!tc_piv_printed_text(element.value, maximum, empty))
     return TC_TLV_INVALID;
   *out = element.value;
   return TC_TLV_OK;
@@ -87,9 +96,9 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input, TC_PIV_printed_encoding encodi
   TC_TLV_element element;
   TC_TLV_reader reader;
   TC_TLV_result result;
+  const tc_piv_printed_rules* rules = printed_rules(profile);
   if (!out || (!input.data && input.length) ||
-      (encoding != TC_PIV_PRINTED_CONTENTS && encoding != TC_PIV_PRINTED_CONTAINER) ||
-      (profile != TC_PIV_PRINTED_PROFILE_PIV && profile != TC_PIV_PRINTED_PROFILE_TWIC))
+      (encoding != TC_PIV_PRINTED_CONTENTS && encoding != TC_PIV_PRINTED_CONTAINER) || !rules)
     return TC_TLV_ARGUMENT;
   if (!tc_internal_ranges_disjoint(input.data, input.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
@@ -98,7 +107,7 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input, TC_PIV_printed_encoding encodi
     if (result != TC_TLV_OK)
       return result;
   }
-  if (profile == TC_PIV_PRINTED_PROFILE_TWIC && input.length > TWIC_CONTENTS_MAX)
+  if (input.length > rules->contents_max)
     return TC_TLV_LIMIT;
   result = TC_TLV_reader_init(&reader, input, TC_TLV_ISO7816, &limits);
   if (result != TC_TLV_OK)
@@ -114,44 +123,37 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input, TC_PIV_printed_encoding encodi
   result = tc_pki_field(&reader, PRINTED_EXPIRATION_TAG, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!printed_date(element.value, profile, &parsed.expiration))
+  if (element.value.length != PRINTED_DATE_LENGTH ||
+      !rules->date(element.value, &parsed.expiration))
     return TC_TLV_INVALID;
   parsed.expiration_text = element.value;
   result = tc_pki_field(&reader, PRINTED_SERIAL_TAG, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (profile == TC_PIV_PRINTED_PROFILE_TWIC) {
-    if (element.value.length != TWIC_SERIAL_LENGTH ||
-        !tc_credential_digits(element.value.data, element.value.length))
-      return TC_TLV_INVALID;
-  } else if (!printable(element.value, PRINTED_SERIAL_MAX, 0))
+  if (!rules->serial(element.value))
     return TC_TLV_INVALID;
   parsed.card_serial_number = element.value;
   result = tc_pki_field(&reader, PRINTED_ISSUER_TAG, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (profile == TC_PIV_PRINTED_PROFILE_TWIC) {
-    if (!twic_issuer(element.value))
-      return TC_TLV_INVALID;
-  } else if (!printable(element.value, PRINTED_ISSUER_LENGTH, 0) ||
-             element.value.length != PRINTED_ISSUER_LENGTH)
+  if (!rules->issuer(element.value))
     return TC_TLV_INVALID;
   parsed.issuer_identification = element.value;
-  if (profile == TC_PIV_PRINTED_PROFILE_TWIC ||
+  if (rules->organizations ||
       (reader.offset < input.length && input.data[reader.offset] == PRINTED_ORGANIZATION_1_TAG)) {
     result = text_field(&reader, PRINTED_ORGANIZATION_1_TAG, PRINTED_AFFILIATION_MAX, 1,
                         &parsed.organization_1);
     if (result != TC_TLV_OK)
       return result;
   }
-  if (profile == TC_PIV_PRINTED_PROFILE_TWIC ||
+  if (rules->organizations ||
       (reader.offset < input.length && input.data[reader.offset] == PRINTED_ORGANIZATION_2_TAG)) {
     result = text_field(&reader, PRINTED_ORGANIZATION_2_TAG, PRINTED_AFFILIATION_MAX, 1,
                         &parsed.organization_2);
     if (result != TC_TLV_OK)
       return result;
   }
-  if (profile == TC_PIV_PRINTED_PROFILE_PIV) {
+  if (rules->error_detection) {
     result = tc_pki_field(&reader, PRINTED_ERROR_TAG, &element);
     if (result != TC_TLV_OK)
       return result;

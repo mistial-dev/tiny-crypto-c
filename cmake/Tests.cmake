@@ -250,7 +250,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # object-reader switches satisfy config.h, and only piv_discovery.c of that
   # module is linked.
   tc_add_test_library(tiny-crypto-c-test-piv-vci ${tc_piv_sm_link_sources}
-    src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c src/twic_card_objects.c)
+    src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c src/twic_discovery.c)
   target_compile_definitions(tiny-crypto-c-test-piv-vci PUBLIC
     TC_ENABLE_PIV_SM=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1
     TC_ENABLE_SHA384=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1
@@ -274,7 +274,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # The catalog and inventory over the simulator, plain and secured.
   tc_add_test_library(tiny-crypto-c-test-piv-catalog ${tc_piv_sm_link_sources}
     src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c src/piv_catalog.c
-    src/piv_inventory.c src/twic_card_objects.c)
+    src/piv_inventory.c src/twic_discovery.c)
   target_compile_definitions(tiny-crypto-c-test-piv-catalog PUBLIC
     TC_ENABLE_PIV_SM=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1
     TC_ENABLE_SHA384=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1
@@ -748,7 +748,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_c_test(test_twic_cipher_${profile}
       tiny-crypto-c-test-twic-cipher-${profile} tests/twic/cipher.c)
   endforeach()
-  set(tc_pki_sources src/common.c src/tlv.c src/tlv_walk.c src/der.c src/x509_crl.c src/x509_crl_extensions.c src/x509_crl_selected.c src/x509_crl_evidence.c src/x509_crl_entries.c src/pki_storage.c src/piv_oid.c src/twic_oid.c src/piv_container_internal.c src/credential_text_internal.c src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/piv_card.c src/twic_card_identifiers.c src/piv_printed.c src/key_challenge.c src/lds.c src/piv_security.c src/fascn.c src/twic_uuid.c
+  set(tc_pki_sources src/common.c src/tlv.c src/tlv_walk.c src/der.c src/x509_crl.c src/x509_crl_extensions.c src/x509_crl_selected.c src/x509_crl_evidence.c src/x509_crl_entries.c src/pki_storage.c src/piv_oid.c src/twic_oid.c src/piv_container_internal.c src/credential_text_internal.c src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/piv_card.c src/twic_card_identifiers.c src/piv_printed.c src/twic_printed.c src/key_challenge.c src/lds.c src/piv_security.c src/fascn.c src/twic_uuid.c
     src/piv_cvc.c src/piv_cvc_verify.c src/piv_chuid.c src/credential.c src/credential_policy.c src/credential_session.c src/credential_security.c src/credential_signer.c src/validation.c src/x509.c src/x509_crypto.c src/x509_time.c src/x509_key.c src/pki_key.c src/pki_signature_oid.c src/x509_ext.c src/x509_name.c src/x509_name_constraints.c src/x509_path.c src/x509_path_extensions.c src/x509_path_workspace.c src/x509_search.c src/x509_store.c src/x509_store_anchor.c src/snapshot.c src/cms.c src/cms_collections.c src/cms_path.c src/x509_revocation.c src/x509_crl_scope.c src/x509_crl_scope_storage.c src/x509_crl_delta.c src/x509_policy.c src/asn1_string.c src/unicode.c src/eac_cvc.c)
   list(APPEND tc_pki_sources src/source.c src/source_der.c src/x509_crl_source.c src/x509_crl_prepare.c)
   tc_add_test_library(tiny-crypto-c-test-pki ${tc_pki_sources})
@@ -813,7 +813,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # and GZIP for compressed certificates.
   tc_add_test_library(tiny-crypto-c-test-piv-objects
     src/common.c src/tlv.c src/tlv_walk.c src/piv_container_internal.c src/piv_aid.c
-    src/twic_aid.c src/twic_card_objects.c src/piv_discovery.c src/piv_ccc.c src/piv_key_history.c src/piv_bit_group.c
+    src/twic_aid.c src/twic_discovery.c src/piv_discovery.c src/piv_ccc.c src/piv_key_history.c src/piv_bit_group.c
     src/piv_pairing_code.c src/piv_certificate.c src/piv_certificate_decode.c
     src/piv_card_objects_internal.c src/credential_text_internal.c)
   target_compile_definitions(tiny-crypto-c-test-piv-objects PUBLIC
@@ -906,7 +906,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # so card tests can verify with the native signature provider.
   set(tc_native_card_sources ${tc_piv_command_sources} src/piv_sm_apdu.c
     src/piv_sm_key_request.c src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c
-    src/twic_card_objects.c src/piv_catalog.c src/piv_inventory.c src/piv_key_policy.c src/piv_key_proof.c
+    src/twic_discovery.c src/piv_catalog.c src/piv_inventory.c src/piv_key_policy.c src/piv_key_proof.c
     src/piv_card_check.c src/piv_card_check_certificates.c src/piv_card_check_signed.c
     src/piv_card_check_keys.c src/piv_card_check_report.c src/piv_card_crl_targets.c src/inflate_tree.c src/inflate_bits.c src/inflate_tables.c src/inflate.c src/gzip.c
     src/gzip_api.c src/piv_certificate_decode.c src/piv_bit_group.c src/piv_ccc.c
