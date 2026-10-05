@@ -5,6 +5,7 @@
 #include <tiny_crypto/eac_cvc.h>
 #include "internal.h"
 #include "pki_internal.h"
+#include "rsa_key_internal.h"
 
 static const TC_TLV_limits unbounded = {SIZE_MAX, SIZE_MAX, SIZE_MAX, SIZE_MAX};
 /* Read the complete outer object. encoded holds one whole certificate or key,
@@ -66,12 +67,7 @@ static TC_TLV_result key_contents(TC_bytes contents, int standalone, TC_EAC_CVC_
     if (!eac_field(&reader, 0x82, &element) || !uint_value(element.value, 0))
       return TC_TLV_INVALID;
     key.exponent = element.value;
-    if (!(key.modulus.data[key.modulus.length - 1] & 1) ||
-        !(key.exponent.data[key.exponent.length - 1] & 1) ||
-        (key.exponent.length == 1 && key.exponent.data[0] < 3) ||
-        key.exponent.length > key.modulus.length ||
-        (key.exponent.length == key.modulus.length &&
-         memcmp(key.exponent.data, key.modulus.data, key.modulus.length) >= 0))
+    if (!tc_rsa_public_shape_valid(key.modulus, key.exponent))
       return TC_TLV_INVALID;
   } else if (family == 2 && id >= 1 && id <= 5) {
     static const unsigned hashes[] = {160, 224, 256, 384, 512};

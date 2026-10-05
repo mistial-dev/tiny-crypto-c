@@ -7,6 +7,7 @@
 #include "mp_internal.h"
 #include "hash_info_internal.h"
 #include "pki_storage_internal.h"
+#include "rsa_key_internal.h"
 
 /* prefix is the canonical DER DigestInfo header for the selected hash.
  * The caller supplies its matching fixed-length digest. */
@@ -74,9 +75,9 @@ static inline int tc_rsa_supported_bits(size_t bits)
   return bits % 8 == 0 && tc_rsa_supported_modulus_size(bits / 8);
 }
 
-/* Structural public-key checks: a supported modulus size with the top and
- * bottom bits set, and an odd minimal exponent 3 <= e < n (RFC 8017 section
- * 3.1). Public entries call this once, after their storage checks. */
+/* Structural public-key checks: a supported modulus size with the top bit
+ * set, a minimal exponent, and the shared RFC 8017 section 3.1 shape. Public
+ * entries call this once, after their storage checks. */
 static inline TC_RSA_result tc_rsa_public_key_check(const TC_RSA_public_key* key)
 {
   if (!key || !key->modulus.data || !key->exponent.data)
@@ -87,10 +88,8 @@ static inline TC_RSA_result tc_rsa_public_key_check(const TC_RSA_public_key* key
   /* A size outside the supported set is well formed but not implemented. */
   if (!tc_rsa_supported_modulus_size(length))
     return TC_RSA_UNSUPPORTED;
-  if (!exponent_length || exponent_length > length || !exponent[0] ||
-      !(exponent[exponent_length - 1] & 1) || (exponent_length == 1 && exponent[0] < 3) ||
-      !(modulus[0] & 0x80) || !(modulus[length - 1] & 1) ||
-      (exponent_length == length && memcmp(exponent, modulus, length) >= 0))
+  if (!exponent_length || !exponent[0] || !(modulus[0] & 0x80) ||
+      !tc_rsa_public_shape_valid(key->modulus, key->exponent))
     return TC_RSA_INVALID;
   return TC_RSA_OK;
 }

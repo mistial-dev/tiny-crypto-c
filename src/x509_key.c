@@ -5,6 +5,7 @@
 #include <tiny_crypto/x509.h>
 #include "pki_internal.h"
 #include "pki_key_internal.h"
+#include "rsa_key_internal.h"
 #include <limits.h>
 #include <string.h>
 
@@ -37,12 +38,7 @@ static TC_TLV_result rsa(TC_X509_public_key* key)
     return TC_TLV_INVALID;
   key->modulus = parsed.modulus;
   key->exponent = parsed.exponent;
-  if (!(key->modulus.data[key->modulus.length - 1] & 1) ||
-      !(key->exponent.data[key->exponent.length - 1] & 1) ||
-      (key->exponent.length == 1 && key->exponent.data[0] < 3) ||
-      key->exponent.length > key->modulus.length ||
-      (key->exponent.length == key->modulus.length &&
-       memcmp(key->exponent.data, key->modulus.data, key->modulus.length) >= 0))
+  if (!tc_rsa_public_shape_valid(key->modulus, key->exponent))
     return TC_TLV_INVALID;
   return bit_count(key->modulus, &key->bits);
 }
