@@ -273,7 +273,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures")
   # The catalog and inventory over the simulator, plain and secured.
   tc_add_test_library(tiny-crypto-c-test-piv-catalog ${tc_piv_sm_link_sources}
-    src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c src/piv_catalog.c
+    src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c src/piv_catalog.c src/twic_catalog.c
     src/piv_inventory.c src/twic_discovery.c)
   target_compile_definitions(tiny-crypto-c-test-piv-catalog PUBLIC
     TC_ENABLE_PIV_SM=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1
@@ -698,7 +698,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # PIV card commands need the APDU channel and the TLV readers. The catalog
   # needs nothing more, so the plain inventory builds here too.
   tc_add_test_library(tiny-crypto-c-test-piv-command src/common.c ${tc_piv_command_sources}
-    src/piv_catalog.c src/piv_inventory.c)
+    src/piv_catalog.c src/twic_catalog.c src/piv_inventory.c)
   target_compile_definitions(tiny-crypto-c-test-piv-command PUBLIC
     TC_ENABLE_APDU=1 TC_ENABLE_TLV=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_TWIC=1 TC_ENABLE_PIV_CATALOG=1
     TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
@@ -906,7 +906,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # so card tests can verify with the native signature provider.
   set(tc_native_card_sources ${tc_piv_command_sources} src/piv_sm_apdu.c
     src/piv_sm_key_request.c src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c
-    src/twic_discovery.c src/piv_catalog.c src/piv_inventory.c src/piv_key_policy.c src/piv_key_proof.c
+    src/twic_discovery.c src/piv_catalog.c src/twic_catalog.c src/piv_inventory.c src/piv_key_policy.c src/piv_key_proof.c
     src/piv_card_check.c src/piv_card_check_certificates.c src/piv_card_check_signed.c
     src/piv_card_check_keys.c src/piv_card_check_report.c src/piv_card_crl_targets.c src/inflate_tree.c src/inflate_bits.c src/inflate_tables.c src/inflate.c src/gzip.c
     src/gzip_api.c src/piv_certificate_decode.c src/piv_bit_group.c src/piv_ccc.c
