@@ -74,6 +74,26 @@ TC_TEST(test_profile)
   out[TC_MIN_TAG_LEN - 1] ^= 1;
   munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
                                  (TC_bytes){out, TC_MIN_TAG_LEN}) == TC_MISMATCH);
+  /* Default verification squeezes long tags across rate blocks. A difference
+   * in the first or last byte is a mismatch, and bad spans are errors. */
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
+                                 (TC_buffer){want, sizeof want}) == TC_OK);
+  munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
+                                 (TC_bytes){want, sizeof want}) == TC_OK);
+  for (i = 0; i < sizeof want; i += sizeof want - 1) {
+    want[i] ^= 0x80;
+    munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
+                                   (TC_bytes){want, sizeof want}) == TC_MISMATCH);
+    want[i] ^= 0x80;
+  }
+  munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
+                                 (TC_bytes){NULL, TC_MIN_TAG_LEN}) == TC_ERROR);
+  munit_assert(TC_KMAC256_verify((TC_bytes){NULL, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
+                                 (TC_bytes){want, TC_MIN_TAG_LEN}) == TC_ERROR);
+  munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){NULL, 4}, (TC_bytes){NULL, 0},
+                                 (TC_bytes){want, TC_MIN_TAG_LEN}) == TC_ERROR);
+  munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 1},
+                                 (TC_bytes){want, TC_MIN_TAG_LEN}) == TC_ERROR);
   munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
                                  (TC_buffer){out, TC_MIN_TAG_LEN - 1}) == TC_ERROR);
   munit_assert(TC_KMAC256_digest_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4},
