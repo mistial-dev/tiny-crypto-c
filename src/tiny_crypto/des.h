@@ -15,7 +15,7 @@
  * Configuration: TC_ENABLE_DES, TC_DES_ENABLE_* per mode, TC_DES_ENABLE_TDES,
  * TC_DES_REJECT_WEAK_KEYS and TC_MIN_TAG_LEN.
  * Limitations: DES has a 56-bit key and its table lookups have no
- * cache-timing protection. Use it for legacy interoperability.
+ * cache-timing protection. Use it only where a protocol requires it.
  * After 2023, SP 800-131A Rev. 2 section 2 allows TDEA only for legacy
  * decryption.
  * Work: every function charges no work budget. The functions return
@@ -125,7 +125,7 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
  *         A NULL ctx is left alone. Every other failure wipes ctx, so a
  *         previous key is unusable after a failed re-init.
  * @note Key parity is ignored. With TC_DES_REJECT_WEAK_KEYS=1 (default 0 for
- *       legacy vectors) weak and semi-weak component keys and TDEA bundles
+ *       published vectors) weak and semi-weak component keys and TDEA bundles
  *       with K1 = K2 or K2 = K3 are rejected, because those collapse to single
  *       DES. K1 = K3 remains valid two-key TDEA.
  */

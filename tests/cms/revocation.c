@@ -4323,8 +4323,8 @@ static MunitResult selection_delta(const MunitParameter params[], void* user)
                     munit_assert_size(probe.calls, ==, RECORDS);
                   } else
                     munit_assert_memory_equal(sizeof latest, &latest, &sentinel);
-                  TC_X509_crl_evidence legacy_evidence = {0};
-                  TC_X509_revocation_status legacy_status;
+                  TC_X509_crl_evidence time_order_evidence = {0};
+                  TC_X509_revocation_status time_order_status;
                   work = TRUST_WORK_BUDGET;
                   munit_assert_int(
                       tc_x509_crl_scope_evaluate(
@@ -4332,16 +4332,17 @@ static MunitResult selection_delta(const MunitParameter params[], void* user)
                               &cache, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_THIS_UPDATE,
                               &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
                               EXTENSION_CAPACITY},
-                          0, &query, &legacy_evidence, NULL),
+                          0, &query, &time_order_evidence, NULL),
                       ==, TC_TLV_OK);
-                  munit_assert_int(tc_x509_crl_evidence_status(&legacy_evidence, &legacy_status),
-                                   ==, TC_TLV_OK);
-                  munit_assert_int(legacy_status, ==,
+                  munit_assert_int(
+                      tc_x509_crl_evidence_status(&time_order_evidence, &time_order_status), ==,
+                      TC_TLV_OK);
+                  munit_assert_int(time_order_status, ==,
                                    revoked ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
                   if (revoked)
-                    munit_assert_uint(legacy_evidence.revocation.reason, ==, 2);
+                    munit_assert_uint(time_order_evidence.revocation.reason, ==, 2);
                   const size_t calls = probe.calls;
-                  legacy_evidence = empty;
+                  time_order_evidence = empty;
                   work = TRUST_WORK_BUDGET;
                   munit_assert_int(
                       tc_x509_crl_scope_evaluate(
@@ -4349,32 +4350,33 @@ static MunitResult selection_delta(const MunitParameter params[], void* user)
                               &cache, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_THIS_UPDATE,
                               &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
                               EXTENSION_CAPACITY},
-                          0, &query, &legacy_evidence, NULL),
+                          0, &query, &time_order_evidence, NULL),
                       ==, TC_TLV_OK);
-                  const size_t legacy_work = TRUST_WORK_BUDGET - work;
-                  legacy_evidence = empty;
-                  work = legacy_work - 1;
+                  const size_t time_order_work = TRUST_WORK_BUDGET - work;
+                  time_order_evidence = empty;
+                  work = time_order_work - 1;
                   munit_assert_int(
                       tc_x509_crl_scope_evaluate(
                           &(tc_x509_crl_scope_context){
                               &cache, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_THIS_UPDATE,
                               &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
                               EXTENSION_CAPACITY},
-                          0, &query, &legacy_evidence, NULL),
+                          0, &query, &time_order_evidence, NULL),
                       ==, TC_TLV_LIMIT);
-                  munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence, &empty);
-                  work = legacy_work;
+                  munit_assert_memory_equal(sizeof time_order_evidence, &time_order_evidence,
+                                            &empty);
+                  work = time_order_work;
                   munit_assert_int(
                       tc_x509_crl_scope_evaluate(
                           &(tc_x509_crl_scope_context){
                               &cache, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_THIS_UPDATE,
                               &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
                               EXTENSION_CAPACITY},
-                          0, &query, &legacy_evidence, NULL),
+                          0, &query, &time_order_evidence, NULL),
                       ==, TC_TLV_OK);
                   munit_assert_size(work, ==, 0);
                   munit_assert_size(probe.calls, ==, calls);
-                  legacy_evidence = empty;
+                  time_order_evidence = empty;
                   work = TRUST_WORK_BUDGET;
                   munit_assert_int(
                       tc_x509_crl_scope_evaluate(
@@ -4382,9 +4384,10 @@ static MunitResult selection_delta(const MunitParameter params[], void* user)
                               &cache, TC_X509_CRL_COMPLETE_ONLY, (TC_X509_crl_order_policy)-1,
                               &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
                               EXTENSION_CAPACITY},
-                          0, &query, &legacy_evidence, NULL),
+                          0, &query, &time_order_evidence, NULL),
                       ==, TC_TLV_ARGUMENT);
-                  munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence, &empty);
+                  munit_assert_memory_equal(sizeof time_order_evidence, &time_order_evidence,
+                                            &empty);
                   munit_assert_size(work, ==, TRUST_WORK_BUDGET);
                   TC_X509_path_options scope_options = updated;
                   scope_options.at = selection_at;
@@ -4392,60 +4395,65 @@ static MunitResult selection_delta(const MunitParameter params[], void* user)
                       numbered ? TC_X509_CRL_DELTA_IF_AVAILABLE : TC_X509_CRL_COMPLETE_ONLY;
                   const TC_X509_crl_order_policy scope_order =
                       numbered ? TC_X509_CRL_ORDER_NUMBER : TC_X509_CRL_ORDER_THIS_UPDATE;
-                  legacy_evidence = empty;
+                  time_order_evidence = empty;
                   trusted = unchanged;
                   work = TRUST_WORK_BUDGET;
                   probe.calls = 0;
-                  munit_assert_int(tc_cms_crl_scope_process(
-                                       &candidate_reader,
-                                       &(tc_x509_crl_scope_processing){
-                                           &index, 0, scope_delta, scope_order, &query, states,
-                                           RECORDS, &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
-                                       &(tc_x509_crl_trust){
-                                           &source, 1, &scope_options, &tree, &validation, &search,
-                                           &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
-                                       &trusted),
-                                   ==, TC_TLV_OK);
+                  munit_assert_int(
+                      tc_cms_crl_scope_process(
+                          &candidate_reader,
+                          &(tc_x509_crl_scope_processing){
+                              &index, 0, scope_delta, scope_order, &query, states, RECORDS,
+                              &time_order_evidence, NULL, NULL, NULL, NULL, NULL},
+                          &(tc_x509_crl_trust){
+                              &source, 1, &scope_options, &tree, &validation, &search,
+                              &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
+                          &trusted),
+                      ==, TC_TLV_OK);
                   const size_t scope_work = TRUST_WORK_BUDGET - work;
                   munit_assert_size(trusted.validation.work_used, ==, scope_work);
                   munit_assert_size(trusted.anchor_index, ==, 1);
                   munit_assert_size(probe.calls, ==, numbered ? RECORDS + 1 : 3);
-                  munit_assert_int(tc_x509_crl_evidence_status(&legacy_evidence, &legacy_status),
-                                   ==, TC_TLV_OK);
-                  munit_assert_int(legacy_status, ==,
+                  munit_assert_int(
+                      tc_x509_crl_evidence_status(&time_order_evidence, &time_order_status), ==,
+                      TC_TLV_OK);
+                  munit_assert_int(time_order_status, ==,
                                    revoked ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
                   if (revoked)
-                    munit_assert_uint(legacy_evidence.revocation.reason, ==, 2);
+                    munit_assert_uint(time_order_evidence.revocation.reason, ==, 2);
                   munit_assert_memory_equal(sizeof candidate_reader, &candidate_reader,
                                             &before_search);
-                  legacy_evidence = empty;
+                  time_order_evidence = empty;
                   trusted = unchanged;
                   work = scope_work - 1;
-                  munit_assert_int(tc_cms_crl_scope_process(
-                                       &candidate_reader,
-                                       &(tc_x509_crl_scope_processing){
-                                           &index, 0, scope_delta, scope_order, &query, states,
-                                           RECORDS, &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
-                                       &(tc_x509_crl_trust){
-                                           &source, 1, &scope_options, &tree, &validation, &search,
-                                           &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
-                                       &trusted),
-                                   ==, TC_TLV_LIMIT);
-                  munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence, &empty);
+                  munit_assert_int(
+                      tc_cms_crl_scope_process(
+                          &candidate_reader,
+                          &(tc_x509_crl_scope_processing){
+                              &index, 0, scope_delta, scope_order, &query, states, RECORDS,
+                              &time_order_evidence, NULL, NULL, NULL, NULL, NULL},
+                          &(tc_x509_crl_trust){
+                              &source, 1, &scope_options, &tree, &validation, &search,
+                              &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
+                          &trusted),
+                      ==, TC_TLV_LIMIT);
+                  munit_assert_memory_equal(sizeof time_order_evidence, &time_order_evidence,
+                                            &empty);
                   munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
                   work = scope_work;
-                  munit_assert_int(tc_cms_crl_scope_process(
-                                       &candidate_reader,
-                                       &(tc_x509_crl_scope_processing){
-                                           &index, 0, scope_delta, scope_order, &query, states,
-                                           RECORDS, &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
-                                       &(tc_x509_crl_trust){
-                                           &source, 1, &scope_options, &tree, &validation, &search,
-                                           &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
-                                       &trusted),
-                                   ==, TC_TLV_OK);
+                  munit_assert_int(
+                      tc_cms_crl_scope_process(
+                          &candidate_reader,
+                          &(tc_x509_crl_scope_processing){
+                              &index, 0, scope_delta, scope_order, &query, states, RECORDS,
+                              &time_order_evidence, NULL, NULL, NULL, NULL, NULL},
+                          &(tc_x509_crl_trust){
+                              &source, 1, &scope_options, &tree, &validation, &search,
+                              &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
+                          &trusted),
+                      ==, TC_TLV_OK);
                   munit_assert_size(work, ==, 0);
-                  legacy_evidence = empty;
+                  time_order_evidence = empty;
                   trusted = unchanged;
                   work = TRUST_WORK_BUDGET;
                   munit_assert_int(
@@ -4453,26 +4461,29 @@ static MunitResult selection_delta(const MunitParameter params[], void* user)
                           &candidate_reader,
                           &(tc_x509_crl_scope_processing){
                               &index, 0, scope_delta, scope_order, &query, states, RECORDS - 1,
-                              &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
+                              &time_order_evidence, NULL, NULL, NULL, NULL, NULL},
                           &(tc_x509_crl_trust){
                               &source, 1, &scope_options, &tree, &validation, &search,
                               &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
                           &trusted),
                       ==, TC_TLV_LIMIT);
                   munit_assert_size(work, ==, TRUST_WORK_BUDGET);
-                  munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence, &empty);
+                  munit_assert_memory_equal(sizeof time_order_evidence, &time_order_evidence,
+                                            &empty);
                   munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
-                  munit_assert_int(tc_cms_crl_scope_process(
-                                       &candidate_reader,
-                                       &(tc_x509_crl_scope_processing){
-                                           &index, 0, scope_delta, scope_order, &query, states,
-                                           RECORDS, &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
-                                       &(tc_x509_crl_trust){
-                                           &source, 0, &scope_options, &tree, &validation, &search,
-                                           &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
-                                       &trusted),
-                                   ==, TC_TLV_INVALID);
-                  munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence, &empty);
+                  munit_assert_int(
+                      tc_cms_crl_scope_process(
+                          &candidate_reader,
+                          &(tc_x509_crl_scope_processing){
+                              &index, 0, scope_delta, scope_order, &query, states, RECORDS,
+                              &time_order_evidence, NULL, NULL, NULL, NULL, NULL},
+                          &(tc_x509_crl_trust){
+                              &source, 0, &scope_options, &tree, &validation, &search,
+                              &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
+                          &trusted),
+                      ==, TC_TLV_INVALID);
+                  munit_assert_memory_equal(sizeof time_order_evidence, &time_order_evidence,
+                                            &empty);
                   munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
                   if (numbered) {
                     work = TRUST_WORK_BUDGET;
@@ -4482,21 +4493,22 @@ static MunitResult selection_delta(const MunitParameter params[], void* user)
                             &candidate_reader,
                             &(tc_x509_crl_scope_processing){
                                 &index, 1, scope_delta, scope_order, &query, states, RECORDS,
-                                &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
+                                &time_order_evidence, NULL, NULL, NULL, NULL, NULL},
                             &(tc_x509_crl_trust){
                                 &source, 1, &scope_options, &tree, &validation, &search,
                                 &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
                             &trusted),
                         ==, TC_TLV_OK);
                     munit_assert_size(probe.calls, ==, RECORDS + 1);
-                    munit_assert_int(tc_x509_crl_evidence_status(&legacy_evidence, &legacy_status),
-                                     ==, TC_TLV_OK);
-                    munit_assert_int(legacy_status, ==,
+                    munit_assert_int(
+                        tc_x509_crl_evidence_status(&time_order_evidence, &time_order_status), ==,
+                        TC_TLV_OK);
+                    munit_assert_int(time_order_status, ==,
                                      revoked ? TC_X509_REVOCATION_REVOKED
                                              : TC_X509_REVOCATION_GOOD);
                     if (revoked)
-                      munit_assert_uint(legacy_evidence.revocation.reason, ==, 2);
-                    const TC_X509_crl_evidence completed = legacy_evidence;
+                      munit_assert_uint(time_order_evidence.revocation.reason, ==, 2);
+                    const TC_X509_crl_evidence completed = time_order_evidence;
                     trusted = unchanged;
                     work = TRUST_WORK_BUDGET;
                     probe.calls = 0;
@@ -4505,13 +4517,14 @@ static MunitResult selection_delta(const MunitParameter params[], void* user)
                             &candidate_reader,
                             &(tc_x509_crl_scope_processing){
                                 &index, 1, scope_delta, scope_order, &query, states, RECORDS,
-                                &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
+                                &time_order_evidence, NULL, NULL, NULL, NULL, NULL},
                             &(tc_x509_crl_trust){
                                 &source, 1, &scope_options, &tree, &validation, &search,
                                 &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
                             &trusted),
                         ==, TC_TLV_END);
-                    munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence, &completed);
+                    munit_assert_memory_equal(sizeof time_order_evidence, &time_order_evidence,
+                                              &completed);
                     munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
                     munit_assert_size(work, ==, TRUST_WORK_BUDGET);
                     munit_assert_size(probe.calls, ==, 0);

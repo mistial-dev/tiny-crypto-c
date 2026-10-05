@@ -1964,7 +1964,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                 attributes & 2 ? chuid.card_uuid : empty, biometric, sizeof biometric);
             for (unsigned selected = 0; selected < 2; ++selected) {
               legacy.signature_profile =
-                  selected ? TC_PIV_CMS_BIOMETRIC_LEGACY : TC_PIV_CMS_BIOMETRIC;
+                  selected ? TC_PIV_CMS_BIOMETRIC_FIPS201_1 : TC_PIV_CMS_BIOMETRIC;
               work = TRUST_WORK;
               munit_assert_int(example_validate_biometric(&legacy, held, &options, &revocation,
                                                           &work, &storage, &biometric_result),

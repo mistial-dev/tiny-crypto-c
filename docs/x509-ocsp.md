@@ -74,7 +74,7 @@ Set `TC_X509_ocsp_encode_request`:
 - `issuer`: the name and public key of its issuer. The certificate's issuer
   Name must match `issuer->name`.
 - `hash`: the CertID hash. Use `TC_HASH_SHA256`, or `TC_HASH_SHA1` for a
-  legacy responder. Other hashes return `TC_TLV_UNSUPPORTED`.
+  responder that accepts only SHA-1 CertIDs. Other hashes return `TC_TLV_UNSUPPORTED`.
 - `nonce`: empty, or 32 to 128 caller-generated random bytes (RFC 9654
   section 2.1).
 - `parsing`: limits for parsing the certificate.

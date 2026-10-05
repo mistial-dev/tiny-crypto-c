@@ -623,7 +623,7 @@
 #endif
 
 /* DES defaults enable CTR and Triple DES only. DES has a 56-bit effective
- * key; use it only for legacy interoperability. */
+ * key; use it only where a protocol requires it. */
 #ifndef TC_DES_ENABLE_ECB
 #define TC_DES_ENABLE_ECB TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif

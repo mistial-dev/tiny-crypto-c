@@ -30,8 +30,8 @@ The role lists exclude APDU and PIV card commands, key proofs, the PIV catalog a
 check, Secure Messaging APDU framing, VCI and the TWIC CCL reader. A role build reports a
 configuration error when one of these is set to `ON`.
 
-SHA-1 supports legacy TWIC signatures described in TWIC Part 2 section 3.3.4.
-Applications must enforce their accepted signature algorithms and legacy policy.
+SHA-1 supports Legacy TWIC signatures described in TWIC Part 2 section 3.3.4.
+Applications must enforce their accepted signature algorithms, including SHA-1.
 Enabling the hash supplies only the implementation.
 
 Applications supply access policy, trust anchors and revocation data.

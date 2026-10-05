@@ -82,8 +82,8 @@ enum {
   BIO_TAMPERED,
   BIO_READ_FAILURE,
   BIO_BAD_KEY,
-  BIO_LEGACY_SIGNATURE,
-  BIO_LEGACY_SIGNATURE_REQUIRED,
+  BIO_LEGACY_FIPS201_1,
+  BIO_LEGACY_FIPS201_1_REQUIRED,
   BIO_RSA_ABSENT,
   BIO_RSA_ABSENT_REQUIRED,
   BIO_RSA_ABSENT_TAMPERED,
@@ -205,7 +205,7 @@ FILE* example_twic_fopen(const char* path, const char* mode)
 static int legacy(void)
 {
   return scenario == LEGACY || scenario == CHUID_LEGACY || scenario == BIO_LEGACY ||
-         scenario == BIO_LEGACY_SIGNATURE || scenario == BIO_LEGACY_SIGNATURE_REQUIRED ||
+         scenario == BIO_LEGACY_FIPS201_1 || scenario == BIO_LEGACY_FIPS201_1_REQUIRED ||
          scenario == SECURITY_LEGACY;
 }
 static int with_chuid(void)
@@ -689,7 +689,7 @@ static void make_chuid(X509* root, EVP_PKEY* root_key, X509* issuer, EVP_PKEY* i
   if (with_biometric()) {
     uint8_t plaintext[2048];
     const TC_bytes signed_guid =
-        scenario == BIO_LEGACY_SIGNATURE || scenario == BIO_LEGACY_SIGNATURE_REQUIRED
+        scenario == BIO_LEGACY_FIPS201_1 || scenario == BIO_LEGACY_FIPS201_1_REQUIRED
             ? (TC_bytes){NULL, 0}
             : (TC_bytes){content + 29, 16};
     const size_t plaintext_length = encode_biometric_parameters(
@@ -939,8 +939,8 @@ static MunitResult command_workflow(const MunitParameter params[], void* context
       argv[argc++] = "--tpk-hex";
       argv[argc++] = "tpk";
     }
-    if (scenario == BIO_LEGACY_SIGNATURE)
-      argv[argc++] = "--legacy-biometric-signature";
+    if (scenario == BIO_LEGACY_FIPS201_1)
+      argv[argc++] = "--fips201-1-biometric-signature";
     if (with_security())
       argv[argc++] = "--security-object";
     if (scenario == SECURITY_PRINTED || scenario == SECURITY_PRINTED_CHANGED)
@@ -955,7 +955,7 @@ static MunitResult command_workflow(const MunitParameter params[], void* context
         scenario == CHUID_RSA_ABSENT || scenario == INTERMEDIATE || scenario == GZIP_VALID ||
         scenario == ROOT_NAME_ALLOWED ||
         (scenario >= CHUID_VALID && scenario <= CHUID_INTERMEDIATE) || scenario == BIO_VALID ||
-        scenario == BIO_LEGACY || scenario == BIO_LEGACY_SIGNATURE || scenario == BIO_RSA_ABSENT ||
+        scenario == BIO_LEGACY || scenario == BIO_LEGACY_FIPS201_1 || scenario == BIO_RSA_ABSENT ||
         scenario == SECURITY_VALID || scenario == SECURITY_LEGACY ||
         scenario == SECURITY_OPTIONAL || scenario == SECURITY_RSA_ABSENT ||
         scenario == SECURITY_PRINTED;
@@ -1066,7 +1066,7 @@ TC_TEST(command_arguments)
   munit_assert_int(example_twic_command_main(11, argv), ==, 2);
   argv[9] = argv[10] = "--piv-certificate-envelope";
   munit_assert_int(example_twic_command_main(11, argv), ==, 2);
-  argv[9] = argv[10] = "--legacy-biometric-signature";
+  argv[9] = argv[10] = "--fips201-1-biometric-signature";
   munit_assert_int(example_twic_command_main(10, argv), ==, 2);
   munit_assert_int(example_twic_command_main(11, argv), ==, 2);
   argv[9] = "--chuid-root";

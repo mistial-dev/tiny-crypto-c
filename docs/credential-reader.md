@@ -12,7 +12,7 @@ verification are separate steps. The command's exit status must never be used as
 a credential acceptance decision.
 
 Build against an installed tiny-crypto-c package. The `desktop` resource profile
-enables the algorithms and parsers used by both commands, including legacy SHA-1.
+enables the algorithms and parsers used by both commands, including SHA-1.
 For a custom profile, enable TLV with BER, DER, APDU, PIV commands, PIV CHUID, PIV objects,
 PIV OIDs, FASC-N, TWIC UUID, TWIC TPK, TWIC CCL, X.509 with path validation and revocation,
 CMS with validation, credential validation, the PIV catalog, key challenges, PIV key proofs,
@@ -200,7 +200,7 @@ OID namespaces and the selected BER policy apply.
 The parser uses the version-3 CBEFF header specified by SP 800-76-1 and
 SP 800-76-2. Signed entryUUID is required by default.
 
-`--legacy-biometric-signature` explicitly selects the FIPS 201-1 section 4.4.2
+`--fips201-1-biometric-signature` explicitly selects the FIPS 201-1 section 4.4.2
 signature profile referenced by the older TWIC biometric specification. It
 permits an absent signed entryUUID. Signed FASC-N remains mandatory and must
 match CHUID and the CBEFF header. A present entryUUID must match CHUID too.
@@ -312,7 +312,7 @@ digitalSignature, RSA-2048/3072 and P-256/P-384 under SP 800-78-5 Tables 9 and
 10, and RSA-1024 only with `allow_rsa1024` on TWIC Legacy. TWIC NEXGEN takes
 RSA-2048. TWIC Legacy uses its PIV application for this operation, with the
 TWIC Legacy policy named in the request. The application retains control of
-certificate validity, legacy-algorithm policy, cancellation and authorization.
+certificate validity, algorithm policy, cancellation and authorization.
 
 Supply `TC_PIV_key_proof_workspace` in caller-owned storage. It holds the
 challenge, the request template and the answer, and every proof wipes it.
@@ -351,7 +351,7 @@ nil UUID.
 Pass the borrowed 25-byte `fascn` directly to `TC_TWIC_CCL_contains`, or use
 `TC_PIV_card_identifiers_match` to compare the identifiers with a CHUID's
 FASC-N and GUID. The latter returns its comparison through `matched`. Check
-both the operation status and that value. An absent legacy UUID matches a nil
+both the operation status and that value. On Legacy TWIC, an absent UUID matches a nil
 GUID. Certificate trust, object signatures and CCL freshness remain separate
 workflow decisions.
 

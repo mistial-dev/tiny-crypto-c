@@ -123,7 +123,7 @@ typedef struct {
   const char* chuid_issuers[ISSUERS];
   const char* chuid_crls[CRLS];
   size_t chuid_issuer_count, chuid_crl_count;
-  int chuid_ber, legacy_biometric, security_object, printed_plaintext;
+  int chuid_ber, fips201_1_biometric, security_object, printed_plaintext;
   uint64_t marsec_level, max_age, minimum_publication;
   unsigned seen;
   int allow_rsa1024;
@@ -145,7 +145,7 @@ static const char usage[] =
     "[--chuid-issuer "
     "ISSUER.der] [--chuid-ber]]\n"
     "  [--tpk-hex ZTA.txt] (decrypts protected biometric objects)\n"
-    "  [--legacy-biometric-signature] (permits an absent signed entryUUID)\n"
+    "  [--fips201-1-biometric-signature] (permits an absent signed entryUUID)\n"
     "  [--security-object] (requires signed CHUID validation)\n"
     "  [--printed-plaintext] (requires --security-object and "
     "--tpk-hex)\n"
@@ -215,10 +215,10 @@ static int options_read(int argc, char** argv, Options* out)
       out->security_object = 1;
       continue;
     }
-    if (!strcmp(option, "--legacy-biometric-signature")) {
-      if (out->legacy_biometric)
+    if (!strcmp(option, "--fips201-1-biometric-signature")) {
+      if (out->fips201_1_biometric)
         return 0;
-      out->legacy_biometric = 1;
+      out->fips201_1_biometric = 1;
       continue;
     }
     if (!strcmp(option, "--chuid-ber")) {
@@ -318,7 +318,7 @@ static int options_read(int argc, char** argv, Options* out)
     return 0;
   if (out->printed_plaintext && (!out->security_object || !out->tpk_hex))
     return 0;
-  if (out->legacy_biometric && !out->tpk_hex)
+  if (out->fips201_1_biometric && !out->tpk_hex)
     return 0;
 #if !(TC_ENABLE_AES && TC_AES_ENABLE_ECB && TC_AES_KEY_BITS == 128)
   if (out->tpk_hex)
@@ -853,7 +853,7 @@ static int signed_objects_check(TC_PIV_link* link, const Options* options, TC_by
       !protected_object_read(link, profile, &face_object, face, work))
     return 0;
   const TC_PIV_CMS_kind signature_profile =
-      options->legacy_biometric ? TC_PIV_CMS_BIOMETRIC_LEGACY : TC_PIV_CMS_BIOMETRIC;
+      options->fips201_1_biometric ? TC_PIV_CMS_BIOMETRIC_FIPS201_1 : TC_PIV_CMS_BIOMETRIC;
   const TC_bytes objects[] = {*fingerprints, *face};
   const TC_PIV_CBEFF_format formats[] = {TC_PIV_CBEFF_FINGERPRINT_TEMPLATE,
                                          TC_PIV_CBEFF_FACE_IMAGE};

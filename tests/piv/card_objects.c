@@ -367,7 +367,7 @@ TC_TEST(ccc_recorded)
   return MUNIT_OK;
 }
 
-TC_TEST(ccc_legacy_elements)
+TC_TEST(ccc_optional_elements)
 {
   /* SP 800-73-4 Part 1 Table 8: optional E3 and B4 before FE. */
   uint8_t filler[49];
@@ -1047,7 +1047,7 @@ static MunitTest tests[] = {
     {"/discovery/framing", discovery_framing, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/discovery/arguments", discovery_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/ccc/recorded", ccc_recorded, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    {"/ccc/legacy-elements", ccc_legacy_elements, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/ccc/optional-elements", ccc_optional_elements, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/ccc/lengths", ccc_lengths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/ccc/structure", ccc_structure, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/key-history/recorded", key_history_recorded, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

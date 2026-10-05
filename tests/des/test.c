@@ -612,7 +612,7 @@ TC_TEST(test_tdes_single_des_equivalence)
 #endif /* TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB */
 
 #if TC_DES_ENABLE_CMAC
-/* OpenSSL-cross-checked KATs (legacy des-cbc / des-ede-cbc / des-ede3-cbc). */
+/* OpenSSL-cross-checked KATs (des-cbc / des-ede-cbc / des-ede3-cbc from the OpenSSL legacy provider). */
 /* Keep this exact message paired with the checked-in known-answer tag. */
 static const uint8_t cmac_kat_msg[] = "tiny-DES-c CMAC Test!";
 static const uint8_t cmac_kat_des[8] = {0x0a, 0xa5, 0xf5, 0xff, 0x35, 0xe8, 0x9f, 0x6a};

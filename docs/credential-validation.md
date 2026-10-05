@@ -89,8 +89,8 @@ the CCL and freshness fields zero. The proof callback receives
 the selected profile and public key from the accepted card certificate. It owns
 the transport and challenge exchange. It also receives the selected signature
 scheme, hash, MGF hash, and salt length. The request chooses RSA v1.5 or PSS.
-The wrapper enforces NEXGEN RSA-2048 and accepts Legacy RSA-1024 only when
-`allow_legacy_rsa1024` is set explicitly.
+The wrapper enforces NEXGEN RSA-2048 and accepts RSA-1024 on TWIC Legacy only when
+`allow_rsa1024` is set explicitly.
 
 The card context may provide an exact card-authentication purpose OID. With an
 empty purpose, `TC_PIV_card_certificate_validate` derives one exact

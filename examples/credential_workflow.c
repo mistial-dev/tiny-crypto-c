@@ -207,7 +207,7 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
   }
 
   const TC_PIV_key_policy key_policy = {request->profile, card_context->options->at,
-                                        request->rsa_padding, request->allow_legacy_rsa1024};
+                                        request->rsa_padding, request->allow_rsa1024};
   TC_PIV_key_parameters key_parameters;
   switch (TC_PIV_key_parameters_select(&accepted.card.certificate, &key_policy, &key_parameters)) {
   case TC_PIV_OK:

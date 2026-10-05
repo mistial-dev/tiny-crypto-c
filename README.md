@@ -100,9 +100,9 @@ and pointers before processing input.
 
 `TINY_CRYPTO_RESOURCE_PROFILE=micro` favors small code and byte-limb EC and
 RSA arithmetic. `mini` uses native arithmetic while keeping optional algorithms
-off. `desktop` enables the supported capabilities, including legacy algorithms
-and both PIV secure-messaging suites. Use this profile when broad compatibility
-is required, and set application policy to restrict legacy algorithms.
+off. `desktop` enables the supported capabilities, including SHA-1, DES,
+MD5 and both PIV secure-messaging suites. Use this profile when broad
+compatibility is required, and set application policy to restrict those algorithms.
 
 `TINY_CRYPTO_TARGET=piv-acu` or `piv-pd` selects a fixed role-specific algorithm
 set independently of resource tuning. A role default overrides the profile
@@ -154,7 +154,7 @@ each dependency that `config.h` requires.
 | `TINY_CRYPTO_EC_ENABLE_P384`     | ON      | ON    | ON   | ON      | P-384                                                                  |
 | `TINY_CRYPTO_EC_SMALL`           | OFF     | ON    | OFF  | OFF     | Byte limbs for EC arithmetic (always used on AVR)                      |
 | `TINY_CRYPTO_ENABLE_RSA`         | OFF     | OFF   | OFF  | ON      | RSA verification, signing, OAEP, key validation and key generation     |
-| `TINY_CRYPTO_RSA_ENABLE_1024`    | OFF     | OFF   | OFF  | OFF     | Legacy RSA-1024, requires an explicit override                         |
+| `TINY_CRYPTO_RSA_ENABLE_1024`    | OFF     | OFF   | OFF  | OFF     | RSA-1024 keys, requires an explicit override                           |
 | `TINY_CRYPTO_RSA_ENABLE_2048`    | ON      | ON    | ON   | ON      | RSA-2048                                                               |
 | `TINY_CRYPTO_RSA_ENABLE_3072`    | ON      | ON    | ON   | ON      | RSA-3072                                                               |
 | `TINY_CRYPTO_RSA_ENABLE_4096`    | ON      | ON    | ON   | ON      | RSA-4096                                                               |
@@ -164,7 +164,7 @@ each dependency that `config.h` requires.
 | `TINY_CRYPTO_ENABLE_SHA256`      | ON      | ON    | ON   | ON      | SHA-256                                                                |
 | `TINY_CRYPTO_ENABLE_SHA384`      | OFF     | OFF   | OFF  | ON      | SHA-384 on the SHA-512 core                                            |
 | `TINY_CRYPTO_ENABLE_SHA512`      | OFF     | OFF   | OFF  | ON      | SHA-512                                                                |
-| `TINY_CRYPTO_ENABLE_MD5`         | OFF     | OFF   | OFF  | ON      | MD5 checksums for legacy data                                          |
+| `TINY_CRYPTO_ENABLE_MD5`         | OFF     | OFF   | OFF  | ON      | MD5 checksums (RFC 1321)                                               |
 | `TINY_CRYPTO_ENABLE_HMAC`        | OFF     | OFF   | OFF  | ON      | HMAC over the enabled SHA algorithms                                   |
 | `TINY_CRYPTO_ENABLE_KMAC256`     | OFF     | OFF   | OFF  | ON      | Fixed-output KMAC256 with customization                                |
 | `TINY_CRYPTO_ENABLE_KDF`         | OFF     | OFF   | OFF  | ON      | SP 800-108r1 KBKDF over the enabled HMAC and CMAC PRFs                 |
@@ -309,7 +309,7 @@ every resource profile. Enable it explicitly. See
 [DES message authentication](docs/api.md#des-message-authentication) for
 algorithm, padding and tag requirements. `TINY_CRYPTO_DES_REJECT_WEAK_KEYS=ON`
 rejects weak or semi-weak DES component keys and TDEA bundles that collapse to
-single DES. It is off by default for legacy-vector compatibility.
+single DES. It is off by default so published DES test vectors with such keys still run.
 
 SHA-1, SHA-224, and SHA-256 are implemented in `hash.c`. SHA-384 and SHA-512
 share a 64-bit core in `sha512.c`. SHA-224 and SHA-384 reuse the compression
@@ -392,7 +392,7 @@ CTR, CBC, ECB, OFB, and CFB provide no authentication. Pair them with a MAC or
 use an authenticated mode such as GCM, CCM, EAX, or SIV. Never reuse a CTR,
 GCM, CCM, EAX, or OFB nonce with the same key.
 
-DES has only a 56-bit effective key and exists for legacy interoperability.
+DES has only a 56-bit effective key and exists for protocols that require it.
 Its table lookups have no cache-timing protection. Limit 3DES to compatibility
 code as well.
 

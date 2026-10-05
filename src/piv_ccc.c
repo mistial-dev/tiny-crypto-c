@@ -41,7 +41,7 @@ static const ccc_field ccc_fields[CCC_FIELDS] = {
 
 /* SP 800-73-4 Part 1 Table 8 places the optional Extended Application
  * CardURL (E3) and Security Object Buffer (B4) before FE. */
-static const ccc_field legacy_fields[2] = {{0xe3, LENGTH_UP_TO, 48}, {0xb4, LENGTH_UP_TO, 48}};
+static const ccc_field optional_fields[2] = {{0xe3, LENGTH_UP_TO, 48}, {0xb4, LENGTH_UP_TO, 48}};
 enum { ERROR_DETECTION_FIELD = CCC_FIELDS - 1 };
 
 static int length_allowed(const ccc_field* field, size_t length)
@@ -79,7 +79,7 @@ static int byte_value(TC_bytes value)
 
 static TC_TLV_result ccc_read(TC_bytes encoded, TC_PIV_container_encoding encoding, TC_PIV_CCC* out)
 {
-  TC_bytes contents, values[CCC_FIELDS], legacy;
+  TC_bytes contents, values[CCC_FIELDS], optional;
   TC_TLV_reader reader;
   TC_TLV_result result = tc_piv_object_contents(encoded, encoding, out, sizeof *out, &contents);
   if (result != TC_TLV_OK)
@@ -88,8 +88,8 @@ static TC_TLV_result ccc_read(TC_bytes encoded, TC_PIV_container_encoding encodi
   for (size_t i = 0; result == TC_TLV_OK && i < ERROR_DETECTION_FIELD; ++i)
     result = field_read(&reader, &ccc_fields[i], &values[i]);
   for (size_t i = 0; result == TC_TLV_OK && i < 2; ++i)
-    if (next_tag(&reader) == legacy_fields[i].tag)
-      result = field_read(&reader, &legacy_fields[i], &legacy);
+    if (next_tag(&reader) == optional_fields[i].tag)
+      result = field_read(&reader, &optional_fields[i], &optional);
   if (result == TC_TLV_OK)
     result =
         field_read(&reader, &ccc_fields[ERROR_DETECTION_FIELD], &values[ERROR_DETECTION_FIELD]);

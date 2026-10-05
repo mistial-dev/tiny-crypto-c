@@ -41,7 +41,7 @@ Build a [CRL index](x509-crl.md#indexing-a-collection) and set
 
 `delta_policy` selects complete CRLs only, deltas when available, or required
 deltas. `order_policy` normally uses CRL numbers. `TC_X509_CRL_ORDER_THIS_UPDATE`
-explicitly enables time ordering for legacy unnumbered CRLs. It is never selected
+explicitly enables time ordering for CRLs without a CRL number. It is never selected
 automatically, and delta pairing still requires numbers.
 
 ## Freshness

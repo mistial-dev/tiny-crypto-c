@@ -639,7 +639,7 @@ int main(void)
         0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23
     };
     static const uint8_t iv[TC_DES_BLOCKLEN] = {0};
-    uint8_t data[16] = "legacy payload";
+    uint8_t data[16] = "DES-CBC payload";
     struct TC_DES_ctx ctx;
     int failed;
 

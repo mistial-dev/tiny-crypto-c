@@ -297,16 +297,16 @@ TC_TEST(identifiers)
                            (TC_TLV_frames){frames, FRAME_COUNT}, &work, &matched),
                        ==, TC_TLV_OK);
       munit_assert_int(matched, ==, mismatch == 0 || !(presence & (1u << (mismatch - 1))));
-      size_t legacy_work = WORK;
-      int legacy_matched = -1;
-      munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC_LEGACY,
+      size_t fips201_1_work = WORK;
+      int fips201_1_matched = -1;
+      munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC_FIPS201_1,
                                                     expected_fascn, expected_uuid, &limits,
                                                     (TC_TLV_frames){frames, FRAME_COUNT},
-                                                    &legacy_work, &legacy_matched),
+                                                    &fips201_1_work, &fips201_1_matched),
                        ==, presence & 1 ? TC_TLV_OK : TC_TLV_INVALID);
-      munit_assert_int(legacy_matched, ==, presence & 1 ? matched : -1);
+      munit_assert_int(fips201_1_matched, ==, presence & 1 ? matched : -1);
       if (!(presence & 1))
-        munit_assert_size(legacy_work, ==, WORK);
+        munit_assert_size(fips201_1_work, ==, WORK);
       if (mismatch == 1)
         fascn[0] ^= 1;
       if (mismatch == 2)

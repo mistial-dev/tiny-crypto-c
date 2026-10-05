@@ -194,7 +194,7 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
   tc_credential_session session;
   if (!request || !request->encoded.data || !request->encoded.length ||
       (request->signature_profile != TC_PIV_CMS_BIOMETRIC &&
-       request->signature_profile != TC_PIV_CMS_BIOMETRIC_LEGACY) ||
+       request->signature_profile != TC_PIV_CMS_BIOMETRIC_FIPS201_1) ||
       (request->format != TC_PIV_CBEFF_FINGERPRINT_TEMPLATE &&
        request->format != TC_PIV_CBEFF_FACE_IMAGE && request->format != TC_PIV_CBEFF_IRIS_IMAGE) ||
       !request->card_expiration || !work || !out ||

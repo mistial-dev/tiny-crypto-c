@@ -86,7 +86,7 @@ typedef struct {
   const TC_TWIC_CCL_snapshot* ccl;
   TC_TWIC_CCL_freshness_policy freshness;
   size_t ccl_reads;
-  uint8_t allow_legacy_rsa1024;
+  uint8_t allow_rsa1024;
   /* RSA representative encoding for the fresh proof. EC ignores this field. */
   TC_PIV_rsa_padding rsa_padding;
   ExampleCredentialProof proof;

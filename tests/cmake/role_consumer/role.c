@@ -26,7 +26,7 @@
 #error "Unrelated algorithm enabled in a PIV role"
 #endif
 
-TC_TEST(legacy_hash)
+TC_TEST(sha1_hash)
 {
   const uint8_t message[] = {'a', 'b', 'c'};
   const uint8_t expected[] = {0xa9, 0x99, 0x3e, 0x36, 0x47, 0x06, 0x81, 0x6a, 0xba, 0x3e,
@@ -165,7 +165,7 @@ int main(int argc, char** argv)
   static char* schemes[] = {"v15", "pss", NULL};
   static MunitParameterEnum rsa_params[] = {{"scheme", schemes}, {NULL, NULL}};
   MunitTest tests[] = {
-      {"/legacy-hash", legacy_hash, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/sha1-hash", sha1_hash, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/gzip", gzip_member, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/native-signature", native_signature, NULL, NULL, MUNIT_TEST_OPTION_NONE, curve_params},
       {"/rsa-signature", rsa_signature, NULL, NULL, MUNIT_TEST_OPTION_NONE, rsa_params},

@@ -68,7 +68,7 @@ and the identifier set. `attribute_oids` must be `TC_CMS_ATTRIBUTE_OIDS_PIV`
 for PIV cards or `TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC` for TWIC readers. The same
 selection applies to the content type, following TWIC Part 2 v5 section 6.
 `TC_PIV_CMS_BIOMETRIC` requires both FASC-N and entryUUID. Select
-`TC_PIV_CMS_BIOMETRIC_LEGACY` explicitly for the FIPS 201-1 signature profile:
+`TC_PIV_CMS_BIOMETRIC_FIPS201_1` explicitly for the FIPS 201-1 signature profile:
 FASC-N remains mandatory and a present entryUUID must match CHUID. Use the
 same profile for identifier matching and set
 `TC_PIV_biometric_validation_request.signature_profile` when validating it.

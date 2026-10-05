@@ -163,13 +163,13 @@ TC_PIV_CBEFF_format TC_PIV_CBEFF_format_identify(const TC_PIV_CBEFF_metadata* me
 static int cms_kind_valid(TC_PIV_CMS_kind kind)
 {
   return kind == TC_PIV_CMS_CHUID || kind == TC_PIV_CMS_BIOMETRIC ||
-         kind == TC_PIV_CMS_BIOMETRIC_LEGACY || kind == TC_PIV_CMS_SECURITY;
+         kind == TC_PIV_CMS_BIOMETRIC_FIPS201_1 || kind == TC_PIV_CMS_SECURITY;
 }
 
 static int cms_identifiers_present(TC_PIV_CMS_kind kind, TC_bytes fascn, TC_bytes uuid)
 {
   return kind == TC_PIV_CMS_CHUID || kind == TC_PIV_CMS_SECURITY ||
-         (fascn.data && (kind == TC_PIV_CMS_BIOMETRIC_LEGACY || uuid.data));
+         (fascn.data && (kind == TC_PIV_CMS_BIOMETRIC_FIPS201_1 || uuid.data));
 }
 
 TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind,

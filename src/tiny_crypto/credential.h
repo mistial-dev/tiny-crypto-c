@@ -96,7 +96,7 @@ typedef struct {
   /* Accepted CHUID from TC_PIV_CHUID_validate at context->options->at. */
   const TC_PIV_CHUID_report* chuid;
   const TC_X509_time* card_expiration;
-  /* Select the current or legacy biometric CMS profile explicitly. */
+  /* Select the SP 800-76-2 or FIPS 201-1 biometric CMS profile explicitly. */
   TC_PIV_CMS_kind signature_profile;
   TC_PIV_CBEFF_format format;
   /* Set to one to require the CBEFF validity period at context time. */

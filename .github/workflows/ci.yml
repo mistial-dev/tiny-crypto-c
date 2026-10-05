@@ -131,8 +131,8 @@ jobs:
       - name: Memory sanitizer
         if: matrix.compiler == 'clang'
         run: make test-msan
-      - name: Option forwarding and legacy opt-in profile
-        run: make test BUILD_DIR=build-legacy TINY_CRYPTO_ENABLE_SHA1=ON TINY_CRYPTO_ENABLE_DES=ON
+      - name: Option forwarding and SHA-1/DES opt-in profile
+        run: make test BUILD_DIR=build-sha1-des TINY_CRYPTO_ENABLE_SHA1=ON TINY_CRYPTO_ENABLE_DES=ON
       - name: SHA-384-only core gating under -Werror
         run: make test BUILD_DIR=build-sha384 CMAKE_ARGS=-DCMAKE_COMPILE_WARNING_AS_ERROR=ON TINY_CRYPTO_ENABLE_SHA256=OFF TINY_CRYPTO_ENABLE_SHA384=ON TINY_CRYPTO_ENABLE_HMAC=ON
       - name: KDF shipped-library profile

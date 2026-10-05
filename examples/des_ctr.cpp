@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * PlatformIO / Arduino example: DES-CTR encrypt then decrypt. Build with
- * -DTC_ENABLE_DES=1. Single DES is a legacy algorithm; use it only where a
+ * -DTC_ENABLE_DES=1. Single DES has a 56-bit key. Use it only where a
  * protocol requires it.
  */
 
