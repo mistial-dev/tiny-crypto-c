@@ -53,19 +53,20 @@ The shared sequence is:
 
 The request selects PIV, TWIC Legacy, or TWIC NEXGEN and its signed CHUID
 schema. TWIC profiles take `TC_CHUID_PROFILE_TWIC_SIGNED`. The PIV profile takes
-`TC_CHUID_PROFILE_PIV` or `TC_CHUID_PROFILE_LEGACY_KEY_MAP`, the explicit PIV-shaped
-option for the historical `3D` field. `TC_PIV_CHUID_validate` also accepts
-`TC_CHUID_PROFILE_LEGACY_KEY_MAP` under TWIC profiles for the PIV application of a
-TWIC card, where a NEXGEN card sends an empty `3D`. PIV uses strict PIV
+`TC_CHUID_PROFILE_PIV` for SP 800-73-5 cards or
+`TC_CHUID_PROFILE_PIV_SP800_73_4`, the explicit opt-in for SP 800-73-4 fields
+and the historical `3D` field. `TC_PIV_CHUID_validate` also accepts
+`TC_CHUID_PROFILE_PIV_SP800_73_4` under TWIC profiles for the PIV application of
+a TWIC card, where a NEXGEN card sends an empty `3D`. PIV uses strict PIV
 identifier and OID rules. TWIC identity binding follows Part 3 section 4.4.4:
 the signed certificate FASC-N identifies the credential. The certificate may
 omit its UUID URI. A present UUID must satisfy the selected profile and match
-the CHUID GUID. The complete FASC-N must match across both authenticated objects.
-`TC_TWIC_card_identifiers_read` and `TC_TWIC_card_identifiers_match` implement
-this reader policy. `TC_PIV_card_identifiers_read` performs the PIV profile check.
-For TWIC, the workflow accepts the registered PIV or TWIC card-authentication
-OID and passes the certificate's exact encoded OID into path validation. PIV
-accepts the PIV OID.
+the CHUID GUID. The complete FASC-N must match across both authenticated
+objects. `TC_TWIC_card_identifiers_read` and `TC_TWIC_card_identifiers_match`
+implement this reader policy. `TC_PIV_card_identifiers_read` performs the PIV
+profile check. For TWIC, the workflow accepts the registered PIV or TWIC
+card-authentication OID and passes the certificate's exact encoded OID into path
+validation. PIV accepts the PIV OID.
 
 `card_key` selects slot 9E Card Authentication or slot 9A PIV Authentication.
 Slot 9A requires the `TC_PIV_CARD` profile. For slot 9A, the workflow reads the

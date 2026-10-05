@@ -51,8 +51,8 @@ void tc_piv_check_chuid(tc_piv_check_run* run)
      * PIV application of a TWIC card keeps the optional Authentication Key
      * Map of SP 800-73-2 (3D), which a NEXGEN card sends empty. */
     TC_PIV_CHUID_profile chuid_profile;
-    if (TC_PIV_card_chuid_profile(run->report->application, report->profile, &chuid_profile) !=
-        TC_TLV_OK) {
+    if (TC_PIV_card_chuid_profile(run->report->application, report->profile,
+                                  run->request->piv_card_chuid, &chuid_profile) != TC_TLV_OK) {
       run->result = TC_PIV_ERROR;
       return;
     }

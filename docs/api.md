@@ -358,14 +358,18 @@ identifier checks, cancellation, fresh key possession, signed objects and a
 bounded list of biometric objects using retained inputs. Reader commands live in the example
 application's proof callback and transport layer.
 
-`TC_PIV_CHUID_read` also provides `TC_CHUID_PROFILE_LEGACY_KEY_MAP`
-for PIV-shaped CHUIDs containing the historical Authentication Key Map (`3D`).
-Select this profile explicitly for compatible credentials. It accepts one map
+`TC_CHUID_PROFILE_PIV` follows SP 800-73-5 Part 1 Table 10. It rejects Buffer
+Length (`EE`), Organizational Identifier (`32`) and DUNS (`33`) and requires an
+RFC 4122 GUID of version 1, 4 or 5 and a version 4 Cardholder UUID (sections
+3.4.1 and 3.4.2). `TC_PIV_CHUID_read` also provides
+`TC_CHUID_PROFILE_PIV_SP800_73_4` for PIV-shaped CHUIDs issued under SP 800-73-4
+or earlier. It accepts the `EE`, `32` and `33` fields, any GUID version and the
+historical Authentication Key Map (`3D`). Select this profile explicitly for
+compatible credentials. It accepts one map
 of up to 512 bytes immediately before the signature and returns its borrowed
 value in `authentication_key_map`. `signed_content` includes the map's exact
 tag, length and value. Authenticate the signature before using the map.
-An empty present map has a non-NULL pointer.
-Current PIV and TWIC profiles retain their field schemas. See
+An empty present map has a non-NULL pointer. See
 [SP 800-73-2, Part 1, Table 8](https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-73-2.pdf)
 for the field definition.
 

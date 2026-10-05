@@ -39,7 +39,9 @@ static const char usage[] =
     "  [--ocsp 9a|9c|9d|9e RESPONSE.der]... [--interface contact|contactless]\n"
     "  [--extended] [--revocation required|when-available]\n"
     "  [--at YYYY-MM-DDTHH:MM:SSZ] [--min-retries N] [--pin-prompt] [--dump-dir DIR]\n"
+    "  [--chuid-sp800-73-4]\n"
     "Reads the card, runs the library card check and prints the report.\n"
+    "--chuid-sp800-73-4 accepts a PIV card CHUID issued under SP 800-73-4.\n"
     "--reader defaults to TC_PIV_READER, a substring of one reader name, for\n"
     "example 'ACR1552 1S CL Reader PICC'. Yubico readers are refused.\n"
     "The PIN and pairing code come from TC_PIV_PIN and TC_PIV_PAIRING_CODE, or\n"
@@ -73,7 +75,7 @@ typedef struct {
   TC_APDU_length_format format;
   TC_validation_revocation revocation;
   unsigned minimum_retries;
-  int pin_prompt;
+  int pin_prompt, chuid_sp800_73_4;
 } Arguments;
 
 static int slot_parse(const char* text, size_t* out)
@@ -100,6 +102,10 @@ static int arguments_parse(int argc, char** argv, Arguments* out)
     }
     if (!strcmp(option, "--pin-prompt")) {
       out->pin_prompt = 1;
+      continue;
+    }
+    if (!strcmp(option, "--chuid-sp800-73-4")) {
+      out->chuid_sp800_73_4 = 1;
       continue;
     }
     if (i + 1 >= argc)
@@ -327,6 +333,8 @@ static int inspect(const Arguments* arguments)
   options.format = arguments->format;
   options.minimum_retries = arguments->minimum_retries;
   options.revocation = arguments->revocation;
+  options.piv_card_chuid =
+      arguments->chuid_sp800_73_4 ? TC_CHUID_PROFILE_PIV_SP800_73_4 : TC_CHUID_PROFILE_PIV;
   options.random = (TC_random_source){example_card_random, NULL};
   const int ask = arguments->pin_prompt || (!getenv("TC_PIV_PIN") && isatty(STDIN_FILENO));
   if (!inputs_load(arguments, anchors, crls, &options) ||

@@ -39,6 +39,9 @@ typedef void (*ExamplePIVInspectDump)(void* context, const TC_PIV_object* object
  * at               the evaluation time.
  * random           secure messaging scalars and key proof challenges.
  * host_id          the host identifier of key establishment (Part 2 4.1.1).
+ * piv_card_chuid   CHUID profile for the PIV application of a PIV card:
+ *                  TC_CHUID_PROFILE_PIV or TC_CHUID_PROFILE_PIV_SP800_73_4
+ *                  (TC_PIV_card_check_request.piv_card_chuid).
  * dump             NULL, or a callback for present objects. */
 typedef struct {
   TC_PIV_interface interface;
@@ -54,6 +57,7 @@ typedef struct {
   TC_X509_time at;
   TC_random_source random;
   uint8_t host_id[8];
+  TC_PIV_CHUID_profile piv_card_chuid;
   ExamplePIVInspectDump dump;
   void* dump_context;
 } ExamplePIVInspectOptions;

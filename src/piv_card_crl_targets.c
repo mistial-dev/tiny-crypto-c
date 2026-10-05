@@ -122,7 +122,7 @@ static TC_bytes object_cms(const TC_PIV_object* object, TC_PIV_application_id ap
     TC_PIV_CHUID chuid;
     const TC_PIV_CHUID_profile profile = application == TC_PIV_APPLICATION_TWIC
                                              ? TC_CHUID_PROFILE_TWIC_SIGNED
-                                             : TC_CHUID_PROFILE_LEGACY_KEY_MAP;
+                                             : TC_CHUID_PROFILE_PIV_SP800_73_4;
     return TC_PIV_CHUID_read(object->encoded, TC_PIV_CHUID_CONTAINER, profile, &chuid) == TC_TLV_OK
                ? chuid.signature
                : none;

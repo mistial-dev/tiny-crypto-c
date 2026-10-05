@@ -2250,7 +2250,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-TC_TEST(legacy_chuid_key_map_signature)
+TC_TEST(sp800_73_4_chuid_key_map_signature)
 {
   enum { CAPACITY = 2048, CERTIFICATE_BYTES = 1024, FRAMES = 16, OIDS = 16, WORK = 100000 };
   uint8_t encoded[CAPACITY], certificate_bytes[CERTIFICATE_BYTES];
@@ -2263,7 +2263,7 @@ TC_TEST(legacy_chuid_key_map_signature)
   static const uint8_t content_type[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 6, 1};
   EVP_PKEY* key = EVP_EC_gen("prime256v1");
   munit_assert_not_null(key);
-  X509* certificate = make_certificate(key, "Legacy CHUID signer", NULL);
+  X509* certificate = make_certificate(key, "SP 800-73-4 CHUID signer", NULL);
   add_extension(certificate, NID_basic_constraints, "critical,CA:FALSE");
   add_extension(certificate, NID_key_usage, "critical,digitalSignature");
   const size_t certificate_length = encode_certificate(certificate, key, EVP_sha256(),
@@ -2297,7 +2297,7 @@ TC_TEST(legacy_chuid_key_map_signature)
 
   TC_PIV_CHUID chuid;
   munit_assert_int(TC_PIV_CHUID_read((TC_bytes){encoded, encoded_length}, TC_PIV_CHUID_CONTENTS,
-                                     TC_CHUID_PROFILE_LEGACY_KEY_MAP, &chuid),
+                                     TC_CHUID_PROFILE_PIV_SP800_73_4, &chuid),
                    ==, TC_TLV_OK);
   TC_PIV_CHUID unchanged;
   memset(&unchanged, 0xa5, sizeof unchanged);
@@ -2515,7 +2515,7 @@ int main(int argc, char** argv)
       {"/rsa-signature", rsa_signature, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/signed-data", signed_data, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/chuid-signature", chuid_signature, NULL, NULL, MUNIT_TEST_OPTION_NONE, fascn_params},
-      {"/legacy-chuid-key-map-signature", legacy_chuid_key_map_signature, NULL, NULL,
+      {"/sp800-73-4-chuid-key-map-signature", sp800_73_4_chuid_key_map_signature, NULL, NULL,
        MUNIT_TEST_OPTION_NONE, NULL},
       {"/security-profile", security_profile, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};

@@ -174,6 +174,9 @@ TC_status example_card_pcsc_transmit(void* context, TC_bytes wire, TC_buffer buf
     response[bytes++] = 16;
     for (unsigned i = 0; i < 16; ++i)
       response[bytes++] = (uint8_t)(i + 32);
+    /* An RFC 4122 version 4 UUID (SP 800-73-5 Part 1 section 3.4.1). */
+    response[bytes - 10] = 0x46;
+    response[bytes - 8] = 0x88;
     response[bytes++] = 0x35;
     response[bytes++] = 8;
     memcpy(response + bytes, "20300101", 8);

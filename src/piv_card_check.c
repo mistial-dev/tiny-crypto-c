@@ -33,14 +33,21 @@ static int profile_fits(TC_PIV_card_profile profile, const TC_PIV_inventory* inv
   return inventory->link.application == TC_PIV_APPLICATION_PIV;
 }
 
-TC_TLV_result TC_PIV_card_chuid_profile(TC_PIV_application_id application,
-                                        TC_PIV_card_profile profile, TC_PIV_CHUID_profile* out)
+static int piv_card_chuid_valid(TC_PIV_CHUID_profile chuid)
 {
-  if (!out ||
+  return chuid == TC_CHUID_PROFILE_PIV || chuid == TC_CHUID_PROFILE_PIV_SP800_73_4;
+}
+
+TC_TLV_result TC_PIV_card_chuid_profile(TC_PIV_application_id application,
+                                        TC_PIV_card_profile profile,
+                                        TC_PIV_CHUID_profile piv_card_chuid,
+                                        TC_PIV_CHUID_profile* out)
+{
+  if (!out || !piv_card_chuid_valid(piv_card_chuid) ||
       (profile != TC_PIV_CARD && profile != TC_TWIC_LEGACY_CARD && profile != TC_TWIC_NEXGEN_CARD))
     return TC_TLV_ARGUMENT;
   if (application == TC_PIV_APPLICATION_PIV)
-    *out = profile == TC_PIV_CARD ? TC_CHUID_PROFILE_PIV : TC_CHUID_PROFILE_LEGACY_KEY_MAP;
+    *out = profile == TC_PIV_CARD ? piv_card_chuid : TC_CHUID_PROFILE_PIV_SP800_73_4;
   else if (application == TC_PIV_APPLICATION_TWIC && profile != TC_PIV_CARD)
     *out = TC_CHUID_PROFILE_TWIC_SIGNED;
   else
@@ -153,6 +160,7 @@ static int arguments_valid(const TC_PIV_card_check_request* request,
   return inventory_complete(inventory) &&
          objects_valid(request->plain_copies, request->plain_copy_count) &&
          request->plain_copy_count <= SIZE_MAX / sizeof *request->plain_copies &&
+         piv_card_chuid_valid(request->piv_card_chuid) &&
          (request->sm_card_cvc.data || !request->sm_card_cvc.length) &&
          context_complete(request->card) && context_complete(request->content) &&
          TC_X509_time_compare(&request->card->options->at, &request->content->options->at,

@@ -57,8 +57,8 @@ typedef struct {
 /* Authenticate a signed CHUID and bind it to the validated card certificate
  * (SP 800-73-5 Part 1 sections 3.1.2 and 3.1.2.1, TWIC Part 2 v5 section 6).
  * - request->profile selects the card profile. PIV takes the PIV or
- *   LEGACY_KEY_MAP CHUID profile. TWIC profiles take TWIC_SIGNED for the TWIC
- *   application, or LEGACY_KEY_MAP for the PIV application of a TWIC card,
+ *   PIV_SP800_73_4 CHUID profile. TWIC profiles take TWIC_SIGNED for the TWIC
+ *   application, or PIV_SP800_73_4 for the PIV application of a TWIC card,
  *   whose CHUID keeps the SP 800-73-2 Authentication Key Map (3D).
  *   twic_reader_policy is 0 or 1 and applies to the PIV profile only.
  * - card and card_expiration come from the already validated card

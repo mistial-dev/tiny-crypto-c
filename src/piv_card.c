@@ -7,6 +7,7 @@
 #include "string_internal.h"
 #include "pki_reader_internal.h"
 #include "pki_tree_internal.h"
+#include "piv_uuid_internal.h"
 
 enum {
   FASCN_BYTES = 25,
@@ -59,14 +60,11 @@ static int uuid_profile(const uint8_t* uuid, TC_PIV_card_profile profile)
   static const uint8_t nil[UUID_BYTES] = {0};
   if (profile == TC_TWIC_LEGACY_CARD)
     return !memcmp(uuid, nil, sizeof nil);
-  if ((uuid[8] & 0xc0) != 0x80)
-    return 0;
   if (profile == TC_TWIC_NEXGEN_CARD) {
     uint64_t number;
     return TC_TWIC_uuid_read((TC_bytes){uuid, UUID_BYTES}, &number) == TC_TLV_OK;
   }
-  const unsigned version = uuid[6] >> 4;
-  return version == 1 || version == 4 || version == 5;
+  return tc_piv_uuid_valid(uuid, TC_PIV_CARD_UUID_VERSIONS);
 }
 
 static TC_TLV_result read_fascn(const TC_X509_general_name* name, TC_PIV_oid_profile profile,
@@ -189,7 +187,7 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
     identifiers.uuid_urn = uuid_urns[card_index];
     if (uuid_count == 2) {
       const size_t cardholder_index = card_index ^ 1u;
-      if ((uuids[cardholder_index][6] >> 4) != 4)
+      if (!tc_piv_uuid_valid(uuids[cardholder_index], TC_PIV_CARDHOLDER_UUID_VERSIONS))
         return TC_TLV_INVALID;
       identifiers.cardholder_uuid_urn = uuid_urns[cardholder_index];
     }

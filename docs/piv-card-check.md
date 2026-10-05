@@ -41,16 +41,17 @@ that matches a `NOT_CHECKABLE` entry rejects the card.
 views of the inventory pool, the workspace buffers and the trust inputs, so keep
 them unchanged while the report is in use.
 
-| Field                              | Purpose                                                                     |
-| ---------------------------------- | --------------------------------------------------------------------------- |
-| `inventory`                        | the read inventory. Its `link` member gives the interface and access state. |
-| `link`                             | the link that read it, or `NULL` for retained objects                       |
-| `profile`                          | the credential profile (see below)                                          |
-| `card`                             | trust, CRLs, time and revocation policy for the card certificates           |
-| `content`                          | trust, CRLs, time and revocation policy for the signed objects and `5FC122` |
-| `ocsp`                             | one DER OCSP response per card certificate slot and its bounds, or `NULL`   |
-| `sm_card_cvc`                      | the card CVC of the secure messaging session, or empty                      |
-| `plain_copies`, `plain_copy_count` | objects read before secure messaging, for `COPY_MATCH`                      |
+| Field                              | Purpose                                                                          |
+| ---------------------------------- | -------------------------------------------------------------------------------- |
+| `inventory`                        | the read inventory. Its `link` member gives the interface and access state.      |
+| `link`                             | the link that read it, or `NULL` for retained objects                            |
+| `profile`                          | the credential profile (see below)                                               |
+| `card`                             | trust, CRLs, time and revocation policy for the card certificates                |
+| `content`                          | trust, CRLs, time and revocation policy for the signed objects and `5FC122`      |
+| `ocsp`                             | one DER OCSP response per card certificate slot and its bounds, or `NULL`        |
+| `sm_card_cvc`                      | the card CVC of the secure messaging session, or empty                           |
+| `plain_copies`, `plain_copy_count` | objects read before secure messaging, for `COPY_MATCH`                           |
+| `piv_card_chuid`                   | CHUID profile of a PIV card's PIV application, `TC_CHUID_PROFILE_PIV` by default |
 
 On the TWIC application the profile equals the SELECT profile of the
 inventory. On the PIV application it is `TC_PIV_CARD`, or a TWIC profile for
@@ -58,6 +59,12 @@ the PIV application of a TWIC card. Both contexts use the same evaluation time
 and may share one validation arena. `TC_validation_options.revocation` of each
 context selects its revocation evidence policy
 ([validation](validation.md#configure-policy-and-trust)).
+
+A PIV card CHUID must follow SP 800-73-5 Part 1 Table 10 by default. Cards
+issued under SP 800-73-4 may carry Buffer Length, Organizational Identifier or
+DUNS fields, or a GUID of another UUID version. Set `piv_card_chuid` to
+`TC_CHUID_PROFILE_PIV_SP800_73_4` to check those cards.
+`TC_PIV_card_chuid_profile` returns the CHUID profile that the check uses.
 
 `TC_PIV_card_check_workspace` holds GZIP and EC scratch and two caller buffers.
 `certificates` receives the decoded GZIP certificates one after another, and
@@ -247,7 +254,7 @@ int check_card(const TC_PIV_link* link, const TC_PIV_inventory* inventory,
       {TC_PIV_CHECK_SECURITY_SIGNATURE, 0, 0},
       {TC_PIV_CHECK_SECURITY_DIGEST, 0, 0x3000}};
   const TC_PIV_card_check_request request = {
-      inventory, link, TC_PIV_CARD, card, content, NULL, {NULL, 0}, NULL, 0};
+      inventory, link, TC_PIV_CARD, card, content, NULL, {NULL, 0}, NULL, 0, 0};
   size_t work = 100000000;
   const TC_PIV_result result = TC_PIV_card_check(&request, workspace, &work, report);
   if (result != TC_PIV_OK)
@@ -341,8 +348,8 @@ which clears its PIN status. `--anchor-sha256` pins the preceding anchor,
 `--ocsp 9a|9c|9d|9e FILE` supplies the OCSP response of one slot, `--at` sets
 the evaluation time as `YYYY-MM-DDTHH:MM:SSZ`, `--min-retries` sets the PIN
 retry floor of `TC_PIV_pin_verify` from 2 to 15 with a default of 3,
-`--extended` selects extended length and `--dump-dir` writes each present
-object to a directory only its owner can read.
+`--extended` selects extended length, `--chuid-sp800-73-4` selects `TC_CHUID_PROFILE_PIV_SP800_73_4` and
+`--dump-dir` writes each present object to a directory only its owner can read.
 `TC_PIV_HARDWARE_GUARD=1` installs the transmit guard of the
 [PIV card hardware tests](testing.md#piv-card-hardware-tests). Only the
 `test_piv_inspect_live` build provides that guard, so another build exits
