@@ -28,7 +28,10 @@ Build a [CRL index](x509-crl.md#indexing-a-collection) and set
 
 - `index`: the parsed CRL collection, kept unchanged throughout the call.
 - `source`: the held source with CRL signer certificates, intermediates and anchors.
-- `anchor_index`: the same source anchor used to validate the target path.
+- `anchor_index`: the same source anchor used to validate the target path. The anchor
+  key signs CRLs only when the anchor record carries `TC_X509_ANCHOR_USAGE_CRL_SIGN`
+  (RFC 5280 section 6.3.3 (f), RFC 10007 section 4). A source certificate with the
+  anchor's name and complete SubjectPublicKeyInfo signs as the anchor key.
 - `signer_policy`: validation options for CRL signers at the same time. Omit
   holder-specific EKU and key-usage requirements. cRLSign is added internally.
   Version 3 CRL signers must carry keyUsage with cRLSign set.

@@ -842,25 +842,41 @@ static TC_bytes crl_der(long serial, uint8_t out[OCSP_FILE_CAPACITY])
 static ocsp_revocation revocation;
 static uint8_t crl_bytes[OCSP_FILE_CAPACITY];
 
-/* Check the one-certificate path CA -> target with a CRL selector from the
- * enum above. delegate, when present, is a source candidate. */
-static TC_TLV_result check_path(TC_bytes response, int crl, const TC_bytes* delegate,
-                                TC_X509_revocation_report* result)
+/* Revocation inputs for the one-certificate path anchor -> target with a CRL
+ * selector from the enum above and an optional OCSP response. The anchor
+ * record stays in revocation.anchor for adjustment before the check. */
+static TC_X509_revocation_options revocation_inputs(TC_bytes anchor, const TC_bytes* candidates,
+                                                    size_t candidate_count, int crl,
+                                                    const TC_bytes* response)
 {
   const long serial = crl == CRL_REVOKES_TARGET     ? TARGET_SERIAL
                       : crl == CRL_REVOKES_DELEGATE ? DELEGATE_SERIAL
                                                     : 0;
   const TC_bytes crls[] = {crl != NO_CRL ? crl_der(serial, crl_bytes) : (TC_bytes){NULL, 0}};
-  /* The CA signs its CRLs, so it is also a signer candidate. */
-  const TC_bytes candidates[] = {pki.ca_bytes, delegate ? *delegate : (TC_bytes){NULL, 0}};
-  ocsp_revocation_init(&revocation, &fixture, pki.ca_bytes, candidates, delegate ? 2 : 1, crls,
+  ocsp_revocation_init(&revocation, &fixture, anchor, candidates, candidate_count, crls,
                        crl != NO_CRL, pki.at);
-  const TC_X509_revocation_options options =
-      ocsp_revocation_options(&revocation, pki.at, &response, 1);
+  return ocsp_revocation_options(&revocation, pki.at, response, response ? 1 : 0);
+}
+
+static TC_TLV_result check_revocation(const TC_X509_revocation_options* options,
+                                      TC_X509_revocation_report* result)
+{
   size_t work = 20000000;
   memset(result, 0xa5, sizeof *result);
-  return TC_X509_path_check_revocation(&pki.target_bytes, 1, &options, &revocation.workspace, &work,
+  return TC_X509_path_check_revocation(&pki.target_bytes, 1, options, &revocation.workspace, &work,
                                        result);
+}
+
+/* Check the one-certificate path CA -> target. delegate, when present, is a
+ * source candidate. */
+static TC_TLV_result check_path(TC_bytes response, int crl, const TC_bytes* delegate,
+                                TC_X509_revocation_report* result)
+{
+  /* The CA signs its CRLs, so it is also a signer candidate. */
+  const TC_bytes candidates[] = {pki.ca_bytes, delegate ? *delegate : (TC_bytes){NULL, 0}};
+  const TC_X509_revocation_options options =
+      revocation_inputs(pki.ca_bytes, candidates, delegate ? 2 : 1, crl, &response);
+  return check_revocation(&options, result);
 }
 
 /* Authenticated revocation from either source wins. An unchecked delegate may
@@ -935,6 +951,59 @@ TC_TEST(path_fallback)
   return MUNIT_OK;
 }
 
+/* A store certificate with the anchor's name and key, issued by an unrelated
+ * CA, is the anchor itself as a CRL signer with an empty path (RFC 5280
+ * section 6.3.3 (f)). It signs CRLs only when the anchor carries
+ * TC_X509_ANCHOR_USAGE_CRL_SIGN (RFC 10007 section 4) and its complete
+ * SubjectPublicKeyInfo matches the anchor key. */
+TC_TEST(anchored_crl_signer)
+{
+  static uint8_t anchor_der[OCSP_FILE_CAPACITY], signer_der[OCSP_FILE_CAPACITY];
+  /* secp384r1 namedCurve parameters (RFC 5480 section 2.1.1.1). */
+  static const uint8_t secp384r1[] = {0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22};
+  TC_X509_revocation_report result;
+  hierarchy_init();
+  const certificate_spec restricted = {.key = pki.ca_key,
+                                       .name = "tiny-crypto-c OCSP CA",
+                                       .signer = pki.ca_key,
+                                       .serial = 2,
+                                       .ca = 1,
+                                       .key_usage = "critical,keyCertSign"};
+  X509* anchor = issue(&restricted);
+  const certificate_spec pinned = {.key = pki.ca_key,
+                                   .name = "tiny-crypto-c OCSP CA",
+                                   .issuer = pki.other_ca,
+                                   .signer = pki.other_key,
+                                   .serial = 3,
+                                   .ca = 1,
+                                   .key_usage = "critical,keyCertSign,cRLSign"};
+  X509* signer = issue(&pinned);
+  const TC_bytes anchor_bytes = certificate_der(anchor, anchor_der);
+  const TC_bytes candidates[] = {certificate_der(signer, signer_der)};
+  const TC_X509_revocation_options options =
+      revocation_inputs(anchor_bytes, candidates, 1, EMPTY_CRL, NULL);
+
+  /* The anchor keyUsage omits cRLSign, so the anchor key signs no CRL. */
+  munit_assert_uint(revocation.anchor.usage, ==, 0);
+  munit_assert_int(check_revocation(&options, &result), ==, TC_TLV_INVALID);
+
+  /* With CRL_SIGN authorized the signer is the anchor. The P-384 curve makes
+   * the direct anchor signature check fail, so the CRL reaches the signer
+   * search and the anchored signer path. */
+  revocation.anchor.usage = TC_X509_ANCHOR_USAGE_CRL_SIGN;
+  revocation.anchor.trust.public_key.curve = TC_EC_P384;
+  munit_assert_int(check_revocation(&options, &result), ==, TC_TLV_OK);
+  munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
+
+  /* The same key bits under other curve parameters are a different key. */
+  revocation.anchor.trust.public_key.algorithm.parameters = (TC_bytes){secp384r1, sizeof secp384r1};
+  munit_assert_int(check_revocation(&options, &result), ==, TC_TLV_INVALID);
+  X509_free(anchor);
+  X509_free(signer);
+  hierarchy_free();
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
@@ -948,6 +1017,7 @@ int main(int argc, char** argv)
       {"/work-limits", work_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/unsuccessful", unsuccessful, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/path-fallback", path_fallback, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/anchored-crl-signer", anchored_crl_signer, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/x509/ocsp/openssl", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);

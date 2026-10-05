@@ -742,10 +742,9 @@ TC_X509_signature_result tc_x509_crl_selected_anchor_check(
 {
   if (!selected || !selected->base || !anchor || !provider || !limits || !names || !work)
     return TC_X509_SIGNATURE_ERROR;
-  if (anchor->usage & ~TC_X509_ANCHOR_USAGE_CRL_SIGN)
-    return TC_X509_SIGNATURE_ERROR;
-  if (!(anchor->usage & TC_X509_ANCHOR_USAGE_CRL_SIGN))
-    return TC_X509_SIGNATURE_INVALID;
+  const TC_TLV_result usage = tc_x509_crl_anchor_usage(anchor);
+  if (usage != TC_TLV_OK)
+    return tc_pki_signature_error(usage);
   const TC_X509_crl* records[] = {selected->base, selected->delta};
   for (size_t i = 0; i < sizeof records / sizeof *records; ++i) {
     if (!records[i])

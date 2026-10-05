@@ -66,6 +66,11 @@ TC_TLV_result tc_x509_crl_fresh_at(const TC_X509_crl* crl, const TC_X509_revocat
  * Output changes only on OK. */
 TC_TLV_result tc_x509_crl_signer_usage(const TC_X509_certificate* signer,
                                        const TC_TLV_limits* limits, size_t* work, int* authorized);
+/* Local CRL-signing authorization of the selected trust anchor (RFC 5280
+ * section 6.3.3 (f), RFC 10007 section 4). OK with
+ * TC_X509_ANCHOR_USAGE_CRL_SIGN, INVALID without it, and ARGUMENT for a NULL
+ * anchor or unknown usage bits. */
+TC_TLV_result tc_x509_crl_anchor_usage(const TC_X509_store_anchor* anchor);
 /* Verify issuer linkage and signature directly with the selected trust anchor.
  * Uses the anchor key's algorithm restrictions. Scope, freshness and CRL policy
  * remain separate.
