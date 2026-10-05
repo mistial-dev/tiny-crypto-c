@@ -113,13 +113,15 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_st
       status = source_status(parsed, before, work);
       if (status != TC_X509_PATH_VALID)
         return status;
-      /* A TrustAnchorInfo without certPath has no name and cannot anchor an
-       * X.509 path. Skip it, as path validation rejects it, and keep
-       * searching. */
-      if (trust.x509_unusable || !trust.trust.name.data || !trust.trust.name.length) {
+      /* A TrustAnchorInfo without certPath is x509_unusable and has no
+       * name. Skip it, as path validation rejects it, and keep searching. A
+       * usable record without a name is a source failure. */
+      if (trust.x509_unusable) {
         tc_x509_path_remember(TC_X509_PATH_INVALID, &failure);
         continue;
       }
+      if (!trust.trust.name.data || !trust.trust.name.length)
+        return TC_X509_PATH_ERROR;
       parsed = TC_X509_name_equal(frame->issuer, trust.trust.name, &options->parsing,
                                   &validation->names, work, &equal);
       if (parsed != TC_TLV_OK) {
