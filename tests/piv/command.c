@@ -477,6 +477,7 @@ TC_TEST(get_data_piv)
       STEP("00CB3FFF055C035FC10200", "5302AA 9000"),
       STEP("00CB3FFF055C035FC10200", "5402AABB 9000"),
       STEP("00CB3FFF055C035FC10200", "53020762 82"),
+      STEP("00CB3FFF055C035FC10200", "53010700 6282"),
       STEP("00CB3FFF055C035FC10200", "6282"),
       STEP("00CB3FFF055C035FC10200", "6A82"),
       STEP("00CB3FFF055C035FC10200", "6982"),
@@ -512,11 +513,12 @@ TC_TEST(get_data_piv)
       TC_PIV_status_classify(0x6282, TC_PIV_COMMAND_GET_DATA, TC_PIV_APPLICATION_PIV, NULL), ==,
       TC_PIV_SW_END_OF_OBJECT);
   /* Malformed answers: bare 9000, empty 7E, 53 for 7E, trailing bytes,
-   * truncation, a foreign tag, inexact 6282 and 6282 without data. */
+   * truncation, a foreign tag, inexact 6282, padded 6282 and 6282 without
+   * data. PIV GET DATA defines no padding (ISO/IEC 7816-4:2020 8.1.2). */
   TC_PIV_data_object preserved;
   memset(&out, 0x5a, sizeof out);
   preserved = out;
-  static const char* const tags[] = {"5FC102", "7E",     "7E",     "5FC102",
+  static const char* const tags[] = {"5FC102", "7E",     "7E",     "5FC102", "5FC102",
                                      "5FC102", "5FC102", "5FC102", "5FC102"};
   for (size_t i = 0; i < sizeof tags / sizeof *tags; ++i) {
     memset(response_bytes, 0xee, sizeof response_bytes);
@@ -552,6 +554,11 @@ TC_TEST(get_data_twic)
                                   STEP("00CB3FFF055C03DFC10100", "DFC101028000 9000"),
                                   STEP("00CB3FFF055C03DFC10100", "9000"),
                                   STEP("00CB3FFF055C03DFC10100", "DFC10202AABB 9000"),
+                                  STEP("00CB3FFF055C03DFC10100", "DFC10102AABB00FF 6282"),
+                                  STEP("00CB3FFF055C03DFC10100", "5302AABB00 6282"),
+                                  STEP("00CB3FFF055C03DFC10100", "DFC10102AABB01 6282"),
+                                  STEP("00CB3FFF055C03DFC10100", "DFC10102AABB00 9000"),
+                                  STEP("00CB3FFF055C03DFC10100", "DFC10103AABB 6282"),
                                   STEP("00CB3FFF055C03DFC10100", "6A88")};
   TC_PIV_link link;
   link_start(&link, steps, sizeof steps / sizeof *steps, TC_PIV_CONTACT);
@@ -580,6 +587,23 @@ TC_TEST(get_data_twic)
   munit_assert_size(out.value.length, ==, 0);
   munit_assert_uint16(out.status, ==, 0x9000);
   munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_INVALID);
+  /* A 6282 answer may end with ISO/IEC 7816-4 padding bytes 00 and FF
+   * (TWIC Part 2 v5 5.2, ISO/IEC 7816-4:2020 8.1.3). */
+  munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_OK);
+  munit_assert_int(out.form, ==, TC_PIV_FORM_TEMPLATE);
+  munit_assert_ptr_equal(out.encoded.data, response_bytes);
+  munit_assert_size(out.encoded.length, ==, 6);
+  munit_assert_size(out.value.length, ==, 2);
+  munit_assert_uint16(out.status, ==, 0x6282);
+  munit_assert_uint16(TC_PIV_link_status(&link), ==, 0x6282);
+  munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_OK);
+  munit_assert_int(out.form, ==, TC_PIV_FORM_CONTAINER);
+  munit_assert_size(out.encoded.length, ==, 4);
+  munit_assert_uint16(out.status, ==, 0x6282);
+  /* Other trailing bytes, padding after 9000 and a truncated TLV stay
+   * malformed. */
+  for (size_t i = 0; i < 3; ++i)
+    munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_INVALID);
   munit_assert_int(get_data_hex(&link, "DFC101", 64, &out), ==, TC_PIV_CARD_STATUS);
   munit_assert_int(TC_PIV_status_classify(TC_PIV_link_status(&link), TC_PIV_COMMAND_GET_DATA,
                                           TC_PIV_APPLICATION_TWIC, NULL),

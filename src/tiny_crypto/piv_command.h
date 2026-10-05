@@ -276,7 +276,9 @@ typedef struct {
  * sends it under secure messaging and frames the decrypted answer, which
  * stays in the response buffer (piv_sm_apdu.h). The answer to 9000
  * or 6282 (ISO/IEC 7816-4 Table 7, TWIC Part 2 v5 5.2) must be exactly one
- * TLV spanning the data field.
+ * TLV spanning the data field. On the TWIC application a 6282 answer may end
+ * with padding bytes 00 or FF after the TLV (TWIC Part 2 v5 5.2, ISO/IEC
+ * 7816-4:2020 8.1.3). encoded then excludes the padding.
  *
  * PIV application: 7E and 7F61 answer with their own tag and every other tag
  * with 53 (Part 2 3.1.2). The only empty form is 53 00 (Part 1 4.1.1).
@@ -291,7 +293,8 @@ typedef struct {
  * TC_PIV_REFUSED      no application is selected, or the link lost its
  *                     secure messaging session.
  * TC_PIV_CARD_STATUS  another status, such as 6982, 6A81, 6A82 or 6A88.
- * TC_PIV_INVALID      framing other than above, or trailing bytes.
+ * TC_PIV_INVALID      framing other than above, or trailing bytes other than
+ *                     TWIC 6282 padding.
  * TC_PIV_LIMIT, TC_PIV_ERROR
  *                     channel results.
  *

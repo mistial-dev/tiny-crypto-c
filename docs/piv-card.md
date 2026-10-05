@@ -96,7 +96,10 @@ leaves no application selected, so select again before the next command.
 section 3.1.2). The answer to `9000` or `6282` must be exactly one TLV that
 spans the data field. `out->encoded` is that TLV and `out->value` its value,
 both borrowed from the response buffer. `out->status` records `6282`, the end
-of the object before Le bytes (ISO/IEC 7816-4 Table 7).
+of the object before Le bytes (ISO/IEC 7816-4 Table 7). On the TWIC application
+a `6282` answer may end with padding bytes `00` or `FF` after the TLV (TWIC Part
+2 v5 section 5.2, ISO/IEC 7816-4:2020 section 8.1.3). `out->encoded` excludes
+the padding. PIV answers and `9000` answers keep exact framing.
 
 | Answer                      | PIV application                     | TWIC application   |
 | --------------------------- | ----------------------------------- | ------------------ |
