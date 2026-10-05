@@ -4,7 +4,12 @@
  * path discovery from a certificate store.
  * Standards: RFC 5280 section 6, RFC 5937.
  * Configuration: TC_ENABLE_X509_PATH.
- * Limitations: revocation is in x509_revocation.h.
+ * Limitations: every intermediate must be a v3 certificate with
+ * basicConstraints cA TRUE, and with keyCertSign when keyUsage is present.
+ * RFC 5280 section 6.1.4(k) lets a relying party establish CA status of v1
+ * and v2 certificates out of band. This library has no such input and rejects
+ * them. Name-constraint forms outside TC_X509_name_within surface as
+ * UNSUPPORTED. Revocation is in x509_revocation.h.
  * Contracts: docs/api.md, including its size_t work units.
  * Guide: docs/x509-path.md. */
 #ifndef TINY_CRYPTO_X509_PATH_H_

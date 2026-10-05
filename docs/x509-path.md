@@ -70,6 +70,21 @@ configuration. These are GeneralSubtree list contents, as returned by
 `TC_X509_name_constraints_read`. Self-issued intermediates receive the standard
 exception. The target receives none.
 
+## CA requirements and limitations
+
+Every intermediate certificate must be version 3 and carry `basicConstraints`
+with `cA` set to TRUE. When it also carries `keyUsage`, `keyCertSign` must be
+set. RFC 5280 section 6.1.4(k) lets a relying party establish CA status for v1
+and v2 certificates by other means. The validator has no out-of-band CA input,
+so such an intermediate makes the path `TC_X509_PATH_INVALID`. The anchor
+itself is trusted through `TC_X509_store_anchor`, so a v1 root used as an
+anchor is accepted.
+
+Name constraints use `TC_X509_name_within`. The forms it does not implement,
+listed in `x509.h`, make the path `TC_X509_PATH_UNSUPPORTED` when they apply to
+a name in the path. Examples are mailbox-specific constraints, DNS wildcards
+and subtrees with a nondefault minimum or maximum.
+
 ## Workspace and buffer lifetime
 
 The validator needs twelve caller-owned scratch arrays. Most applications
