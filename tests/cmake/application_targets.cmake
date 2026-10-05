@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# Configure, build and run tests/cmake/target_consumer for every application
-# target under every resource profile, then check that an explicit switch
-# outside a target's set fails configuration.
+# Configure, build with warnings as errors and run tests/cmake/target_consumer
+# for every application target under every resource profile, then check that
+# an explicit switch outside a target's set fails configuration.
 if(NOT SOURCE_DIR OR NOT BINARY_DIR OR NOT C_COMPILER)
   message(FATAL_ERROR "SOURCE_DIR, BINARY_DIR and C_COMPILER are required")
 endif()
@@ -10,7 +10,8 @@ function(configure_consumer label)
   # Start from a fresh tree so cache entries from earlier runs cannot apply.
   file(REMOVE_RECURSE "${BINARY_DIR}")
   execute_process(COMMAND "${CMAKE_COMMAND}" -S "${SOURCE_DIR}/tests/cmake/target_consumer"
-    -B "${BINARY_DIR}" -DSOURCE_DIR=${SOURCE_DIR} -DCMAKE_C_COMPILER=${C_COMPILER} ${ARGN}
+    -B "${BINARY_DIR}" -DSOURCE_DIR=${SOURCE_DIR} -DCMAKE_C_COMPILER=${C_COMPILER}
+    -DCMAKE_C_FLAGS=-Werror ${ARGN}
     RESULT_VARIABLE result OUTPUT_QUIET ERROR_VARIABLE errors)
   set(configure_result ${result} PARENT_SCOPE)
   set(configure_errors "${errors}" PARENT_SCOPE)

@@ -67,6 +67,8 @@ static TC_PIV_result application_allows(const TC_PIV_link* link,
 #if TC_ENABLE_TWIC
   if (link->application == TC_PIV_APPLICATION_TWIC)
     return tc_twic_proof_allowed(link, request->key_reference, request->policy.profile);
+#else
+  (void)link;
 #endif
   return key_reference_valid(request->key_reference) ? TC_PIV_OK : TC_PIV_ARGUMENT;
 }
