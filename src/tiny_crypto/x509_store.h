@@ -38,9 +38,10 @@ enum { TC_X509_ANCHOR_USAGE_CRL_SIGN = 1u << 0 };
  * extension spans are checked for controls those fields must reflect.
  *
  * Borrowed DER spans. Policy and extension spans contain SEQUENCE contents.
- * extensions holds TrustAnchorInfo exts, which must omit
- * certificatePolicies, policyConstraints, inhibitAnyPolicy or nameConstraints
- * (RFC 5914 section 2.6). certificate_extensions holds the anchor
+ * extensions holds TrustAnchorInfo exts. Validation ignores
+ * certificatePolicies, policyConstraints, inhibitAnyPolicy and
+ * nameConstraints there (RFC 5914 section 2.6), so set those controls in the
+ * normalized fields. certificate_extensions holds the anchor
  * certificate's own extensions. A path control there whose normalized field
  * is empty makes validation return UNSUPPORTED, unless replaced_controls marks
  * it as replaced. Build records from certificates with

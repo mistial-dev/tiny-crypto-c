@@ -470,15 +470,27 @@ TC_TEST(policy_sets)
   return MUNIT_OK;
 }
 
-/* RFC 5914 section 2.6 forbids these extensions in TrustAnchorInfo exts. */
-TC_TEST(forbidden_exts)
+/* RFC 5914 section 2.6: nameConstraints (30), certificatePolicies (32),
+ * policyConstraints (36) and inhibitAnyPolicy (54) must not appear in
+ * TrustAnchorInfo exts and are ignored if they do. The record's path
+ * controls stay empty. basicConstraints (19) is permitted. Duplicate
+ * detection still covers the ignored extensions. */
+TC_TEST(ignored_exts)
 {
   static const unsigned ids[] = {30, 32, 36, 54, 19};
   for (size_t i = 0; i < sizeof ids / sizeof *ids; ++i) {
-    /* basicConstraints (19) is permitted and parses; the others are not. */
     uint8_t extension[] = {0x30, 9, 6, 3, 0x55, 0x1d, (uint8_t)ids[i], 4, 2, 0x30, 0};
-    munit_assert_int(read_with_exts(extension, sizeof extension), ==,
-                     (ids[i] == 19 ? TC_TLV_OK : TC_TLV_INVALID));
+    TC_X509_store_anchor anchor;
+    munit_assert_int(read_info(NULL, 0, extension, sizeof extension, &anchor), ==, TC_TLV_OK);
+    munit_assert_null(anchor.names.permitted.data);
+    munit_assert_null(anchor.names.excluded.data);
+    munit_assert_null(anchor.policy_set.data);
+    munit_assert_uint(anchor.policy_flags, ==, 0);
+    munit_assert_uint(anchor.replaced_controls, ==, 0);
+    uint8_t twice[2 * sizeof extension];
+    memcpy(twice, extension, sizeof extension);
+    memcpy(twice + sizeof extension, extension, sizeof extension);
+    munit_assert_int(read_with_exts(twice, sizeof twice), ==, TC_TLV_INVALID);
   }
   return MUNIT_OK;
 }
@@ -786,7 +798,7 @@ static MunitTest tests[] = {
     {"/next-overlap", next_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/certificate-builder", certificate_builder, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/exts-path-length", exts_path_length, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    {"/forbidden-exts", forbidden_exts, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/ignored-exts", ignored_exts, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/duplicate-exts", duplicate_exts, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/flags-and-unusable", flags_and_unusable, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/malformed", malformed, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

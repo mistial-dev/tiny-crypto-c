@@ -72,11 +72,11 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
     const unsigned id = tc_pki_extension_id(&extension);
     if (!id)
       continue;
-    /* RFC 5914 section 2.6: these duplicate CertPathControls and must not
-     * appear in TrustAnchorInfo exts. Reject them so a constraint is never
-     * silently dropped. */
+    /* RFC 5914 section 2.6: these duplicate CertPathControls, must not
+     * appear in TrustAnchorInfo exts and are ignored if they do. Their OIDs
+     * still take part in the duplicate check. */
     if (trust_anchor_info && tc_pki_extension_path_control(id))
-      return TC_TLV_INVALID;
+      continue;
     switch (id) {
     case TC_PKI_EXT_CERTIFICATE_POLICIES: {
       TC_TLV_element value;

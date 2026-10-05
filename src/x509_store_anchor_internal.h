@@ -19,7 +19,7 @@ TC_TLV_result tc_x509_anchor_subtrees(const TC_X509_name_constraints* names,
                                       const TC_X509_workspace* workspace);
 /* Decode an Extensions SEQUENCE into out's path-control fields. With
  * trust_anchor_info set, the list is TrustAnchorInfo exts, where RFC 5914
- * section 2.6 forbids the CertPathControls duplicates (INVALID). */
+ * section 2.6 ignores the CertPathControls duplicates. */
 TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* limits,
                                         const TC_X509_workspace* workspace, int trust_anchor_info,
                                         TC_X509_store_anchor* out);

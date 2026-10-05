@@ -367,26 +367,46 @@ static void check_profile(const char* profile)
                    ==, TC_X509_PATH_UNSUPPORTED);
   /* RFC 5914 section 2.6: nameConstraints, certificatePolicies,
    * policyConstraints and inhibitAnyPolicy must not appear in
-   * TrustAnchorInfo exts. A caller-built anchor carrying one is rejected, so
-   * a constraint is never silently dropped. */
+   * TrustAnchorInfo exts and are ignored if they do. The record fields from
+   * CertPathControls carry the enforced controls. */
   {
     static const uint8_t ids[] = {30, 32, 36, 54};
     for (size_t i = 0; i < sizeof ids; ++i)
       for (int critical = 0; critical < 2; ++critical) {
-        uint8_t forbidden[] = {0x30, 12, 6, 3, 0x55, 0x1d, 0, 1, 1, 0xff, 4, 2, 0x30, 0};
-        size_t length = sizeof forbidden;
-        forbidden[6] = ids[i];
+        uint8_t ignored[] = {0x30, 12, 6, 3, 0x55, 0x1d, 0, 1, 1, 0xff, 4, 2, 0x30, 0};
+        size_t length = sizeof ignored;
+        ignored[6] = ids[i];
         if (!critical) {
-          memmove(forbidden + 7, forbidden + 10, 4);
-          forbidden[1] = 9;
+          memmove(ignored + 7, ignored + 10, 4);
+          ignored[1] = 9;
           length -= 3;
         }
         options_anchor[0] = anchor;
-        options_anchor[0].extensions = (TC_bytes){forbidden, length};
+        options_anchor[0].extensions = (TC_bytes){ignored, length};
         munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, options_anchor, &options,
                                                            &storage.path.validation, &result),
-                         ==, TC_X509_PATH_INVALID);
+                         ==, TC_X509_PATH_VALID);
       }
+    /* nameConstraints permitting only directoryName CN=Z, which the chain
+     * violates. In exts it is ignored. As the CertPathControls names field
+     * it applies. */
+    static const uint8_t permitted_z[] = {
+        0x30, 29,   6,  3,    0x55, 0x1d, 30, 4, 22, 0x30, 20, 0xa0, 18,   0x30, 16, 0xa4,
+        14,   0x30, 12, 0x31, 10,   0x30, 8,  6, 3,  0x55, 4,  3,    0x0c, 1,    'Z'};
+    TC_X509_name_constraints names;
+    munit_assert_int(TC_X509_name_constraints_read(
+                         (TC_bytes){permitted_z + 9, sizeof permitted_z - 9}, &limits, &names),
+                     ==, TC_TLV_OK);
+    options_anchor[0] = anchor;
+    options_anchor[0].extensions = (TC_bytes){permitted_z, sizeof permitted_z};
+    munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, options_anchor, &options,
+                                                       &storage.path.validation, &result),
+                     ==, TC_X509_PATH_VALID);
+    options_anchor[0] = anchor;
+    options_anchor[0].names = names;
+    munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, options_anchor, &options,
+                                                       &storage.path.validation, &result),
+                     ==, TC_X509_PATH_INVALID);
   }
   /* RFC 5280 section 4.2.1.10 requires minimum zero and no maximum. The
    * validator does not implement distances, so a subtree that sets one is

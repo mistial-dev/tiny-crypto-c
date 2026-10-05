@@ -140,11 +140,13 @@ enforced. A basicConstraints pathLen in `exts` can only lower
 record whose `extensions` pathLen is below its `path_len`, or that has no
 `path_len`, returns `TC_X509_PATH_UNSUPPORTED`.
 
-RFC 5914 section 2.6 forbids certificatePolicies, policyConstraints,
-inhibitAnyPolicy and nameConstraints in the `exts` field, because
-`CertPathControls` carries them. Such an extension makes the anchor
-`TC_TLV_INVALID` when parsed and `TC_X509_PATH_INVALID` when a caller-built
-anchor carries it in `extensions`. A `TrustAnchorInfo` embedded certificate
+RFC 5914 section 2.6 says certificatePolicies, policyConstraints,
+inhibitAnyPolicy and nameConstraints must not appear in the `exts` field and are
+ignored if they do, because `CertPathControls` carries them. The reader and path
+validation ignore them in `exts` and in a caller-built anchor's `extensions`,
+so a list with such an anchor stays readable to its end. Set those controls in
+the record fields of a caller-built anchor. A duplicate extension in `exts` is
+still `TC_TLV_INVALID`. A `TrustAnchorInfo` embedded certificate
 must match the stated name and public key, and any subject key identifier
 must match the anchor key identifier. The anchor record selected by path
 search applies only to that attempted path. Another anchor cannot relax its

@@ -293,7 +293,9 @@ TC_X509_path_status TC_X509_path_validate(const TC_bytes* chain, size_t count,
  * stable throughout validation, and result policy spans may also borrow
  * anchor->policy_set. Other rules, work and statuses match
  * TC_X509_path_validate, with these additions. INVALID for an x509_unusable
- * anchor or a CertPathControls duplicate in anchor->extensions. UNSUPPORTED
+ * anchor. certificatePolicies, policyConstraints, inhibitAnyPolicy and
+ * nameConstraints in anchor->extensions are ignored (RFC 5914 section 2.6).
+ * UNSUPPORTED
  * for an unimplemented critical anchor extension, or for a path control in
  * the anchor's extension spans that its record fields omit (see
  * TC_X509_store_anchor). ERROR for unknown policy_flags or replaced_controls

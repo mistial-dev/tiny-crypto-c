@@ -583,11 +583,11 @@ static TC_TLV_result anchor_control_applied(const TC_X509_store_anchor* anchor, 
 }
 
 /* Check one of the anchor's extension lists before path processing.
- * TrustAnchorInfo exts must not carry certificatePolicies,
- * policyConstraints, inhibitAnyPolicy or nameConstraints (RFC 5914 section
- * 2.6), so any of them there is INVALID. A path control that the record
- * fields do not reflect is UNSUPPORTED, and so is any other critical
- * extension this validator does not implement. */
+ * certificatePolicies, policyConstraints, inhibitAnyPolicy and
+ * nameConstraints in TrustAnchorInfo exts are ignored (RFC 5914 section
+ * 2.6). The record fields from CertPathControls carry those controls. A
+ * path control that the record fields do not reflect is UNSUPPORTED, and so
+ * is any other critical extension this validator does not implement. */
 static TC_TLV_result anchor_extensions_check(const TC_X509_store_anchor* anchor, TC_bytes contents,
                                              int trust_anchor_info, const TC_TLV_limits* limits,
                                              size_t* work)
@@ -605,7 +605,7 @@ static TC_TLV_result anchor_extensions_check(const TC_X509_store_anchor* anchor,
     const int path_control = tc_pki_extension_path_control(id);
     int applied;
     if (trust_anchor_info && path_control)
-      return TC_TLV_INVALID;
+      continue;
     if (extension.critical && id != TC_PKI_EXT_SUBJECT_KEY_IDENTIFIER &&
         id != TC_PKI_EXT_KEY_USAGE && id != TC_PKI_EXT_BASIC_CONSTRAINTS && !path_control)
       return TC_TLV_UNSUPPORTED;
