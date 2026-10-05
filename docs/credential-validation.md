@@ -4,116 +4,93 @@
 
 # Composing PIV and TWIC validation
 
-[`examples/credential_workflow.c`](../examples/credential_workflow.c) composes
-the public validation APIs over retained PIV or TWIC credential objects, trust
-snapshots, and policy. Card commands, response framing, and reader access belong
-to the application.
+[`examples/credential_workflow.c`](../examples/credential_workflow.c) runs the public validation
+APIs over retained PIV or TWIC objects, trust snapshots and policy. The application owns card
+commands, response framing and reader access. `example_credential_validate` runs these steps:
+
+1. Validate the card-key certificate under card-key trust and read its identifiers with
+   `TC_PIV_card_certificate_validate` ([card check](piv-card-check.md#retained-certificates)).
+1. For TWIC, check the held canceled-card-list snapshot and its freshness.
+1. Ask the application for a fresh proof with the accepted public key.
+1. Validate the signed CHUID under separate content-signer trust.
+1. If supplied, validate the Security Object over the retained inventory.
+1. If supplied, parse authenticated printed information and check its expiration against the
+   CHUID.
+1. If supplied, bind the unsigned TWIC CHUID to the inventory.
+1. If supplied, check each biometric format and authenticate it against the CHUID.
+1. For TWIC, check the CCL snapshot again.
+
+The [credential reader example](credential-reader.md) runs the same checks against a live card,
+and the [card check](piv-card-check.md) reports each check over an inventory separately.
+
+## Profiles and identifiers
+
+The request selects PIV, TWIC Legacy or TWIC NEXGEN and a signed CHUID schema.
+TWIC takes `TC_CHUID_PROFILE_TWIC_SIGNED`. PIV takes `TC_CHUID_PROFILE_PIV` for SP 800-73-5, or
+`TC_CHUID_PROFILE_PIV_SP800_73_4` to opt in to SP 800-73-4 fields and the historical `3D` field.
+`TC_PIV_CHUID_validate` also accepts the SP 800-73-4 schema under TWIC profiles for a TWIC card's
+PIV application, where NEXGEN sends an empty `3D`.
+
+PIV applies strict identifier and OID rules (`TC_PIV_card_identifiers_read`) and the PIV
+card-authentication OID. TWIC follows Part 3 section 4.4.4 (`TC_TWIC_card_identifiers_read` and
+`TC_TWIC_card_identifiers_match`). The full certificate FASC-N identifies the credential and must
+match the CHUID. A UUID URI is optional, and a present one must satisfy the profile and match the
+CHUID GUID. TWIC accepts the registered PIV or TWIC card-authentication OID and passes the
+certificate's exact encoded OID to path validation.
+
+`card_key` selects slot 9E Card Authentication or slot 9A PIV Authentication. Slot 9A requires
+`TC_PIV_CARD` and takes the Card UUID from the signed CHUID GUID, which strict PIV requires in the
+certificate. With `twic_reader_policy`, slot 9A on a TWIC card's PIV application accepts either
+registered FASC-N OID and an absent Card UUID, and still checks any UUIDs present.
+
+The card context may name an exact card-authentication purpose OID. With an empty purpose,
+`TC_PIV_card_certificate_validate` derives one exact PIV/TWIC-compatible purpose from the
+certificate. Slot 9E requires digital-signature key usage, extended key usage and an explicit
+purpose match. Slot 9A requires digital-signature key usage.
+
+## Key proof and time
+
+The proof callback owns the transport and challenge exchange. It receives the profile, the key
+reference, the accepted public key, and the signature scheme, hash, MGF hash and salt length. The
+request chooses RSA v1.5 or PSS. NEXGEN requires RSA-2048. TWIC Legacy accepts RSA-1024 only with
+`allow_rsa1024`.
+
+The two `TC_validation_context` values run in sequence, so they may share one initialized
+validation arena. Both use the same evaluation time, which TWIC also requires to equal
+`TC_TWIC_CCL_freshness_policy.now`. PIV leaves the CCL and freshness fields zero.
+
+`required_objects` names the evidence the decision needs: the Security Object, unsigned CHUID,
+printed information or each biometric modality. Missing required evidence returns
+`EXAMPLE_CREDENTIAL_UNAVAILABLE` before the card proof.
 
 ## Inventory hash inputs
 
-`TC_PIV_security_data.parts` selects the bytes authenticated for each container.
-Choose this representation before checking a hash and keep it fixed for the
-decision. A mismatch fails validation.
+`TC_PIV_security_data.parts` selects the bytes hashed for each container. Choose them before the
+check and keep them fixed for the decision. The library hashes the supplied spans as given, with no
+decryption or fallback, and a mismatch fails. Both forms exclude the outer GET DATA `53` wrapper:
 
-Encrypted biometric objects use their stored BC field, including its tag and
-length. For a printed-plaintext policy, container `0x3001` uses the decrypted
-printed-information TLVs. Keep that buffer stable until inventory validation
-finishes, then wipe it. The outer GET DATA `53` wrapper is excluded in both cases.
-The library hashes the supplied spans directly, with no decryption or
-representation fallback during inventory validation.
+- Encrypted biometric objects use their stored `BC` field, including its tag and length.
+- Under a printed-plaintext policy, container `0x3001` uses the decrypted printed-information TLVs.
+  Keep that buffer stable until inventory validation ends, then wipe it.
 
-In the reader utility, supply `--printed-plaintext`, `--security-object` and
-`--tpk-hex` to hash the decrypted printed fields. The command keeps
-the stored object and decrypted fields in separate buffers. Both remain in
-locked memory until the final check finishes.
+`security.printed`, when supplied, must equal the authenticated `0x3001` bytes and is parsed with
+`TC_PIV_printed_read`. TWIC applies the DFC109 rules of TWIC Part 2 section 4.7.2, including field
+order, the eight-digit card serial and the `7099` issuer prefix. The printed expiration must match
+the signed CHUID and be current at the validation time. The result then sets `result.has_printed`
+and exposes borrowed fields in `result.printed`.
 
-When `security.printed` is supplied, `example_credential_validate` requires it to equal the
-authenticated container `0x3001` bytes and parses it with `TC_PIV_printed_read`. TWIC profiles
-use the DFC109 rules of TWIC Part 2 section 4.7.2, including the field order, the eight-digit
-card serial and the `7099` issuer prefix. The printed expiration must match the signed CHUID
-expiration and remain current at the shared validation time. The accepted
-result exposes borrowed printed fields through `result.printed` and sets
-`result.has_printed`.
+## Results and lifetimes
 
-The shared sequence is:
+All encoded inputs and trust sources are borrowed. Keep the certificate, CHUID, inventory, CCL
+snapshot and their storage unchanged until the decision ends. `ExampleCredentialValidationResult`
+holds views into them. Its `biometrics` array holds one `TC_PIV_biometric_report` per supplied
+biometric, in request order, with the authenticated record for a matcher.
 
-1. Validate the selected card-key certificate under card-key trust and read its
-   identifiers with `TC_PIV_card_certificate_validate`
-   ([card check](piv-card-check.md#retained-certificates)).
-1. For TWIC, check the held canceled-card-list snapshot and its freshness metadata.
-1. Ask the application to perform a fresh proof with the accepted public key.
-1. Validate the signed CHUID under separate content-signer trust.
-1. When supplied, validate the Security Object and its retained object inventory.
-1. When supplied, parse authenticated printed information and check its
-   expiration against the signed CHUID.
-1. When supplied, bind the unsigned TWIC CHUID to the accepted inventory.
-1. When supplied, check each biometric format and authenticate every biometric
-   object against the accepted CHUID.
-1. For TWIC, check the held canceled-card-list snapshot again.
+The typed verdict separates invalid credentials, revocation, cancellation, stale data, unavailable
+evidence, unsupported algorithms, exhausted limits and failed key possession.
+`EXAMPLE_CREDENTIAL_VALID` is authentication evidence. Site authorization, live biometric matching
+and required-object policy stay with the application.
 
-The request selects PIV, TWIC Legacy, or TWIC NEXGEN and its signed CHUID
-schema. TWIC profiles take `TC_CHUID_PROFILE_TWIC_SIGNED`. The PIV profile takes
-`TC_CHUID_PROFILE_PIV` for SP 800-73-5 cards or
-`TC_CHUID_PROFILE_PIV_SP800_73_4`, the explicit opt-in for SP 800-73-4 fields
-and the historical `3D` field. `TC_PIV_CHUID_validate` also accepts
-`TC_CHUID_PROFILE_PIV_SP800_73_4` under TWIC profiles for the PIV application of
-a TWIC card, where a NEXGEN card sends an empty `3D`. PIV uses strict PIV
-identifier and OID rules. TWIC identity binding follows Part 3 section 4.4.4:
-the signed certificate FASC-N identifies the credential. The certificate may
-omit its UUID URI. A present UUID must satisfy the selected profile and match
-the CHUID GUID. The complete FASC-N must match across both authenticated
-objects. `TC_TWIC_card_identifiers_read` and `TC_TWIC_card_identifiers_match`
-implement this reader policy. `TC_PIV_card_identifiers_read` performs the PIV
-profile check. For TWIC, the workflow accepts the registered PIV or TWIC
-card-authentication OID and passes the certificate's exact encoded OID into path
-validation. PIV accepts the PIV OID.
-
-`card_key` selects slot 9E Card Authentication or slot 9A PIV Authentication.
-Slot 9A requires the `TC_PIV_CARD` profile. For slot 9A, the workflow reads the
-signed CHUID GUID before certificate identifier selection. Strict PIV requires
-that Card UUID in the certificate. A TWIC reader using the PIV application can set
-`twic_reader_policy` with slot 9A to accept either registered FASC-N OID and report
-an absent Card UUID while still checking any UUIDs that are present. The proof
-callback receives the selected key reference so its transport can address the
-correct slot.
-
-`required_objects` states which evidence the application needs for its decision.
-It can require the Security Object, unsigned CHUID, printed information, or each
-biometric modality independently. Missing required evidence returns
-`EXAMPLE_CREDENTIAL_UNAVAILABLE` before the card proof begins.
-
-The two `TC_validation_context` values may share one initialized validation arena
-because the operations are sequential. They use the same evaluation time. TWIC
-also requires that time to equal `TC_TWIC_CCL_freshness_policy.now`. PIV leaves
-the CCL and freshness fields zero. The proof callback receives
-the selected profile and public key from the accepted card certificate. It owns
-the transport and challenge exchange. It also receives the selected signature
-scheme, hash, MGF hash, and salt length. The request chooses RSA v1.5 or PSS.
-The wrapper enforces NEXGEN RSA-2048 and accepts RSA-1024 on TWIC Legacy only when
-`allow_rsa1024` is set explicitly.
-
-The card context may provide an exact card-authentication purpose OID. With an
-empty purpose, `TC_PIV_card_certificate_validate` derives one exact
-PIV/TWIC-compatible purpose from the certificate. Slot 9E requires
-digital-signature key usage, extended key usage and an explicit purpose match
-before accepting the path. Slot 9A requires digital-signature key usage. For a live card, the
-[card check](piv-card-check.md) composes the same validators over an
-inventory and reports each check separately.
-
-All encoded inputs and trust sources are borrowed. Keep the certificate, CHUID,
-object inventory, applicable CCL snapshot, and their backing storage immutable
-until the acceptance decision is complete. `ExampleCredentialValidationResult`
-retains borrowed views into those inputs. Its `biometrics` array holds one
-`TC_PIV_biometric_report` per supplied biometric, in request order, with the
-authenticated record for a matcher.
-
-`example_credential_validate` returns a typed verdict for invalid credentials,
-revocation, cancellation, stale data, unavailable evidence, unsupported
-algorithms, exhausted limits and failed key possession. Treat
-`EXAMPLE_CREDENTIAL_VALID` as authentication evidence. The application
-applies site authorization, live biometric matching and any required-object policy.
-
-For a later access decision, initialize fresh card and content contexts with the
-current application clock. TWIC also acquires the current CCL snapshot. Call
-`example_credential_validate` again over the retained bytes to repeat the time,
-trust, and cancellation checks that apply to the selected profile.
+For a later access decision, create fresh card and content contexts at the current time, acquire
+the current CCL snapshot for TWIC, and call `example_credential_validate` again over the retained
+bytes.

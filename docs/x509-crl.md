@@ -4,13 +4,12 @@
 
 # X.509 CRL parsing
 
-Include `<tiny_crypto/x509_crl.h>` and enable
-`TINY_CRYPTO_ENABLE_X509_REVOCATION`.
-`TC_X509_crl_read` reads a DER `CertificateList` into borrowed spans and decoded
-update times. Revocation decisions use the separate path revocation API.
+Include `<tiny_crypto/x509_crl.h>` and enable `TINY_CRYPTO_ENABLE_X509_REVOCATION`.
+`TC_X509_crl_read` reads a DER `CertificateList` into borrowed spans and decoded update times. It
+parses only. Signature verification, signer trust, freshness, scope and base/delta selection happen
+in [path revocation checking](x509-revocation.md).
 
-Pass the encoded CRL, parsing limits, frames with one entry per nesting level,
-a work budget and a result:
+Pass the encoded CRL, parsing limits, one frame per nesting level, a work budget and a result:
 
 ```c
 enum { CRL_MAX_BYTES = 65536, CRL_MAX_ELEMENTS = 8192,
@@ -29,28 +28,26 @@ if (result != TC_TLV_OK) {
 }
 ```
 
-Here `encoded` is a `TC_bytes` containing one complete CRL. Choose limits for
-your issuer's CRLs and keep the frame array outside a small task stack if needed.
-The work counter is consumed on parsing failures as well as success.
+`encoded` is a `TC_bytes` holding one complete CRL. Choose limits for your issuer's CRLs, and keep
+the frame array outside a small task stack if needed.
 
-`encoded` and `tbs` retain the complete CRL and signed TBSCertList. `issuer` is
-the DER Name. `signature` contains the signature bytes without BIT STRING
-framing. `revoked` and `extensions` retain their SEQUENCE wrappers and are empty
-when absent. `version` is 1 or 2. Read `next_update` only when `has_next_update`
-is set.
+Result fields:
 
-Keep the input bytes alive and unchanged while using the result. Frame scratch
-may be reused after the call. Input, limits, frames, work and result storage must
-not overlap. A failed call leaves the result untouched.
+- `encoded` and `tbs`: the complete CRL and the signed TBSCertList.
+- `issuer`: the DER Name.
+- `signature`: the signature bytes without BIT STRING framing.
+- `revoked` and `extensions`: their SEQUENCE encodings, empty when absent.
+- `version`: 1 or 2.
+- `next_update`: valid only when `has_next_update` is set.
 
-Extension interpretation, signature verification, signer trust, freshness,
-scope and base/delta selection are separate from this reader. Use
-[path revocation checking](x509-revocation.md) for a validated certificate path.
+Keep the input unchanged while using the result. Frames are reusable after the call. A failed call
+leaves the result untouched and still consumes work. Overlap and failure rules follow
+[Working with the API](api.md#input-stability-and-overlap).
 
 ## CRL extensions
 
-`TC_X509_crl_extensions_read` decodes CRL-level extensions into a
-`TC_X509_crl_extensions` view. Pass `crl.extensions` and a `TC_X509_workspace`:
+`TC_X509_crl_extensions_read` decodes `crl.extensions` into a `TC_X509_crl_extensions` view, using a
+`TC_X509_workspace`:
 
 ```c
 enum { CRL_EXTENSION_CAPACITY = 16 };
@@ -66,25 +63,23 @@ if (result != TC_TLV_OK) {
 }
 ```
 
-The OID array needs one slot per extension and is reused to detect duplicates.
-It may be reused after the call because returned spans borrow the CRL.
-An absent extension sequence produces an empty view.
+The OID array needs one slot per extension and detects duplicates. It is reusable after the call,
+because returned spans borrow the CRL. An absent extension sequence gives an empty view.
 
-`present` and `critical` use the `TC_X509_CRL_EXT_*` masks. `number` and
-`base_number` contain DER INTEGER contents. `distribution` describes the issuing
-distribution point, including reason and certificate-type restrictions.
-`freshest` retains a CRLDistributionPoints sequence. `issuer_alt` contains
-GeneralNames fields without their SEQUENCE wrapper.
+- `present` and `critical`: `TC_X509_CRL_EXT_*` masks.
+- `number` and `base_number`: DER INTEGER contents.
+- `distribution`: the issuing distribution point, including reason and certificate-type limits.
+- `freshest`: a CRLDistributionPoints sequence.
+- `issuer_alt`: GeneralNames contents without the SEQUENCE wrapper.
+- `unknown_critical_oid`: an unrecognized critical extension.
 
-An unrecognized critical extension is reported in `unknown_critical_oid`.
-Revocation policy decides whether decoded criticality and scope are acceptable.
+Revocation policy decides whether the decoded criticality and scope are acceptable.
 
 ## Indexing a collection
 
-`TC_X509_crl_index_init` accepts an array of DER spans and fills a caller-owned
-`TC_X509_crl_record` array. Pass the same parsing workspace used above, one work
-budget for the collection, and a `TC_X509_crl_index` result. Record capacity must
-cover the number of input spans. Parsing limits apply separately to each CRL.
+`TC_X509_crl_index_init` parses an array of DER spans into a caller-owned `TC_X509_crl_record`
+array and a `TC_X509_crl_index`. Pass the parsing workspace above and one work budget for the
+collection. Record capacity must cover every input span, and the parsing limits apply to each CRL.
 
 ```c
 const TC_bytes inputs[] = {encoded};
@@ -98,61 +93,57 @@ if (result != TC_TLV_OK) {
 }
 ```
 
-The index borrows the record array, and each record borrows its original CRL
-bytes. Keep both unchanged while using the index. Frame and OID scratch may be
-reused after initialization. Empty input accepts NULL/0 input and record arrays.
+The index borrows the record array, and each record borrows its CRL bytes. Keep both unchanged while
+using the index. Frame and OID scratch are reusable after initialization. An empty collection
+accepts NULL/0 input and record arrays.
 
-Malformed CRLs stop initialization without changing the index result. Record
-storage may be partially populated. Extension-policy failures are retained in
-records so later selection can evaluate alternatives. The revocation resolver
-checks signature validity, freshness and trust.
+A malformed CRL stops initialization and leaves the index result unchanged, with record storage
+possibly partly written. Extension-policy failures stay in their records, so selection can try
+alternatives later.
 
 ## File and flash sources
 
-Include `<tiny_crypto/x509_crl_source.h>` for CRLs held outside RAM. A `TC_source`
-supplies a 64-bit length and an exact read-at callback. Return `TC_ERROR` for a
-short read or storage failure, and the preparation call returns `TC_TLV_IO`.
-Keep the source unchanged throughout preparation.
+Include `<tiny_crypto/x509_crl_source.h>` for CRLs held outside RAM. A `TC_source` supplies a 64-bit
+length and an exact read-at callback. The callback returns `TC_ERROR` for a short read or storage
+failure, and preparation then returns `TC_TLV_IO`. Keep the source unchanged throughout preparation.
 
-`TC_X509_crl_prepare_begin` takes the source, target serial/issuer pairs, limits
-and a caller-owned workspace. Use `TC_X509_crl_prepare_size` and
-`TC_X509_crl_prepare_alignment` to size its state buffer. `TC_X509_crl_storage`
-provides alignment for static storage. The remaining workspace contains a read
-window, metadata buffer, entry scratch, retained issuer storage, parser/name
-scratch and one match slot per target.
+### Begin and step
 
-Call `TC_X509_crl_prepare_step` until `complete` is set. Each call consumes a
-per-call work budget. Refill that budget before the next call. Physical
-read-byte and callback limits apply to the whole job. Preparation hashes the
-TBSCertList in the same pass that scans the entries. Each entry is hashed from
-the bytes its parser reads. The other TBSCertList bytes are read once, hashed and
-compared with the metadata and crlExtensions copied by begin, or with the DER
-headers that begin located. A source that returns different bytes on a later
-read then yields `TC_TLV_INVALID` or a digest that fails signature
-verification. `max_entries` bounds the entries scanned per call and `max_bytes`
-bounds the TBSCertList bytes hashed around them. Individual metadata and entry
-limits stay independent of the complete CRL size.
-A CRL whose extensions fail policy, such as an unknown critical extension,
-still prepares. Its record keeps `TC_TLV_INVALID` or `TC_TLV_UNSUPPORTED` in
-`policy`, its entries are left unscanned and every target is unmatched. The
-resolver skips that record, as it does for the same CRL from
+`TC_X509_crl_prepare_begin` takes the source, the target serial/issuer pairs, limits and a
+caller-owned workspace. `TC_X509_crl_prepare_size` and `TC_X509_crl_prepare_alignment` size its
+state buffer, and `TC_X509_crl_storage` gives static storage the right alignment. The rest of the
+workspace holds a read window, a metadata buffer, entry scratch, retained issuer storage,
+parser/name scratch and one match slot per target.
+
+Call `TC_X509_crl_prepare_step` until `complete` is set, refilling its per-call work budget before
+each call. Read-byte and callback limits apply to the whole job. `max_entries` bounds entries
+scanned per call and `max_bytes` bounds TBSCertList bytes hashed around them. Metadata and entry
+limits are independent of the CRL size.
+
+Preparation hashes the TBSCertList during the entry scan. Each entry is hashed from the bytes its
+parser reads. The remaining bytes are read once, hashed and compared with the metadata and
+crlExtensions copied by begin, or with the DER headers begin located. A source that returns
+different bytes on a later read yields `TC_TLV_INVALID` or a digest that fails signature
+verification.
+
+A CRL whose extensions fail policy, such as an unknown critical extension, still prepares. Its
+record keeps `TC_TLV_INVALID` or `TC_TLV_UNSUPPORTED` in `policy`, its entries stay unscanned and
+every target is unmatched. The resolver skips that record, as it does for the same CRL from
 `TC_X509_crl_index_init` (RFC 5280 section 5.2).
 
-After completion, `TC_X509_crl_prepare_finish` fills a `TC_X509_crl_record` for
-an index. Its digest and queried matches remain in job storage. The revocation
-resolver verifies the signature and applies signer trust, freshness, distribution
-scope and base/delta policy. Include targets for every path member and candidate
-CRL signer whose revocation may be checked. A target absent from the prepared
-batch produces `TC_TLV_UNSUPPORTED`.
+### Finish
 
-The certificate source must include the CRL signer certificates, including a
-root certificate when that root signs a CRL. Trust anchors supply trusted names
-and keys. Signer certificates supply the extensions used in signer selection.
-Equal-number delta CRLs with different retained hash algorithms produce
-`TC_TLV_UNSUPPORTED` when their signed contents must be compared.
+`TC_X509_crl_prepare_finish` fills a `TC_X509_crl_record` for an index. Its digest and matches stay
+in job storage. Include targets for every path member and candidate CRL signer whose revocation may
+be checked. A target missing from the batch produces `TC_TLV_UNSUPPORTED`. Equal-number delta CRLs
+with different retained hash algorithms produce `TC_TLV_UNSUPPORTED` when their signed contents
+must be compared.
 
-Keep job state, metadata, targets and matches unchanged until the last record
-use. Read-window, entry, issuer and parser scratch can be reused after preparation.
-The completed record retains the required evidence in RAM, so its source can be
-released. Call `TC_X509_crl_prepare_clear` after releasing all borrowed records.
-Preparation failures leave scratch provisional and require a new job.
+The certificate source must include the CRL signer certificates, including a root that signs a
+CRL. Trust anchors supply trusted names and keys, and signer certificates supply the extensions used
+in signer selection.
+
+Keep job state, metadata, targets and matches unchanged until the last record use. Read-window,
+entry, issuer and parser scratch are reusable after preparation. The record holds its evidence in
+RAM, so the source can be released. Call `TC_X509_crl_prepare_clear` after releasing every borrowed
+record. A preparation failure leaves scratch provisional and requires a new job.

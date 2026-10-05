@@ -4,10 +4,9 @@
 
 # DER values
 
-Enable `TINY_CRYPTO_ENABLE_TLV=ON` and `TINY_CRYPTO_ENABLE_DER=ON`, then
-include `<tiny_crypto/der.h>`. The readers check one complete DER value and
-return borrowed views of its contents. They build on the
-[TLV readers](tlv.md) and share `TC_TLV_result`.
+Enable `TINY_CRYPTO_ENABLE_TLV=ON` and `TINY_CRYPTO_ENABLE_DER=ON`, then include
+`<tiny_crypto/der.h>`. Each reader checks one complete DER value and returns borrowed views of its
+contents. The readers build on the [TLV readers](tlv.md) and share `TC_TLV_result`.
 
 ## Quick start
 
@@ -34,9 +33,8 @@ TC_TLV_result read_key_and_signature(TC_bytes key_der, TC_bytes signature_der,
 }
 ```
 
-The readers allocate nothing and need no frames, work budget or workspace.
-Pass the exact encoding: a truncated value, trailing bytes after it or a
-different tag returns `TC_TLV_INVALID`.
+The readers need no allocation, frames, work budget or workspace. Pass the exact encoding.
+Truncation, trailing bytes or a different tag returns `TC_TLV_INVALID`.
 
 ## Readers
 
@@ -57,17 +55,14 @@ different tag returns `TC_TLV_INVALID`.
 | `TC_DER_rsa_private`            | PKCS #1 two-prime RSAPrivateKey                   | eight component magnitudes                |
 | `TC_DER_ecdsa_signature`        | ECDSA-Sig-Value                                   | `r` and `s` magnitudes                    |
 
-`TC_DER_integer_contents`, `TC_DER_uint32_contents` and `TC_DER_oid_contents`
-check the contents octets of an IMPLICIT-tagged value. Use them after a TLV
-reader has checked the context-specific tag and length.
+`TC_DER_integer_contents`, `TC_DER_uint32_contents` and `TC_DER_oid_contents` check the
+contents octets of an IMPLICIT-tagged value after a TLV reader has checked its context-specific tag
+and length.
 
-OID contents stay encoded, so an OID of any arc size needs no integer
-conversion. Compare OIDs as byte spans. Integer magnitudes also stay encoded
-for the RSA and EC code that consumes them.
+OIDs and integer magnitudes stay encoded. Compare OIDs as byte spans, which handles any arc size.
+The RSA and EC code consumes the magnitudes directly.
 
 ## Results and failure state
-
-Every reader returns one of these values:
 
 - `TC_TLV_OK`: the encoding is valid and the outputs are written.
 - `TC_TLV_INVALID`: malformed, truncated or trailing input, a wrong tag, a
@@ -80,8 +75,7 @@ Every reader returns one of these values:
 - `TC_TLV_ARGUMENT`: a NULL output, an output that overlaps the input or
   another output, or a span with NULL data and a nonzero length.
 
-Outputs are unchanged on every failure. `TC_TLV_END` and `TC_TLV_MORE` are
-never returned.
+Outputs stay unchanged on every failure. The readers never return `TC_TLV_END` or `TC_TLV_MORE`.
 
 ## Conformance
 
@@ -110,20 +104,18 @@ packages) and RFC 3279 section 2.2.3 (ECDSA signatures).
 
 ## Limitations
 
-- The readers check encodings. Callers validate algorithm parameters, key
-  mathematics, public and private key consistency, attribute schemas and
-  signature ranges against the group order.
+- The readers check encodings. Callers validate algorithm parameters, key mathematics, public and
+  private key consistency, attribute schemas and signature ranges against the group order.
 - PKCS #8 version 1 requires its public key. Version 0 rejects one.
-- Readers take complete values only. Use the [TLV stream reader](tlv.md) for
+- Readers take complete values. Use the [TLV stream reader](tlv.md#whole-tree-traversal) for
   fragmented input.
-- Encoders are outside this module.
+- The module provides readers only.
 
 ## Tests
 
-`test_tlv_full` runs the DER reader tests, including malformed, truncated and
-unsupported-version encodings. `test_tlv_core` checks a build without DER, BER and the
-stream reader. `fuzz_tlv` exercises the DER readers under libFuzzer. Run the
-unit tests with:
+`test_tlv_full` covers the DER readers, including malformed, truncated and unsupported-version
+encodings. `test_tlv_core` checks a build without DER, BER and the stream reader. `fuzz_tlv`
+exercises the DER readers under libFuzzer.
 
 ```sh
 ctest --test-dir build -R '^test_tlv_(full|core)$' --output-on-failure
