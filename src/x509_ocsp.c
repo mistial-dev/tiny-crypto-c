@@ -527,27 +527,18 @@ static TC_TLV_result delegate_path(TC_bytes encoded, const TC_X509_ocsp_verify_r
   return tc_x509_path_result_status(status);
 }
 
-/* id-pkix-ocsp-nocheck has a NULL value (RFC 6960 4.2.2.2.1). The path
- * validation before this call already rejected duplicate extensions. */
+/* id-pkix-ocsp-nocheck has a NULL value (RFC 6960 4.2.2.2.1). */
 static TC_TLV_result delegate_nocheck(const TC_X509_certificate* signer,
                                       const TC_TLV_limits* limits, size_t* work, int* nocheck)
 {
-  TC_TLV_reader reader;
-  TC_X509_extension extension;
-  int found = 0;
-  TC_TLV_result status = tc_pki_extensions_init(&reader, signer, limits, work);
+  TC_bytes value;
+  const TC_TLV_result status = tc_pki_extension_find(
+      signer, (TC_bytes){nocheck_oid, sizeof nocheck_oid}, limits, work, &value);
   if (status != TC_TLV_OK)
     return status;
-  while ((status = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
-    if (!oid_is(extension.oid, nocheck_oid, sizeof nocheck_oid))
-      continue;
-    if (TC_DER_null(extension.value) != TC_TLV_OK)
-      return TC_TLV_INVALID;
-    found = 1;
-  }
-  if (status != TC_TLV_END)
-    return status;
-  *nocheck = found;
+  if (value.data && TC_DER_null(value) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  *nocheck = value.data != NULL;
   return TC_TLV_OK;
 }
 
