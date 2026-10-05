@@ -64,6 +64,7 @@ void check_hash(const uint8_t (&expected)[N], const uint8_t (&boundary)[BOUNDARY
 
 template <class Hmac, size_t N> void check_hmac(const hmac_vector* vectors, size_t count)
 {
+  const size_t minimum = TC_HMAC_MIN_TAG_LEN_FOR(N);
   uint8_t tag[N];
   uint8_t streamed[N];
   for (size_t i = 0; i < count; ++i) {
@@ -77,18 +78,18 @@ template <class Hmac, size_t N> void check_hmac(const hmac_vector* vectors, size
     CHECK(Hmac::mac(key, msg, full) == TC_OK);
     CHECK(std::memcmp(full, v.tag, N) == 0);
     CHECK(Hmac::verify(key, msg, bytes{tag, N}) == TC_OK);
-    CHECK(Hmac::verify(key, msg, bytes{tag, TC_HMAC_MIN_TAG_LEN}) == TC_OK);
-    tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 1;
-    CHECK(Hmac::verify(key, msg, bytes{tag, TC_HMAC_MIN_TAG_LEN}) == TC_MISMATCH);
-    tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 1;
+    CHECK(Hmac::verify(key, msg, bytes{tag, minimum}) == TC_OK);
+    tag[minimum - 1] ^= 1;
+    CHECK(Hmac::verify(key, msg, bytes{tag, minimum}) == TC_MISMATCH);
+    tag[minimum - 1] ^= 1;
 
     /* A truncated mac is the leading bytes of the full tag and verifies. */
     uint8_t truncated[N];
     std::memset(truncated, 0xA5, sizeof truncated);
-    CHECK(Hmac::mac(key, msg, buffer{truncated, TC_HMAC_MIN_TAG_LEN}) == TC_OK);
-    CHECK(std::memcmp(truncated, v.tag, TC_HMAC_MIN_TAG_LEN) == 0);
-    CHECK(truncated[TC_HMAC_MIN_TAG_LEN] == 0xA5);
-    CHECK(Hmac::verify(key, msg, bytes{truncated, TC_HMAC_MIN_TAG_LEN}) == TC_OK);
+    CHECK(Hmac::mac(key, msg, buffer{truncated, minimum}) == TC_OK);
+    CHECK(std::memcmp(truncated, v.tag, minimum) == 0);
+    CHECK(truncated[minimum] == 0xA5);
+    CHECK(Hmac::verify(key, msg, bytes{truncated, minimum}) == TC_OK);
 
     Hmac hmac;
     CHECK(hmac.init(key) == TC_OK);
@@ -125,8 +126,8 @@ template <class Hmac, size_t N> void check_hmac(const hmac_vector* vectors, size
   CHECK(noexcept(Hmac(key0)));
   CHECK(Hmac::mac(key0, bytes{nullptr, 1}, buffer{tag, N}) == TC_ERROR);
   CHECK(Hmac::mac(key0, msg0, buffer{tag, N + 1}) == TC_ERROR);
-  CHECK(Hmac::mac(key0, msg0, buffer{tag, TC_HMAC_MIN_TAG_LEN - 1}) == TC_ERROR);
-  CHECK(Hmac::verify(key0, msg0, bytes{tag, TC_HMAC_MIN_TAG_LEN - 1}) == TC_ERROR);
+  CHECK(Hmac::mac(key0, msg0, buffer{tag, minimum - 1}) == TC_ERROR);
+  CHECK(Hmac::verify(key0, msg0, bytes{tag, minimum - 1}) == TC_ERROR);
 }
 
 } /* namespace */

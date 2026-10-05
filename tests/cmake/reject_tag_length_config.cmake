@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
-# Checks that config.h keeps TC_MIN_TAG_LEN in 8..16 and rejects the removed
-# per-mode minimum tag length macros.
+# Checks that config.h keeps TC_MIN_TAG_LEN in 8..16, keeps TC_HMAC_MIN_TAG_LEN
+# at 10 or more, and rejects the removed per-mode minimum tag length macros.
 
 file(MAKE_DIRECTORY "${BINARY_DIR}")
 set(probe "${BINARY_DIR}/tag_length_probe.c")
@@ -44,6 +44,18 @@ endforeach()
 tc_compile_probe(result output TC_MIN_TAG_LEN=9 TC_ENABLE_DES=1 TC_DES_ENABLE_CMAC=1)
 if(result EQUAL 0 OR NOT output MATCHES "TC_MIN_TAG_LEN above 8 requires TC_DES_ENABLE_CMAC=0")
   message(FATAL_ERROR "TC_MIN_TAG_LEN=9 with DES-CMAC was not rejected:\n${output}")
+endif()
+
+# RFC 2104 section 5: the HMAC floor holds at least 80 bits.
+foreach(value 1 9)
+  tc_compile_probe(result output "TC_HMAC_MIN_TAG_LEN=${value}" TC_ENABLE_HMAC=1)
+  if(result EQUAL 0 OR NOT output MATCHES "TC_HMAC_MIN_TAG_LEN must be at least 10")
+    message(FATAL_ERROR "TC_HMAC_MIN_TAG_LEN=${value} was not rejected:\n${output}")
+  endif()
+endforeach()
+tc_compile_probe(result output TC_HMAC_MIN_TAG_LEN=10 TC_ENABLE_HMAC=1)
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "TC_HMAC_MIN_TAG_LEN=10 was rejected:\n${output}")
 endif()
 
 # Defining a per-mode minimum stops the build.

@@ -459,18 +459,20 @@
 #if TC_MIN_TAG_LEN < 8 || TC_MIN_TAG_LEN > 16
 #error "TC_MIN_TAG_LEN must be in 8..16"
 #endif
-/* Minimum accepted HMAC tag length for the one-shot HMAC and verify APIs.
- * RFC 2104 section 5 asks for at least half the digest and at least 80 bits.
- * It may not exceed the digest length of any enabled SHA. */
+/* Library-wide floor in bytes for the default one-shot HMAC and verify APIs.
+ * RFC 2104 section 5 asks for at least 80 bits and at least half the digest.
+ * The floor must be at least 10 bytes, and hash.h raises it to half of each
+ * digest (TC_HMAC_MIN_TAG_LEN_FOR). It may not exceed the digest length of
+ * any enabled SHA. */
 #ifndef TC_HMAC_MIN_TAG_LEN
 #define TC_HMAC_MIN_TAG_LEN 16
 #endif
-#if TC_ENABLE_HMAC && (TC_HMAC_MIN_TAG_LEN < 1 || (TC_ENABLE_SHA1 && TC_HMAC_MIN_TAG_LEN > 20) ||  \
+#if TC_ENABLE_HMAC && (TC_HMAC_MIN_TAG_LEN < 10 || (TC_ENABLE_SHA1 && TC_HMAC_MIN_TAG_LEN > 20) || \
                        (TC_ENABLE_SHA224 && TC_HMAC_MIN_TAG_LEN > 28) ||                           \
                        (TC_ENABLE_SHA256 && TC_HMAC_MIN_TAG_LEN > 32) ||                           \
                        (TC_ENABLE_SHA384 && TC_HMAC_MIN_TAG_LEN > 48) ||                           \
                        (TC_ENABLE_SHA512 && TC_HMAC_MIN_TAG_LEN > 64))
-#error "TC_HMAC_MIN_TAG_LEN must be at least 1 and at most every enabled SHA digest length"
+#error "TC_HMAC_MIN_TAG_LEN must be at least 10 and at most every enabled SHA digest length"
 #endif
 
 /* AES defaults favor small constant-time firmware: one key schedule size,

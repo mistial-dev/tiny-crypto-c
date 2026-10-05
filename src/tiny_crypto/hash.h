@@ -369,6 +369,16 @@ TC_status TC_SHA512_digest(TC_bytes data, uint8_t digest[TC_SHA512_DIGESTLEN]);
 #if TC_ENABLE_HMAC
 /* --- HMAC (FIPS 198-1) --- */
 
+/* Shortest tag in bytes that the default one-shot and verify calls accept for
+ * a digest of digest_length bytes: half the digest (RFC 2104 section 5), or
+ * the larger of TC_HMAC_MIN_TAG_LEN and TC_MIN_TAG_LEN when that is longer.
+ * The _short_tag calls accept TC_HASH_MAC_MIN_TAG_LEN up to this length - 1. */
+#define TC_HMAC_MIN_TAG_LEN_FOR(digest_length)                                                     \
+  (TC_HMAC_MIN_TAG_LEN_FLOOR_ > (digest_length) / 2 ? TC_HMAC_MIN_TAG_LEN_FLOOR_                   \
+                                                    : (digest_length) / 2)
+#define TC_HMAC_MIN_TAG_LEN_FLOOR_                                                                 \
+  (TC_HMAC_MIN_TAG_LEN > TC_MIN_TAG_LEN ? TC_HMAC_MIN_TAG_LEN : TC_MIN_TAG_LEN)
+
 #if TC_ENABLE_SHA1
 /* Key an HMAC-SHA-1 context. Keys longer than TC_SHA1_BLOCKLEN bytes are
  * hashed first and shorter keys are zero-padded (FIPS 198-1 section 4). An
@@ -386,8 +396,8 @@ TC_status TC_HMAC_SHA1_final(struct TC_HMAC_SHA1_ctx* ctx, uint8_t tag[TC_SHA1_D
 void TC_HMAC_SHA1_ctx_clear(struct TC_HMAC_SHA1_ctx* ctx);
 
 /* One-shot HMAC-SHA-1 truncated to tag.capacity bytes. The default call takes
- * max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)..TC_SHA1_DIGESTLEN; the short-tag
- * call takes 1..that minimum - 1. */
+ * TC_HMAC_MIN_TAG_LEN_FOR(TC_SHA1_DIGESTLEN)..TC_SHA1_DIGESTLEN, and the
+ * short-tag call takes TC_HASH_MAC_MIN_TAG_LEN up to that minimum - 1. */
 TC_status TC_HMAC_SHA1_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 TC_status TC_HMAC_SHA1_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
@@ -415,8 +425,8 @@ TC_status TC_HMAC_SHA224_final(struct TC_HMAC_SHA224_ctx* ctx, uint8_t tag[TC_SH
 void TC_HMAC_SHA224_ctx_clear(struct TC_HMAC_SHA224_ctx* ctx);
 
 /* One-shot HMAC-SHA-224 truncated to tag.capacity bytes. The default call takes
- * max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)..TC_SHA224_DIGESTLEN; the short-tag
- * call takes 1..that minimum - 1. */
+ * TC_HMAC_MIN_TAG_LEN_FOR(TC_SHA224_DIGESTLEN)..TC_SHA224_DIGESTLEN, and the
+ * short-tag call takes TC_HASH_MAC_MIN_TAG_LEN up to that minimum - 1. */
 TC_status TC_HMAC_SHA224_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 TC_status TC_HMAC_SHA224_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
@@ -444,8 +454,8 @@ TC_status TC_HMAC_SHA256_final(struct TC_HMAC_SHA256_ctx* ctx, uint8_t tag[TC_SH
 void TC_HMAC_SHA256_ctx_clear(struct TC_HMAC_SHA256_ctx* ctx);
 
 /* One-shot HMAC-SHA-256 truncated to tag.capacity bytes. The default call takes
- * max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)..TC_SHA256_DIGESTLEN; the short-tag
- * call takes 1..that minimum - 1. */
+ * TC_HMAC_MIN_TAG_LEN_FOR(TC_SHA256_DIGESTLEN)..TC_SHA256_DIGESTLEN, and the
+ * short-tag call takes TC_HASH_MAC_MIN_TAG_LEN up to that minimum - 1. */
 TC_status TC_HMAC_SHA256_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 TC_status TC_HMAC_SHA256_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
@@ -473,8 +483,8 @@ TC_status TC_HMAC_SHA384_final(struct TC_HMAC_SHA384_ctx* ctx, uint8_t tag[TC_SH
 void TC_HMAC_SHA384_ctx_clear(struct TC_HMAC_SHA384_ctx* ctx);
 
 /* One-shot HMAC-SHA-384 truncated to tag.capacity bytes. The default call takes
- * max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)..TC_SHA384_DIGESTLEN; the short-tag
- * call takes 1..that minimum - 1. */
+ * TC_HMAC_MIN_TAG_LEN_FOR(TC_SHA384_DIGESTLEN)..TC_SHA384_DIGESTLEN, and the
+ * short-tag call takes TC_HASH_MAC_MIN_TAG_LEN up to that minimum - 1. */
 TC_status TC_HMAC_SHA384_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 TC_status TC_HMAC_SHA384_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
@@ -502,8 +512,8 @@ TC_status TC_HMAC_SHA512_final(struct TC_HMAC_SHA512_ctx* ctx, uint8_t tag[TC_SH
 void TC_HMAC_SHA512_ctx_clear(struct TC_HMAC_SHA512_ctx* ctx);
 
 /* One-shot HMAC-SHA-512 truncated to tag.capacity bytes. The default call takes
- * max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)..TC_SHA512_DIGESTLEN; the short-tag
- * call takes 1..that minimum - 1. */
+ * TC_HMAC_MIN_TAG_LEN_FOR(TC_SHA512_DIGESTLEN)..TC_SHA512_DIGESTLEN, and the
+ * short-tag call takes TC_HASH_MAC_MIN_TAG_LEN up to that minimum - 1. */
 TC_status TC_HMAC_SHA512_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 TC_status TC_HMAC_SHA512_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 

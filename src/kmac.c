@@ -113,6 +113,15 @@ static int tc_kmac_input(const struct TC_KMAC256_ctx* ctx, TC_bytes input)
          tc_internal_ranges_disjoint(ctx, sizeof(*ctx), input.data, input.length);
 }
 
+/* SP 800-185 section 8.4.2: a KMAC tag holds at least 32 bits. short_tag
+ * selects TC_HASH_MAC_MIN_TAG_LEN..TC_MIN_TAG_LEN - 1, and the default calls
+ * take TC_MIN_TAG_LEN and longer. */
+static int tc_kmac_tag_length_allowed(size_t length, int short_tag)
+{
+  return length >= TC_HASH_MAC_MIN_TAG_LEN &&
+         tc_internal_tag_length_allowed(length, SIZE_MAX, short_tag);
+}
+
 static int tc_kmac_output(TC_buffer out)
 {
   return out.data != NULL && out.capacity != 0 && tc_kmac_length(out.capacity);
@@ -188,9 +197,8 @@ static void tc_kmac_squeeze(struct TC_KMAC256_ctx* ctx, uint8_t* out, size_t len
 
 static TC_status tc_kmac_final(struct TC_KMAC256_ctx* ctx, TC_buffer out, int short_tag)
 {
-  if (!ctx || !tc_kmac_output(out) ||
-      !tc_internal_tag_length_allowed(out.capacity, SIZE_MAX, short_tag) || !tc_kmac_live(ctx) ||
-      !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), out.data, out.capacity))
+  if (!ctx || !tc_kmac_output(out) || !tc_kmac_tag_length_allowed(out.capacity, short_tag) ||
+      !tc_kmac_live(ctx) || !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), out.data, out.capacity))
     return TC_ERROR;
   tc_kmac_finish_absorb(ctx, out.capacity);
   tc_kmac_squeeze(ctx, out.data, out.capacity);
@@ -221,7 +229,7 @@ static TC_status tc_kmac_digest(TC_bytes key, TC_bytes data, TC_bytes custom, TC
   TC_status status;
   if (!tc_kmac_span(key.data, key.length) || !tc_internal_span_valid(data.data, data.length) ||
       !tc_kmac_span(custom.data, custom.length) || !tc_kmac_output(out) ||
-      !tc_internal_tag_length_allowed(out.capacity, SIZE_MAX, short_tag))
+      !tc_kmac_tag_length_allowed(out.capacity, short_tag))
     return TC_ERROR;
   /* The local context holds the keyed sponge. It is wiped on every path. */
   status = TC_KMAC256_init(&ctx, key, custom);
@@ -252,8 +260,7 @@ static TC_status tc_kmac_verify(TC_bytes key, TC_bytes data, TC_bytes custom, TC
   TC_status status;
   volatile unsigned different = 0;
 
-  if (!tc_kmac_span(tag.data, tag.length) ||
-      !tc_internal_tag_length_allowed(tag.length, SIZE_MAX, short_tag))
+  if (!tc_kmac_span(tag.data, tag.length) || !tc_kmac_tag_length_allowed(tag.length, short_tag))
     return TC_ERROR;
   status = TC_KMAC256_init(&ctx, key, custom);
   if (status == TC_OK)

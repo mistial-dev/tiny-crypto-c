@@ -6,7 +6,8 @@
  * Limitations: fixed-output KMAC256 only.
  * Work: every function charges no work budget. Default output and verify
  * calls require at least TC_MIN_TAG_LEN bytes. Explicit _short_tag calls
- * accept 1..TC_MIN_TAG_LEN - 1 bytes.
+ * accept TC_HASH_MAC_MIN_TAG_LEN..TC_MIN_TAG_LEN - 1 bytes (SP 800-185
+ * section 8.4.2).
  * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_KMAC_H_
 #define TINY_CRYPTO_KMAC_H_

@@ -4,6 +4,7 @@
  * Shared hash and HMAC operations (FIPS 180-4, RFC 1321, FIPS 198-1). The
  * per-algorithm files supply compression functions and descriptors. */
 #include "hash_core_internal.h"
+#include <tiny_crypto/hash.h>
 
 #if TC_HASH_CORE_ENABLED
 #include <string.h>
@@ -406,12 +407,13 @@ TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* worksp
   uint8_t full[TC_HASH_CORE_MAX_DIGEST];
   TC_status status;
 
-  /* SP 800-107: a truncated tag keeps the leftmost bytes. The algorithm and
-   * library-wide policies jointly set the default minimum. */
-  const size_t minimum =
-      TC_HMAC_MIN_TAG_LEN > TC_MIN_TAG_LEN ? TC_HMAC_MIN_TAG_LEN : TC_MIN_TAG_LEN;
+  /* SP 800-107 Rev. 1 section 5.3.3: a truncated tag keeps the leftmost
+   * bytes and holds at least 32 bits. RFC 2104 section 5 sets the default
+   * minimum. */
+  const size_t minimum = TC_HMAC_MIN_TAG_LEN_FOR(info->digest_bytes);
   if (tag.data == NULL || tag.capacity > info->digest_bytes ||
-      (short_tag ? tag.capacity == 0 || tag.capacity >= minimum : tag.capacity < minimum) ||
+      (short_tag ? tag.capacity < TC_HASH_MAC_MIN_TAG_LEN || tag.capacity >= minimum
+                 : tag.capacity < minimum) ||
       (message.length != 0 && message.data == NULL))
     return TC_ERROR;
   status = tc_hmac_core_init(stored, workspace, key.data, key.length);

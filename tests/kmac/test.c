@@ -105,6 +105,16 @@ TC_TEST(test_profile)
   munit_assert(TC_KMAC256_digest_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4},
                                            (TC_bytes){NULL, 0},
                                            (TC_buffer){out, TC_MIN_TAG_LEN}) == TC_ERROR);
+  /* SP 800-185 section 8.4.2: a KMAC tag holds at least 32 bits. */
+  munit_assert(
+      TC_KMAC256_digest_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
+                                  (TC_buffer){out, TC_HASH_MAC_MIN_TAG_LEN - 1}) == TC_ERROR);
+  munit_assert(
+      TC_KMAC256_verify_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
+                                  (TC_bytes){out, TC_HASH_MAC_MIN_TAG_LEN - 1}) == TC_ERROR);
+  munit_assert(TC_KMAC256_digest_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                           (TC_bytes){NULL, 0},
+                                           (TC_buffer){out, TC_HASH_MAC_MIN_TAG_LEN}) == TC_OK);
   munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 32}, (TC_bytes){NULL, 0},
                                  (TC_buffer){want, 32}) == TC_OK);
   memcpy(out, data, 32);

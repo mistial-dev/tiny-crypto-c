@@ -494,22 +494,30 @@ returns `TC_MISMATCH`. Inputs and outputs may overlap in any way. See
 
 ## Tag lengths
 
-`TC_MIN_TAG_LEN` in `config.h` sets one minimum tag length for CCM, EAX,
-AES-CMAC, DES-CMAC, HMAC and KMAC. It defaults to 8 bytes, the 64-bit floor of SP 800-38B
-Appendix A.2, and a build may raise it to 16. Values outside 8..16 stop the
-build. A value above 8 also requires `TC_DES_ENABLE_CMAC=0`, since a DES-CMAC
-tag holds at most 8 bytes.
+`TC_MIN_TAG_LEN` in `config.h` sets the minimum tag length for the default
+CCM, EAX, AES-CMAC, DES-CMAC and KMAC entry points. It defaults to 8 bytes,
+the 64-bit floor of SP 800-38B Appendix A.2, and a build may raise it to 16.
+Values outside 8..16 stop the build. A value above 8 also requires
+`TC_DES_ENABLE_CMAC=0`, since a DES-CMAC tag holds at most 8 bytes.
 
-| Mode       | Default entry points                                      | `_short_tag` entry points                      |
-| ---------- | --------------------------------------------------------- | ---------------------------------------------- |
-| CCM        | even lengths from `TC_MIN_TAG_LEN` to 16                  | even lengths from 4 up to `TC_MIN_TAG_LEN - 1` |
-| EAX        | `TC_MIN_TAG_LEN`..16                                      | 1..`TC_MIN_TAG_LEN - 1`                        |
-| AES-CMAC   | `TC_MIN_TAG_LEN`..16                                      | 1..`TC_MIN_TAG_LEN - 1`                        |
-| DES-CMAC   | `TC_MIN_TAG_LEN`..8                                       | 1..`TC_MIN_TAG_LEN - 1`                        |
-| GCM        | 12..16                                                    | 4 or 8 (SP 800-38D appendix C)                 |
-| ISO 9797-1 | 8                                                         | 4..7                                           |
-| HMAC       | `max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)`..digest length | 1..default minimum - 1                         |
-| KMAC256    | `TC_MIN_TAG_LEN`..`UINT64_MAX / 8`                        | 1..`TC_MIN_TAG_LEN - 1`                        |
+The default HMAC minimum for a digest of `L` bytes is
+`TC_HMAC_MIN_TAG_LEN_FOR(L)`: the largest of `L / 2`, `TC_HMAC_MIN_TAG_LEN` and
+`TC_MIN_TAG_LEN`. RFC 2104 section 5 recommends at least half the digest and at
+least 80 bits, so `TC_HMAC_MIN_TAG_LEN` defaults to 16 and a value below 10
+stops the build. HMAC and KMAC tags never go below `TC_HASH_MAC_MIN_TAG_LEN`
+(4 bytes), the 32-bit floor of SP 800-107 Rev. 1 section 5.3.3 and SP 800-185
+section 8.4.2.
+
+| Mode       | Default entry points                                    | `_short_tag` entry points                      |
+| ---------- | ------------------------------------------------------- | ---------------------------------------------- |
+| CCM        | even lengths from `TC_MIN_TAG_LEN` to 16                | even lengths from 4 up to `TC_MIN_TAG_LEN - 1` |
+| EAX        | `TC_MIN_TAG_LEN`..16                                    | 1..`TC_MIN_TAG_LEN - 1`                        |
+| AES-CMAC   | `TC_MIN_TAG_LEN`..16                                    | 1..`TC_MIN_TAG_LEN - 1`                        |
+| DES-CMAC   | `TC_MIN_TAG_LEN`..8                                     | 1..`TC_MIN_TAG_LEN - 1`                        |
+| GCM        | 12..16                                                  | 4 or 8 (SP 800-38D appendix C)                 |
+| ISO 9797-1 | 8                                                       | 4..7                                           |
+| HMAC       | `TC_HMAC_MIN_TAG_LEN_FOR(digest length)`..digest length | 4..default minimum - 1                         |
+| KMAC256    | `TC_MIN_TAG_LEN`..`UINT64_MAX / 8`                      | 4..`TC_MIN_TAG_LEN - 1`                        |
 
 Each accepted length has exactly one entry point. The other entry point returns
 `TC_ERROR` and leaves every output unchanged. A zero-length tag is never

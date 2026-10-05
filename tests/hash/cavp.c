@@ -402,7 +402,7 @@ TC_TEST_SHARED(test_cavp_hmac)
       }
 
       /* The one-shot and verify APIs agree whenever Tlen is in range. */
-      if (tlen >= TC_HMAC_MIN_TAG_LEN) {
+      if ((size_t)tlen >= TC_HMAC_MIN_TAG_LEN_FOR((size_t)group_len)) {
         int rc = cavp_hmac_verify(alg, key, (size_t)key_len, msg, (size_t)msg_len, expected,
                                   (size_t)tlen);
         munit_assert_int(rc, ==, TC_OK);

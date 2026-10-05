@@ -138,6 +138,11 @@ void TC_secure_zero(void* memory, size_t length);
  * or the lengths differ, and TC_ERROR for an invalid span. */
 TC_status TC_ct_equal(TC_bytes a, TC_bytes b);
 
+/* Shortest HMAC or KMAC tag in bytes. SP 800-107 Rev. 1 section 5.3.3 and
+ * SP 800-185 section 8.4.2 forbid tags below 32 bits, so the _short_tag
+ * entry points of both MACs start at this length. */
+#define TC_HASH_MAC_MIN_TAG_LEN 4
+
 #ifdef __cplusplus
 }
 #endif

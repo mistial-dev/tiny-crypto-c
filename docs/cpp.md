@@ -160,8 +160,8 @@ plaintext is released. A `GCM` object initialized with a short tag uses the
 
 Hash, HMAC, MD5 and KMAC256 inputs are `TC_bytes` spans in C and `bytes` in
 C++. Fixed-length digests and full HMAC tags go to digest-sized arrays. A
-one-shot HMAC writes `tag.capacity` bytes, from the greater of
-`TC_HMAC_MIN_TAG_LEN` and `TC_MIN_TAG_LEN` to the digest length, and
+one-shot HMAC writes `tag.capacity` bytes, from
+`TC_HMAC_MIN_TAG_LEN_FOR(digest length)` to the digest length, and
 verification compares `tag.length` bytes. KMAC256 writes
 `out.capacity` bytes, and that length is part of the MAC input.
 
