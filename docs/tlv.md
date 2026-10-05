@@ -37,6 +37,10 @@ suffice. The frames are scratch and may change on failure.
 Use `object` only after `TC_TLV_OK`. `TC_TLV_MORE` means the object is truncated.
 Request more input or reject an incomplete message. `TC_TLV_INVALID` means bad
 framing, and `TC_TLV_LIMIT` means a configured resource bound was exceeded.
+ISO/IEC 7816-4:2020 section 6.3 allows length fields of one to five bytes, so
+the ISO 7816 profiles report a first length byte of `85` to `FE` as
+`TC_TLV_INVALID`. BER and DER report more length octets than the length type holds as
+`TC_TLV_LIMIT` (X.690 section 8.1.3.5).
 Errors leave `object` unchanged. Frame scratch may change.
 
 `object.encoded` includes the whole object, including its end-of-contents bytes

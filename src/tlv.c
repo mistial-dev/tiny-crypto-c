@@ -81,9 +81,13 @@ TC_TLV_result tc_tlv_header_read(const uint8_t* data, size_t length, TC_TLV_prof
 #endif
   } else if (b & 128) {
     n = b & 127;
-    /* Limit work before reading length octets. BER/ISO allow non-shortest
-     * lengths, and the encoded width is still capped. */
-    if (n > length_octets || (iso && n > 4))
+    /* ISO/IEC 7816-4:2020 6.3 c) allows one to five length bytes, so a wider
+     * ISO length field is malformed. */
+    if (iso && n > 4)
+      return TC_TLV_INVALID;
+    /* Limit work before reading length octets. BER and ISO allow
+     * non-shortest lengths (X.690 8.1.3.5), so the width is capped. */
+    if (n > length_octets)
       return TC_TLV_LIMIT;
     if (n > length - p)
       return TC_TLV_MORE;
