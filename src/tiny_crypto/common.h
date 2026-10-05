@@ -127,8 +127,8 @@ typedef enum {
 
 /* Best-effort secret wipe: write zero to length bytes of memory through
  * volatile stores. GCC and Clang builds add a compiler memory barrier. This
- * defeats common dead-store removal. memory must be writable for length bytes. NULL is
- * accepted only when length is zero. Copies already held in CPU registers
+ * defeats common dead-store removal. memory must be writable for length bytes.
+ * NULL memory is a no-op for any length. Copies already held in CPU registers
  * or elsewhere remain. */
 void TC_secure_zero(void* memory, size_t length);
 
