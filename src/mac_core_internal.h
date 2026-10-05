@@ -34,4 +34,17 @@ TC_status tc_mac_cmac_final(const tc_block_cipher* cipher, uint8_t* mac, uint8_t
 TC_status tc_mac_cmac_parts(const tc_block_cipher* cipher, const uint8_t* initial,
                             const TC_bytes* parts, size_t count, const uint8_t* complete_subkey,
                             const uint8_t* partial_subkey, uint8_t* tag);
+
+/* One-shot SP 800-38B CMAC of msg over a keyed cipher whose doubling uses
+ * reduction. The tag is the leading tag.capacity bytes of T (section 6.2
+ * step 7). tc_internal_tag_length_allowed with the block size as maximum
+ * selects the lengths, and short_tag picks the entry point. The tag is
+ * written last, so it may overlap msg, and every failure leaves it
+ * unchanged. Subkeys and the full tag are wiped. */
+TC_status tc_mac_cmac_oneshot(const tc_block_cipher* cipher, uint8_t reduction, TC_bytes msg,
+                              TC_buffer tag, int short_tag);
+/* Recompute a tag of tag.length bytes as above and compare it with
+ * TC_ct_equal. Returns TC_OK, TC_MISMATCH or TC_ERROR. */
+TC_status tc_mac_cmac_verify(const tc_block_cipher* cipher, uint8_t reduction, TC_bytes msg,
+                             TC_bytes tag, int short_tag);
 #endif

@@ -28,25 +28,33 @@ static tc_block_cipher tc_des_cmac_cipher(const struct TC_DES_CMAC_ctx* ctx, tc_
   return tc_des_block_cipher(key);
 }
 
+/* Validate a DES or TDEA CMAC key and schedule it. Returns 0 for a NULL key
+ * with a length, a length other than 8, 16 or 24, or a key refused under
+ * TC_DES_REJECT_WEAK_KEYS. */
+static int tc_des_cmac_schedule(TC_bytes key, TC_DES_key_bundle* keys, uint8_t* triple)
+{
+  if (!tc_internal_span_valid(key.data, key.length) ||
+      (key.length != TC_DES_KEYLEN && key.length != TC_DES_KEYLEN_2KEY &&
+       key.length != TC_DES_KEYLEN_3KEY))
+    return 0;
+#if TC_DES_REJECT_WEAK_KEYS
+  if (tc_des_bundle_is_rejected(key.data, key.length))
+    return 0;
+#endif
+  *triple = (uint8_t)(key.length != TC_DES_KEYLEN);
+  tc_des_schedule_key(keys->schedule, key.data, key.length);
+  return 1;
+}
+
 TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, TC_bytes key)
 {
   if (ctx == NULL)
     return TC_ERROR;
-  if (!tc_internal_span_valid(key.data, key.length) ||
-      (key.length != TC_DES_KEYLEN && key.length != TC_DES_KEYLEN_2KEY &&
-       key.length != TC_DES_KEYLEN_3KEY) ||
-      !tc_internal_ranges_disjoint(ctx, sizeof *ctx, key.data, key.length)) {
-    TC_DES_CMAC_ctx_clear(ctx);
-    return TC_ERROR;
-  }
+  /* Check overlap before clearing, which would wipe a key staged in ctx. */
+  const int disjoint = tc_internal_ranges_disjoint(ctx, sizeof *ctx, key.data, key.length);
   TC_DES_CMAC_ctx_clear(ctx);
-#if TC_DES_REJECT_WEAK_KEYS
-  if (tc_des_bundle_is_rejected(key.data, key.length))
+  if (!disjoint || !tc_des_cmac_schedule(key, &ctx->keys, &ctx->triple))
     return TC_ERROR;
-#endif
-
-  ctx->triple = (uint8_t)(key.length != TC_DES_KEYLEN);
-  tc_des_schedule_key(ctx->keys.schedule, key.data, key.length);
   tc_des_block_key mac_key;
   const tc_block_cipher cipher = tc_des_cmac_cipher(ctx, &mac_key);
   if (tc_mac_derive_subkeys(&cipher, 0x1b, 0, ctx->k1, ctx->k2) != TC_OK) {
@@ -94,61 +102,42 @@ void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx)
   TC_secure_zero(ctx, sizeof(*ctx));
 }
 
-/* One-shot CMAC over the streaming context. The tag is the leading tag_len
- * bytes of T (SP 800-38B section 6.2 step 7). short_tag selects the lengths
- * below TC_MIN_TAG_LEN (Appendix A.2). */
-static TC_status tc_des_cmac_oneshot(TC_bytes key, TC_bytes msg, TC_buffer tag, int short_tag)
+/* One-shot CMAC or verification with a freshly scheduled key. verify selects
+ * the comparison against expected, otherwise the tag goes to tag. */
+static TC_status tc_des_cmac_oneshot(TC_bytes key, TC_bytes msg, TC_buffer tag, TC_bytes expected,
+                                     int verify, int short_tag)
 {
-  struct TC_DES_CMAC_ctx ctx;
-  uint8_t full[TC_DES_CMAC_TAG_MAX];
-  TC_status status;
-
-  if (tag.data == NULL ||
-      !tc_internal_tag_length_allowed(tag.capacity, TC_DES_CMAC_TAG_MAX, short_tag) ||
-      !tc_internal_span_valid(msg.data, msg.length))
-    return TC_ERROR;
-  status = TC_DES_CMAC_init(&ctx, key);
-  /* Empty message: msg may be NULL. update reads msg only when its length is
-   * nonzero. */
-  if (status == TC_OK)
-    status = TC_DES_CMAC_update(&ctx, msg);
-  if (status == TC_OK)
-    status = TC_DES_CMAC_final(&ctx, (TC_buffer){full, sizeof full});
-  if (status == TC_OK)
-    memcpy(tag.data, full, tag.capacity);
-  TC_secure_zero(full, sizeof(full));
-  TC_DES_CMAC_ctx_clear(&ctx);
+  TC_DES_key_bundle keys;
+  uint8_t triple;
+  TC_status status = TC_ERROR;
+  if (tc_des_cmac_schedule(key, &keys, &triple)) {
+    const tc_des_block_key block_key = {keys.schedule, triple};
+    const tc_block_cipher cipher = tc_des_block_cipher(&block_key);
+    status = verify ? tc_mac_cmac_verify(&cipher, 0x1b, msg, expected, short_tag)
+                    : tc_mac_cmac_oneshot(&cipher, 0x1b, msg, tag, short_tag);
+  }
+  TC_secure_zero(&keys, sizeof keys);
   return status;
-}
-
-static TC_status tc_des_cmac_verify_oneshot(TC_bytes key, TC_bytes msg, TC_bytes tag, int short_tag)
-{
-  uint8_t computed[TC_DES_CMAC_TAG_MAX];
-  if (!tc_internal_tag_length_allowed(tag.length, TC_DES_CMAC_TAG_MAX, short_tag))
-    return TC_ERROR;
-  return tc_internal_verify_tag(
-      tc_des_cmac_oneshot(key, msg, (TC_buffer){computed, tag.length}, short_tag), computed,
-      sizeof computed, tag.data, tag.length);
 }
 
 TC_status TC_DES_CMAC(TC_bytes key, TC_bytes msg, TC_buffer tag)
 {
-  return tc_des_cmac_oneshot(key, msg, tag, 0);
+  return tc_des_cmac_oneshot(key, msg, tag, (TC_bytes){NULL, 0}, 0, 0);
 }
 
 TC_status TC_DES_CMAC_verify(TC_bytes key, TC_bytes msg, TC_bytes tag)
 {
-  return tc_des_cmac_verify_oneshot(key, msg, tag, 0);
+  return tc_des_cmac_oneshot(key, msg, (TC_buffer){NULL, 0}, tag, 1, 0);
 }
 
 TC_status TC_DES_CMAC_short_tag(TC_bytes key, TC_bytes msg, TC_buffer tag)
 {
-  return tc_des_cmac_oneshot(key, msg, tag, 1);
+  return tc_des_cmac_oneshot(key, msg, tag, (TC_bytes){NULL, 0}, 0, 1);
 }
 
 TC_status TC_DES_CMAC_verify_short_tag(TC_bytes key, TC_bytes msg, TC_bytes tag)
 {
-  return tc_des_cmac_verify_oneshot(key, msg, tag, 1);
+  return tc_des_cmac_oneshot(key, msg, (TC_buffer){NULL, 0}, tag, 1, 1);
 }
 
 #endif /* TC_DES_ENABLE_CMAC */

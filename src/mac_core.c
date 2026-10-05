@@ -138,3 +138,35 @@ TC_status tc_mac_cmac_parts(const tc_block_cipher* cipher, const uint8_t* initia
   TC_secure_zero(block, sizeof block);
   return status;
 }
+
+TC_status tc_mac_cmac_oneshot(const tc_block_cipher* cipher, uint8_t reduction, TC_bytes msg,
+                              TC_buffer tag, int short_tag)
+{
+  uint8_t k1[TC_BLOCK_MAX], k2[TC_BLOCK_MAX], full[TC_BLOCK_MAX];
+  TC_status status;
+  if (tag.data == NULL ||
+      !tc_internal_tag_length_allowed(tag.capacity, cipher->block_size, short_tag) ||
+      !tc_internal_span_valid(msg.data, msg.length))
+    return TC_ERROR;
+  status = tc_mac_derive_subkeys(cipher, reduction, 0, k1, k2);
+  if (status == TC_OK)
+    status = tc_mac_cmac_parts(cipher, NULL, &msg, 1, k1, k2, full);
+  if (status == TC_OK)
+    memcpy(tag.data, full, tag.capacity);
+  TC_secure_zero(k1, sizeof k1);
+  TC_secure_zero(k2, sizeof k2);
+  TC_secure_zero(full, sizeof full);
+  return status;
+}
+
+TC_status tc_mac_cmac_verify(const tc_block_cipher* cipher, uint8_t reduction, TC_bytes msg,
+                             TC_bytes tag, int short_tag)
+{
+  uint8_t computed[TC_BLOCK_MAX];
+  if (tag.data == NULL ||
+      !tc_internal_tag_length_allowed(tag.length, cipher->block_size, short_tag))
+    return TC_ERROR;
+  return tc_internal_verify_tag(
+      tc_mac_cmac_oneshot(cipher, reduction, msg, (TC_buffer){computed, tag.length}, short_tag),
+      computed, sizeof computed, tag.data, tag.length);
+}
