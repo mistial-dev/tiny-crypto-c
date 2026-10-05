@@ -91,6 +91,15 @@ typedef struct {
   TC_work_budget work;
 } TC_execution;
 
+/* Per-call approval policy for operations that generate keys or apply
+ * protection. TC_APPROVED_ONLY, the zero value, refuses parameters that the
+ * cited NIST standards disallow for that purpose, such as RSA-1024 key
+ * generation. TC_PERMIT_DISALLOWED performs the operation on request. Every
+ * other value behaves as TC_APPROVED_ONLY. Processing already protected data,
+ * such as signature verification, ignores the policy. docs/api.md,
+ * Disallowed parameters, lists the gated operations. */
+typedef enum { TC_APPROVED_ONLY = 0, TC_PERMIT_DISALLOWED = 1 } TC_approval_policy;
+
 /* Credential validation combines signatures, trust policy and status evidence. */
 typedef TC_result TC_credential_status;
 #define TC_CREDENTIAL_VALID TC_RESULT_OK

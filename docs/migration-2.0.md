@@ -42,7 +42,9 @@ the work budget or `TC_execution`. RSA and EC randomized operations share
 Enable required modulus sizes independently with
 `TINY_CRYPTO_RSA_ENABLE_1024`, `_2048`, `_3072` and `_4096`. RSA-1024 is a
 legacy interoperability option and defaults off. PIV and TWIC key policy
-rejects it, except TWIC Legacy key proofs that set `allow_rsa1024`.
+rejects it, except TWIC Legacy key proofs that set `allow_rsa1024`. RSA-1024 key generation
+and private-key validation also need `TC_PERMIT_DISALLOWED`, described in
+[disallowed parameters](api.md#disallowed-parameters).
 
 ## Removed switches
 

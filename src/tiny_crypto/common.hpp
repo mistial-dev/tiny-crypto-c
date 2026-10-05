@@ -29,6 +29,7 @@ typedef ::TC_buffer buffer;
 typedef ::TC_result result;
 typedef ::TC_status status;
 typedef ::TC_credential_status credential_status;
+typedef ::TC_approval_policy approval_policy;
 
 /* Compare two byte spans. Returns TC_OK when both hold the same bytes and
  * TC_MISMATCH when the contents or the lengths differ. A span with NULL data

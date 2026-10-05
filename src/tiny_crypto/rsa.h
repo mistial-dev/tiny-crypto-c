@@ -5,7 +5,9 @@
  * generation.
  * Standards: RFC 8017, FIPS 186-5 appendices A.1 and C.
  * Configuration: TC_ENABLE_RSA, TC_RSA_ENABLE_1024/2048/3072/4096 and
- * TC_RSA_SMALL. RSA-1024 is a legacy size and is disabled by default.
+ * TC_RSA_SMALL. RSA-1024 is off by default. SP 800-131A Rev. 2 Table 2 keeps it
+ * for signature verification only.
+ * Generating or validating an RSA-1024 key also needs TC_PERMIT_DISALLOWED.
  * Limitations: two-prime keys of 1024, 2048, 3072 or 4096 bits.
  * Contracts: docs/api.md, including its TC_work_budget units.
  * Guide: docs/rsa.md. */
@@ -203,12 +205,15 @@ void TC_RSA_prepared_public_key_clear(TC_RSA_prepared_public_key* setup);
  * e. Scratch needs TC_RSA_KEYGEN_WORKSPACE_WORDS(bits) limbs. Output buffers
  * remain unchanged until a complete key is published. Scratch, state,
  * outputs, their metadata and the workspace descriptor must be mutually
- * disjoint. Zero-initialize state before the first init.
+ * disjoint. Zero-initialize state before the first init. FIPS 186-5
+ * section 5.1 and appendix A.1.3 step 1 require nlen >= 2048, so RSA-1024
+ * generation needs approval = TC_PERMIT_DISALLOWED.
  *
  * init:
  * TC_RSA_ARGUMENT     NULL pointer or buffer, misaligned scratch, overlap or
  *                     an active state.
- * TC_RSA_UNSUPPORTED  another key size.
+ * TC_RSA_UNSUPPORTED  another key size, or RSA-1024 without
+ *                     TC_PERMIT_DISALLOWED.
  * TC_RSA_LIMIT        a zero limit, or a buffer or scratch shorter than
  *                     required.
  * Failures leave state, outputs and scratch unchanged. Charges no work.
@@ -234,8 +239,8 @@ void TC_RSA_prepared_public_key_clear(TC_RSA_prepared_public_key* setup);
  * clear wipes state and its scratch. It accepts NULL. Call it whenever
  * abandoning an in-progress generation. */
 TC_RSA_result TC_RSA_keygen_init(TC_RSA_keygen_state* state, size_t bits,
-                                 const TC_RSA_keygen_output* output, TC_RSA_keygen_limits limits,
-                                 const TC_RSA_workspace* workspace);
+                                 TC_approval_policy approval, const TC_RSA_keygen_output* output,
+                                 TC_RSA_keygen_limits limits, const TC_RSA_workspace* workspace);
 TC_RSA_result TC_RSA_keygen_step(TC_RSA_keygen_state* state, TC_random_source random,
                                  TC_RSA_cancel_fn cancel, void* cancel_context,
                                  TC_work_budget* work);
@@ -459,11 +464,15 @@ TC_RSA_result TC_RSA_sign_pss_digest(const TC_RSA_private_key* key,
  * LCM(p - 1, q - 1). exponent_policy selects the public exponent range:
  * TC_RSA_EXPONENT_FIPS requires TC_RSA_exponent_in_fips_range, and
  * TC_RSA_EXPONENT_ANY_ODD accepts any odd 3 <= e < n. Every other criterion
- * applies under both policies.
+ * applies under both policies. FIPS 186-5 section 5.1 requires nlen >= 2048,
+ * so an RSA-1024 key needs approval = TC_PERMIT_DISALLOWED under either exponent
+ * policy. Signing, decryption and verification with an RSA-1024 key need no
+ * permission.
  *
- * TC_RSA_ARGUMENT     an unknown policy, NULL or misaligned storage, NULL
- *                     random.fill, or overlap.
- * TC_RSA_UNSUPPORTED  unsupported modulus size.
+ * TC_RSA_ARGUMENT     an unknown exponent policy, NULL or misaligned
+ *                     storage, NULL random.fill, or overlap.
+ * TC_RSA_UNSUPPORTED  unsupported modulus size, or RSA-1024 without
+ *                     TC_PERMIT_DISALLOWED.
  * TC_RSA_INVALID      malformed components, or a failed criterion or
  *                     primality round.
  * TC_RSA_LIMIT        short scratch, random_attempts below the round count,
@@ -477,6 +486,7 @@ TC_RSA_result TC_RSA_sign_pss_digest(const TC_RSA_private_key* key,
  * the caller. */
 TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,
                                           TC_RSA_exponent_policy exponent_policy,
+                                          TC_approval_policy approval,
                                           const TC_RSA_workspace* workspace,
                                           TC_RSA_execution* execution);
 /* 1 when a big-endian magnitude is odd and 2^16 < e < 2^256 (FIPS 186-5

@@ -261,6 +261,34 @@ with a few times the total input bytes plus one signature reservation per
 signature the operation can check, then tune it against the largest inputs the
 application accepts. Work units are independent of elapsed time.
 
+## Disallowed parameters
+
+Build options decide which algorithms and sizes are compiled, such as
+`TINY_CRYPTO_RSA_ENABLE_1024`. At run time, the operations in the table below
+generate keys or apply protection, and they refuse a compiled parameter that the
+cited standard does not approve for that purpose. Operations that process already
+protected data, such as signature verification, accept every compiled parameter.
+
+Each gated operation takes a `TC_approval_policy` value from `common.h`.
+`TC_APPROVED_ONLY`, the zero value, refuses the parameter. `TC_PERMIT_DISALLOWED`
+performs that one call on request. Any other value behaves as `TC_APPROVED_ONLY`.
+A refused call returns the module's UNSUPPORTED result
+before any output, workspace, work or random-source change. A C function with an
+options or parameters structure reads its `approval` field. Other C functions take
+an `approval` parameter after the size or curve it qualifies. C++ wrappers take the
+parameter as a trailing `tiny_crypto::approval_policy` argument that defaults to
+`TC_APPROVED_ONLY`.
+
+| Operation                                                        | Parameter | Requirement                                                             |
+| ---------------------------------------------------------------- | --------- | ----------------------------------------------------------------------- |
+| `TC_RSA_keygen_init`, `TC_RSA_validate_private_key` (`approval`) | RSA-1024  | FIPS 186-5 section 5.1 and appendix A.1.3 step 1 require `nlen >= 2048` |
+
+```c
+/* RSA-1024 key generation on request. */
+TC_RSA_result status =
+    TC_RSA_keygen_init(&state, 1024, TC_PERMIT_DISALLOWED, &output, limits, &workspace);
+```
+
 ## Naming and argument order
 
 Public C names start with `TC_` and a module prefix, such as `TC_AES_`,

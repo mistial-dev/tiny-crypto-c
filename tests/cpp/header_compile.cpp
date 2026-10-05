@@ -248,12 +248,13 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
                                 sm_workspace) != TC_ERROR;
 #endif
 #if TC_ENABLE_X509
-  TC_RSA_result (*validate)(const TC_RSA_private_key*, TC_RSA_exponent_policy,
+  TC_RSA_result (*validate)(const TC_RSA_private_key*, TC_RSA_exponent_policy, TC_approval_policy,
                             const TC_RSA_workspace*, TC_RSA_execution*) =
       TC_RSA_validate_private_key;
   tiny_crypto::rsa_result (*validate_cpp)(
       const tiny_crypto::rsa_private_key&, const tiny_crypto::rsa_workspace&,
-      tiny_crypto::rsa_execution&, TC_RSA_exponent_policy) = tiny_crypto::rsa_validate_private_key;
+      tiny_crypto::rsa_execution&, TC_RSA_exponent_policy, tiny_crypto::approval_policy) =
+      tiny_crypto::rsa_validate_private_key;
   (void)validate;
   (void)validate_cpp;
 #if defined(__AVR__)

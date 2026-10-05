@@ -10,19 +10,21 @@ extern "C" {
 /* Read a two-prime PKCS #1 key, validate its factors and CRT fields, then sign.
  * Keep DER and digest stable and separate from signature, scratch and RNG state.
  * Size scratch for the larger of validation and signing workspace requirements.
- * Signature length is the modulus size in bytes. Use it only on TC_RSA_OK. */
-TC_RSA_result example_sign_rsa_der(TC_bytes der, TC_hash_algorithm hash, TC_bytes digest,
-                                   TC_buffer signature, TC_random_source random,
-                                   const TC_RSA_workspace* workspace);
+ * Signature length is the modulus size in bytes. Use it only on TC_RSA_OK.
+ * approval is passed to key validation: RSA-1024 keys need TC_PERMIT_DISALLOWED. */
+TC_RSA_result example_sign_rsa_der(TC_bytes der, TC_approval_policy approval,
+                                   TC_hash_algorithm hash, TC_bytes digest, TC_buffer signature,
+                                   TC_random_source random, const TC_RSA_workspace* workspace);
 
 /* PKCS #8 variant with the same buffer contract. Checks key restrictions
  * before validation and v1.5 signing. PSS-only keys return TC_RSA_INVALID. */
-TC_RSA_result example_sign_rsa_pkcs8(TC_bytes der, TC_hash_algorithm hash, TC_bytes digest,
-                                     TC_buffer signature, TC_random_source random,
-                                     const TC_RSA_workspace* workspace);
+TC_RSA_result example_sign_rsa_pkcs8(TC_bytes der, TC_approval_policy approval,
+                                     TC_hash_algorithm hash, TC_bytes digest, TC_buffer signature,
+                                     TC_random_source random, const TC_RSA_workspace* workspace);
 
 /* Same PKCS #8 workflow using PSS, SHA-256/MGF1-SHA-256 and a 32-byte salt. */
-TC_RSA_result example_sign_rsa_pkcs8_pss_sha256(TC_bytes der, TC_bytes digest, TC_buffer signature,
+TC_RSA_result example_sign_rsa_pkcs8_pss_sha256(TC_bytes der, TC_approval_policy approval,
+                                                TC_bytes digest, TC_buffer signature,
                                                 TC_random_source random,
                                                 const TC_RSA_workspace* workspace);
 

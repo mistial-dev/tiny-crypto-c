@@ -70,6 +70,14 @@ static inline int tc_rsa_supported_modulus_size(size_t length)
          (TC_RSA_ENABLE_4096 && length == TC_RSA_MAX_MODULUS_BYTES);
 }
 
+/* FIPS 186-5 section 5.1 and appendix A.1.3 step 1: key-pair generation and
+ * validation use nlen >= 2048. A smaller enabled modulus of length bytes
+ * needs TC_PERMIT_DISALLOWED. */
+static inline int tc_rsa_key_pair_size_permitted(size_t length, TC_approval_policy approval)
+{
+  return length >= 256 || approval == TC_PERMIT_DISALLOWED;
+}
+
 static inline int tc_rsa_supported_bits(size_t bits)
 {
   return bits % 8 == 0 && tc_rsa_supported_modulus_size(bits / 8);

@@ -98,7 +98,8 @@ static TC_RSA_result validate_key(const TC_RSA_private_key* key, TC_random_fn ra
                                   size_t attempts, const TC_RSA_workspace* workspace, uint32_t work)
 {
   TC_RSA_execution execution = {{random, context}, attempts, {work}};
-  return TC_RSA_validate_private_key(key, TC_RSA_EXPONENT_FIPS, workspace, &execution);
+  return TC_RSA_validate_private_key(key, TC_RSA_EXPONENT_FIPS, TC_PERMIT_DISALLOWED, workspace,
+                                     &execution);
 }
 
 static TC_RSA_result sign_v15(const TC_RSA_private_key* key, TC_hash_algorithm hash,
@@ -320,7 +321,15 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
                     TC_RSA_VALIDATE_WORKSPACE_WORDS(4096));
   {
     random_source source = {witness, witness, width / 2, 0, TC_OK};
-    munit_assert_int(example_validate_rsa_key(&public_components,
+    /* The default FIPS 186-5 size limit refuses RSA-1024 before any RNG
+     * request. TC_PERMIT_DISALLOWED accepts it. */
+    munit_assert_int(example_validate_rsa_key(&public_components, TC_APPROVED_ONLY,
+                                              (TC_random_source){random_bytes, &source},
+                                              &(TC_RSA_workspace){scratch, validation_words}),
+                     ==, bits < 2048 ? TC_RSA_UNSUPPORTED : TC_RSA_OK);
+    munit_assert_size(source.calls, ==, bits < 2048 ? 0 : 2 * TC_RSA_VALIDATION_ROUNDS);
+    source.calls = 0;
+    munit_assert_int(example_validate_rsa_key(&public_components, TC_PERMIT_DISALLOWED,
                                               (TC_random_source){random_bytes, &source},
                                               &(TC_RSA_workspace){scratch, validation_words}),
                      ==, TC_RSA_OK);
@@ -982,7 +991,7 @@ static TC_RSA_result validate_policy(const TC_RSA_private_key* key, TC_RSA_expon
   TC_RSA_execution execution = {{system_random, NULL},
                                 4 * TC_RSA_VALIDATION_ROUNDS,
                                 {TC_RSA_VALIDATE_WORK(bits, 4 * TC_RSA_VALIDATION_ROUNDS)}};
-  return TC_RSA_validate_private_key(key, policy, &workspace, &execution);
+  return TC_RSA_validate_private_key(key, policy, TC_PERMIT_DISALLOWED, &workspace, &execution);
 }
 
 /* FIPS 186-5 A.1.1 criteria beyond the component equations. Each rejected

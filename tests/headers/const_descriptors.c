@@ -96,14 +96,14 @@ static int rsa_probe(const tc_const_descriptors* d, TC_bytes none)
   const TC_RSA_keygen_limits limits = {0, 0};
   int r = 0;
   r += (int)TC_RSA_prepare_public_key(NULL, NULL, d->rsa, d->rsa, NULL);
-  r += (int)TC_RSA_keygen_init(NULL, 0, NULL, limits, d->rsa);
+  r += (int)TC_RSA_keygen_init(NULL, 0, TC_APPROVED_ONLY, NULL, limits, d->rsa);
   r += (int)TC_RSA_raw_public(NULL, none, empty, d->rsa, NULL);
   r += (int)TC_RSA_raw_private(NULL, none, none, empty, d->rsa, NULL);
   r += (int)TC_RSA_encrypt_oaep(NULL, NULL, none, empty, d->rsa, NULL);
   r += (int)TC_RSA_decrypt_oaep(NULL, NULL, none, empty, NULL, d->rsa, NULL);
   r += (int)TC_RSA_sign_v15_digest(NULL, NULL, none, empty, d->rsa, NULL);
   r += (int)TC_RSA_sign_pss_digest(NULL, NULL, none, empty, d->rsa, NULL);
-  r += (int)TC_RSA_validate_private_key(NULL, TC_RSA_EXPONENT_FIPS, d->rsa, NULL);
+  r += (int)TC_RSA_validate_private_key(NULL, TC_RSA_EXPONENT_FIPS, TC_APPROVED_ONLY, d->rsa, NULL);
   r += (int)TC_RSA_validate_crt(NULL, NULL, d->rsa, NULL);
   r += (int)TC_RSA_derive_crt(NULL, NULL, d->rsa, NULL);
   r += (int)TC_RSA_verify_v15_digest(NULL, NULL, none, none, d->rsa, NULL);

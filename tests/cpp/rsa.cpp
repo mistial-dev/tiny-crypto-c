@@ -61,7 +61,10 @@ TEST_CASE("RSA key generation state wrappers")
                                            {q, sizeof q}};
   tiny_crypto::rsa_keygen_state state = {};
   auto workspace = tiny_crypto::rsa_workspace_for(words);
-  CHECK(tiny_crypto::rsa_keygen_init(state, 1024, output, {1, 1}, workspace) == TC_RSA_OK);
+  CHECK(tiny_crypto::rsa_keygen_init(state, 1024, output, {1, 1}, workspace) == TC_RSA_UNSUPPORTED);
+  CHECK(state.marker == 0);
+  CHECK(tiny_crypto::rsa_keygen_init(state, 1024, output, {1, 1}, workspace,
+                                     TC_PERMIT_DISALLOWED) == TC_RSA_OK);
   tiny_crypto::rsa_keygen_clear(state);
   CHECK(state.marker == 0);
 }
@@ -165,14 +168,18 @@ TEST_CASE("RSA private validation wrapper")
   unsigned calls = 0;
   tiny_crypto::rsa_execution execution = {
       {unavailable_random, &calls}, TC_RSA_VALIDATION_ROUNDS, {0}};
-  CHECK(tiny_crypto::rsa_validate_private_key(key, workspace, execution) == TC_RSA_LIMIT);
+  /* RSA-1024 validation needs TC_PERMIT_DISALLOWED. */
+  CHECK(tiny_crypto::rsa_validate_private_key(key, workspace, execution) == TC_RSA_UNSUPPORTED);
+  CHECK(tiny_crypto::rsa_validate_private_key(key, workspace, execution, TC_RSA_EXPONENT_FIPS,
+                                              TC_PERMIT_DISALLOWED) == TC_RSA_LIMIT);
   execution = {{nullptr, &calls}, TC_RSA_VALIDATION_ROUNDS, {10000}};
   CHECK(tiny_crypto::rsa_validate_private_key(key, workspace, execution) == TC_RSA_ARGUMENT);
   std::memset(words, 0xa5, sizeof words);
   execution = {{unavailable_random, &calls},
                TC_RSA_VALIDATION_ROUNDS,
                {TC_RSA_VALIDATE_WORK(1024u, TC_RSA_VALIDATION_ROUNDS)}};
-  CHECK(tiny_crypto::rsa_validate_private_key(key, workspace, execution) == TC_RSA_INVALID);
+  CHECK(tiny_crypto::rsa_validate_private_key(key, workspace, execution, TC_RSA_EXPONENT_FIPS,
+                                              TC_PERMIT_DISALLOWED) == TC_RSA_INVALID);
   CHECK(calls == 0);
   for (auto word : words)
     CHECK(word == 0);
@@ -246,7 +253,8 @@ const generated_key& key_fixture()
   tiny_crypto::rsa_keygen_state state = {};
   uint32_t rng = UINT32_C(0x2545f491);
   REQUIRE(tiny_crypto::rsa_keygen_init(state, 1024, output, {4096, 16384},
-                                       tiny_crypto::rsa_workspace_for(words)) == TC_RSA_OK);
+                                       tiny_crypto::rsa_workspace_for(words),
+                                       TC_PERMIT_DISALLOWED) == TC_RSA_OK);
   tiny_crypto::rsa_result status;
   do {
     TC_work_budget budget = {50000};

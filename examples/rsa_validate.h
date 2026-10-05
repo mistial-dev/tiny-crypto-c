@@ -8,9 +8,10 @@ extern "C" {
 #endif
 
 /* Keep key bytes and RNG state separate from caller-owned scratch.
- * Accept the key only on TC_RSA_OK, then apply application key-strength policy. */
-TC_RSA_result example_validate_rsa_key(const TC_RSA_private_key* key, TC_random_source random,
-                                       const TC_RSA_workspace* workspace);
+ * Accept the key only on TC_RSA_OK, then apply application key-strength policy.
+ * An RSA-1024 key returns TC_RSA_UNSUPPORTED unless approval is TC_PERMIT_DISALLOWED. */
+TC_RSA_result example_validate_rsa_key(const TC_RSA_private_key* key, TC_approval_policy approval,
+                                       TC_random_source random, const TC_RSA_workspace* workspace);
 
 #ifdef __cplusplus
 }
