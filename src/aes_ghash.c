@@ -159,19 +159,4 @@ void tc_aes_gcm_ghash_block(struct TC_AES_GCM_ctx* ctx, const uint8_t* block)
   TC_secure_zero(value, sizeof(value));
 }
 
-void tc_aes_gcm_hash_bytes(struct TC_AES_GCM_ctx* ctx, const uint8_t* data, size_t length)
-{
-  uint8_t block[TC_AES_BLOCKLEN] = {0};
-
-  while (length >= TC_AES_BLOCKLEN) {
-    tc_aes_gcm_ghash_block(ctx, data);
-    data += TC_AES_BLOCKLEN;
-    length -= TC_AES_BLOCKLEN;
-  }
-  if (length != 0) {
-    memcpy(block, data, length);
-    tc_aes_gcm_ghash_block(ctx, block);
-  }
-}
-
 #endif

@@ -47,30 +47,10 @@ static void tc_aes_ccm_make_counter(uint8_t* counter, const uint8_t* nonce, size
   tc_aes_ccm_store_length(counter + 1 + nonce_len, value, q);
 }
 
-/* The counter occupies the low q bytes of the block (SP 800-38C A.3). */
-static void tc_aes_ccm_increment_counter(uint8_t* counter, unsigned q)
-{
-  /* The length checks keep the block count below 2^(8q), so no carry is lost. */
-  (void)tc_internal_increment_be(counter + TC_AES_BLOCKLEN - q, q);
-}
-
-static TC_status tc_aes_ccm_xor_block(uint8_t* dst, size_t length, uint8_t* counter,
-                                      const uint8_t* round_key)
-{
-  uint8_t stream[TC_AES_BLOCKLEN];
-  size_t i;
-  TC_status status;
-
-  memcpy(stream, counter, TC_AES_BLOCKLEN);
-  status = tc_aes_cipher((state_t*)stream, round_key);
-  if (status != TC_OK)
-    goto done;
-  for (i = 0; i < length; ++i)
-    dst[i] ^= stream[i];
-done:
-  TC_secure_zero(stream, sizeof(stream));
-  return status;
-}
+/* The counter occupies the low q bytes of the block (SP 800-38C A.3). The
+ * payload limit keeps the block count below 2^(8q), so the full-block
+ * increment of the shared AEAD keystream never carries into the nonce. */
+static const tc_aes_mac_ctr_bits tc_aes_ccm_counter_bits = {0, 0, 0};
 
 /* Decrypt when expected_tag is set, otherwise encrypt and write output_tag.
  * Exactly one tag pointer is set. The policy wrappers have already checked
@@ -92,7 +72,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_by
     struct TC_AES_key_ctx aes;
     uint8_t mac[TC_AES_BLOCKLEN];
     uint8_t block[TC_AES_BLOCKLEN];
-    uint8_t work[TC_AES_BLOCKLEN]; /* B0, then full tag */
+    uint8_t work[TC_AES_BLOCKLEN]; /* B0, the decrypt pass counter, then the tag */
     uint8_t counter[TC_AES_BLOCKLEN];
     uint8_t s0[TC_AES_BLOCKLEN];
     uint8_t plain[TC_AES_BLOCKLEN];
@@ -151,33 +131,34 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_by
       goto done;
   }
 
+  /* S0 encrypts Ctr0, and the payload starts at Ctr1 (SP 800-38C 6.1). */
   tc_aes_ccm_make_counter(st.counter, nonce, nonce_len, 0);
   memcpy(st.s0, st.counter, TC_AES_BLOCKLEN);
   if (tc_aes_cipher((state_t*)st.s0, st.aes.round_key) != TC_OK)
     goto done;
-  tc_aes_ccm_increment_counter(st.counter, q);
+  tc_internal_increment_be(st.counter, TC_AES_BLOCKLEN);
 
-  while (offset < input_len) {
-    const size_t length =
-        (input_len - offset < TC_AES_BLOCKLEN) ? input_len - offset : TC_AES_BLOCKLEN;
-
-    if (!decrypt &&
-        tc_mac_cbc_update(&mac_cipher, st.mac, st.block, &used, input + offset, length, 0) != TC_OK)
+  if (!decrypt) {
+    /* The MAC reads all plaintext before CTR writes output, so the text may
+     * be encrypted in place. */
+    if (tc_mac_cbc_update(&mac_cipher, st.mac, st.block, &used, input, input_len, 0) != TC_OK ||
+        tc_aes_mac_ctr_xor(st.aes.round_key, st.counter, input, output, input_len,
+                           tc_aes_ccm_counter_bits) != TC_OK)
       goto done;
-    memset(st.plain, 0, TC_AES_BLOCKLEN);
-    memcpy(st.plain, input + offset, length);
-    if (decrypt && tc_aes_ccm_xor_block(st.plain, length, st.counter, st.aes.round_key) != TC_OK)
-      goto done;
-    if (decrypt &&
-        tc_mac_cbc_update(&mac_cipher, st.mac, st.block, &used, st.plain, length, 0) != TC_OK)
-      goto done;
-    if (!decrypt) {
-      if (tc_aes_ccm_xor_block(st.plain, length, st.counter, st.aes.round_key) != TC_OK)
+  } else {
+    /* CBC-MAC needs plaintext, so the first pass decrypts each block into
+     * private storage and leaves the caller's buffer untouched. */
+    memcpy(st.work, st.counter, TC_AES_BLOCKLEN);
+    while (offset < input_len) {
+      const size_t length =
+          (input_len - offset < TC_AES_BLOCKLEN) ? input_len - offset : TC_AES_BLOCKLEN;
+      if (tc_aes_mac_ctr_xor(st.aes.round_key, st.work, input + offset, st.plain, length,
+                             tc_aes_ccm_counter_bits) != TC_OK ||
+          tc_mac_cbc_update(&mac_cipher, st.mac, st.block, &used, st.plain, length, 0) != TC_OK)
         goto done;
-      memcpy(output + offset, st.plain, length);
+      tc_internal_increment_be(st.work, TC_AES_BLOCKLEN);
+      offset += length;
     }
-    tc_aes_ccm_increment_counter(st.counter, q);
-    offset += length;
   }
   if (tc_mac_cbc_pad(&mac_cipher, st.mac, st.block, &used) != TC_OK)
     goto done;
@@ -186,23 +167,10 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_by
     st.work[i] = (uint8_t)(st.mac[i] ^ st.s0[i]);
   if (decrypt) {
     status = TC_ct_equal((TC_bytes){st.work, tag_len}, (TC_bytes){expected_tag, tag_len});
-    if (status == TC_OK) {
-      /* CBC-MAC needs plaintext. The first pass keeps each block private. The
-       * second CTR pass writes the caller's buffer after authentication. */
-      tc_aes_ccm_make_counter(st.counter, nonce, nonce_len, 0);
-      tc_aes_ccm_increment_counter(st.counter, q);
-      offset = 0;
-      while (offset < input_len) {
-        const size_t length =
-            input_len - offset < TC_AES_BLOCKLEN ? input_len - offset : TC_AES_BLOCKLEN;
-        memcpy(output + offset, input + offset, length);
-        status = tc_aes_ccm_xor_block(output + offset, length, st.counter, st.aes.round_key);
-        if (status != TC_OK)
-          goto done;
-        tc_aes_ccm_increment_counter(st.counter, q);
-        offset += length;
-      }
-    }
+    /* The second CTR pass writes the caller's buffer after authentication. */
+    if (status == TC_OK)
+      status = tc_aes_mac_ctr_xor(st.aes.round_key, st.counter, input, output, input_len,
+                                  tc_aes_ccm_counter_bits);
   } else {
     memcpy(output_tag, st.work, tag_len);
     status = TC_OK;

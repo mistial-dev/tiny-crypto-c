@@ -5,8 +5,8 @@
  * and CMAC subkey derivation (NIST SP 800-38B). */
 #include "aes_mac_core_internal.h"
 
-#if TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME || TC_AES_ENABLE_SIV
-/* EAX, EAX' and SIV share this keystream loop. It stays separate from the
+#if TC_AES_ENABLE_CCM || TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME || TC_AES_ENABLE_SIV
+/* CCM, EAX, EAX' and SIV share this keystream loop. It stays separate from the
  * SP 800-38A core in block_modes.c for two reasons. The AEAD counter wraps
  * modulo 2^128 (the EAX paper and RFC 5297 sections 2.5 and 6), while the core
  * requires callers to reject a request that would wrap the counter. The
