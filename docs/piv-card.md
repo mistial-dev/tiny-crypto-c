@@ -78,17 +78,21 @@ v4 Appendix D.3), with Le `00`. SELECT is always plain (Part 2 section 4.2).
   accept another sub-version as Legacy. Without the flag it is
   `TC_PIV_UNSUPPORTED`.
 
-Selecting another application sets the card's security statuses to FALSE,
-and reselecting the PIV application keeps them (Part 2 section 3.1.1). The link
-clears its VCI and PIN status on every SELECT, so query the PIN again with
-`TC_PIV_verify_status` when the application needs it. Selecting another
-application also ends a bound secure messaging session, and reselecting the
-PIV application keeps it. After a successful SELECT
-the link records the application and profile. It applies the `7F66` limits to the channel
-and sets the GET RESPONSE flags. The PIV application uses a plain CLA `00`
-(Part 2 sections 4.2.6 and A.4.1). The TWIC application also requests `FF`
-after `61 00` (TWIC Part 2 v5 section 5.2 note 3a, Appendix E). A failed SELECT
-leaves no application selected, so select again before the next command.
+The link follows the card's selection state (Part 2 sections 2.4.2 and 3.1.1):
+
+| Outcome                                    | Application | PIN, VCI and secure messaging |
+| ------------------------------------------ | ----------- | ----------------------------- |
+| `9000` for another application             | new         | cleared                       |
+| `9000` reselecting the current application | kept        | kept                          |
+| Card status such as `6A82`                 | kept        | kept                          |
+| Transport failure for another application  | none        | cleared                       |
+
+A `9000` with a malformed template for another application leaves no
+application selected, since the card left the previous one. After a successful
+SELECT the link records the application and profile. It applies the `7F66`
+limits to the channel and sets the GET RESPONSE flags. The PIV application uses
+a plain CLA `00` (Part 2 sections 4.2.6 and A.4.1). The TWIC application also
+requests `FF` after `61 00` (TWIC Part 2 v5 section 5.2 note 3a, Appendix E).
 
 ## GET DATA
 

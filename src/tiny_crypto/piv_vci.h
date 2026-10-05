@@ -70,9 +70,10 @@ typedef enum { TC_PIV_VCI_PAIRED, TC_PIV_VCI_WITHOUT_PAIRING } TC_PIV_vci_mode;
  *   messaging scratch, which are wiped.
  * On TC_PIV_OK the link reports vci = 1, which TC_PIV_pin_verify and later
  * layers use for the contactless rules of Part 1 Tables 2 and 4. The VCI
- * ends with the session: on SELECT, TC_PIV_link_unsecure, a session loss and
- * a new key request. The contact interface accepts the call too, where it
- * serves no purpose (Part 1 Table 4 footnote 11).
+ * ends with the session: on a SELECT of another application,
+ * TC_PIV_link_unsecure, a session loss and a new key request. The contact
+ * interface accepts the call too, where it serves no purpose (Part 1 Table 4
+ * footnote 11).
  *
  * TC_PIV_ARGUMENT     NULL link, discovery or out, a cleared link,
  *                     pairing_code with NULL data and a nonzero length, a

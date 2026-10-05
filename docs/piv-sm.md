@@ -96,8 +96,8 @@ The flow follows section 4.1.1 on a link that selected the PIV application:
    signer, binds the card UUID from the CHUID and completes key confirmation.
 1. `TC_PIV_link_secure` protects the commands that follow. SELECT and GET
    RESPONSE stay plain.
-1. `TC_PIV_link_unsecure`, `TC_PIV_link_clear` or a SELECT of another
-   application clears the session.
+1. `TC_PIV_link_unsecure`, `TC_PIV_link_clear` or a successful SELECT of
+   another application clears the session.
 
 ```c
 #include <tiny_crypto/piv_sm_apdu.h>
@@ -257,10 +257,10 @@ Object on any link. The results follow `<tiny_crypto/piv_vci.h>`:
 | `TC_PIV_ARGUMENT`    | a code other than 8 ASCII digits, an empty code when pairing is required, or overlap with the link |
 | `TC_PIV_CARD_STATUS` | a rejected code, such as `6300`, clears the VCI. An outer SM status also ends the session          |
 
-The VCI ends with the conditions it depends on: a SELECT, `TC_PIV_link_unsecure`,
-a session loss and a new key request all clear it. The pairing code is secret
-material. The library copies it to a stack array and the secure messaging
-scratch, and wipes both. The contact interface accepts the call too, where it
+The VCI ends with the conditions it depends on: a SELECT of another application,
+`TC_PIV_link_unsecure`, a session loss and a new key request all clear it. The
+pairing code is secret material. The library copies it to a stack array and the
+secure messaging scratch, and wipes both. The contact interface accepts the call too, where it
 serves no purpose (Part 1 Table 4 footnote 11).
 
 ## Key establishment

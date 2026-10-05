@@ -229,17 +229,17 @@ TC_TLV_result TC_PIV_application_read(TC_bytes response, TC_PIV_application_id e
 
 /* SELECT the application by AID (SP 800-73-5 Part 2 3.1.1, TWIC Part 2 v5
  * 5.1): the complete PIV AID, or the 9-byte TWIC AID prefix, with Le 00. The
- * command is always plain. Selecting another application sets the card's
- * security statuses to FALSE, and reselecting the PIV application keeps them
- * (Part 2 3.1.1). The link clears its VCI and PIN status in both cases, so
- * query the PIN again with TC_PIV_verify_status. Selecting an application
- * other than the selected one also clears a bound secure messaging session.
- * On success the link records
- * the application and profile, applies the DO 7F66 limits to the channel and
- * sets TC_APDU_GET_RESPONSE_PLAIN_CLA (Part 2 4.2.6, A.4.1, TWIC Part 2 v5
+ * command is always plain. The link follows the card's selection state
+ * (Part 2 2.4.2 and 3.1.1). A 9000 for another application clears the
+ * application, the VCI and PIN status and a bound secure messaging session,
+ * even when its template is malformed. A transport failure for another
+ * application clears them too, since the card's selection is unknown. A card
+ * status other than 9000 and any reselection of the current application
+ * keep them. On success the link records the application and profile,
+ * applies the DO 7F66 limits to the channel and sets
+ * TC_APDU_GET_RESPONSE_PLAIN_CLA (Part 2 4.2.6, A.4.1, TWIC Part 2 v5
  * Appendix E). GET RESPONSE after 61 00 requests 256 bytes with Le 00 on both
- * applications (TWIC Part 2 v5 Appendix E). Any other outcome after transmit
- * leaves no application selected.
+ * applications (TWIC Part 2 v5 Appendix E).
  *
  * TC_PIV_ARGUMENT     NULL link or out, a cleared link, an unknown
  *                     application or flag, response with NULL data or below

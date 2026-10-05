@@ -592,9 +592,9 @@ TC_TEST(pin_contactless)
   return MUNIT_OK;
 }
 
-/* Secure messaging belongs to the PIV application: reselecting it keeps the
- * session and selecting TWIC ends it. Unsecure and clear wipe the session
- * and the SM scratch. */
+/* Secure messaging belongs to the PIV application: reselecting it or a
+ * failed SELECT keeps the session and selecting TWIC ends it (SP 800-73-5
+ * Part 2 3.1.1). Unsecure and clear wipe the session and the SM scratch. */
 TC_TEST(unbind)
 {
   for (size_t s = 0; s < SUITE_COUNT; ++s) {
@@ -608,6 +608,17 @@ TC_TEST(unbind)
                                    response_buffer(RESPONSE_BYTES), &application),
                      ==, TC_PIV_OK);
     link_info(&link, &info);
+    munit_assert_uint8(info.secured, ==, 1);
+    /* The card does not know the TWIC AID, so PIV stays selected. */
+    static const uint8_t not_found[] = {0x6a, 0x82};
+    const TC_bytes piv_answer = card.select_answer;
+    card.select_answer = (TC_bytes){not_found, sizeof not_found};
+    munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_TWIC, 0,
+                                   response_buffer(RESPONSE_BYTES), &application),
+                     ==, TC_PIV_CARD_STATUS);
+    card.select_answer = piv_answer;
+    link_info(&link, &info);
+    munit_assert_int(info.application, ==, TC_PIV_APPLICATION_PIV);
     munit_assert_uint8(info.secured, ==, 1);
     /* The model answers the TWIC SELECT with the PIV template, which fails. */
     munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_TWIC, 0,

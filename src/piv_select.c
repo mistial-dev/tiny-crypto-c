@@ -301,14 +301,13 @@ static TC_PIV_result template_result(TC_TLV_result result)
   }
 }
 
-/* A new selection resets the PIV security statuses (Part 2 3.1.1). Secure
- * messaging belongs to the PIV application, so selecting another application
- * ends a bound session. Reselecting PIV keeps it, since Part 2 4.3 names no
- * SELECT among the events that destroy the session keys. */
-static void selection_reset(TC_PIV_link* link, TC_PIV_application_id application)
+/* The card changed or may have changed its selection to another
+ * application: clear the application and its security statuses (SP 800-73-5
+ * Part 2 2.4.2 and 3.1.1). Secure messaging belongs to the PIV application
+ * (Part 2 4), so the session ends too. */
+static void selection_reset(TC_PIV_link* link)
 {
-  if (link->application != (uint8_t)application)
-    tc_piv_link_unbind(link);
+  tc_piv_link_unbind(link);
   link->application = TC_PIV_APPLICATION_NONE;
   link->profile = TC_PIV_CARD;
   link->sm_suite = 0;
@@ -346,10 +345,16 @@ TC_PIV_result TC_PIV_select(TC_PIV_link* link, TC_PIV_application_id application
                            : (TC_bytes){prefix, TC_PIV_AID_PREFIX_BYTES};
   const TC_APDU_command command = {aid,    TC_APDU_SHORT_MAX_NE, TC_PIV_PLAIN_CLA,
                                    SELECT, SELECT_BY_NAME,       0x00};
-  selection_reset(link, application);
+  /* Reselecting the current application keeps its state whatever the
+   * outcome. A failed SELECT keeps the current application and its security
+   * statuses (Part 2 3.1.1). A 9000, or a transport failure with an unknown
+   * outcome, moves the card away from the current application. */
+  const int switching = link->application != (uint8_t)application;
   TC_APDU_response answer;
   TC_PIV_result result =
       tc_piv_link_transceive(link, TC_PIV_COMMAND_SELECT, &command, response, &answer);
+  if (switching && (result != TC_PIV_OK || answer.sw == TC_PIV_SW_SUCCESS_VALUE))
+    selection_reset(link);
   if (result != TC_PIV_OK)
     return result;
   if (answer.sw != TC_PIV_SW_SUCCESS_VALUE)
