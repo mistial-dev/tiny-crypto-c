@@ -6,12 +6,19 @@ if(NOT SOURCE_DIR OR NOT BINARY_DIR OR NOT C_COMPILER)
   message(FATAL_ERROR "SOURCE_DIR, BINARY_DIR and C_COMPILER are required")
 endif()
 
+# Warnings fail the build: /WX for MSVC cl, -Werror for GCC and Clang.
+if(C_COMPILER MATCHES "(^|[/\\])[Cc][Ll](\\.[Ee][Xx][Ee])?$")
+  set(warnings_as_errors /WX)
+else()
+  set(warnings_as_errors -Werror)
+endif()
+
 function(configure_consumer label)
   # Start from a fresh tree so cache entries from earlier runs cannot apply.
   file(REMOVE_RECURSE "${BINARY_DIR}")
   execute_process(COMMAND "${CMAKE_COMMAND}" -S "${SOURCE_DIR}/tests/cmake/target_consumer"
     -B "${BINARY_DIR}" -DSOURCE_DIR=${SOURCE_DIR} -DCMAKE_C_COMPILER=${C_COMPILER}
-    -DCMAKE_C_FLAGS=-Werror ${ARGN}
+    -DCMAKE_C_FLAGS=${warnings_as_errors} ${ARGN}
     RESULT_VARIABLE result OUTPUT_QUIET ERROR_VARIABLE errors)
   set(configure_result ${result} PARENT_SCOPE)
   set(configure_errors "${errors}" PARENT_SCOPE)
