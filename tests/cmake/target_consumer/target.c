@@ -29,8 +29,9 @@
 #endif
 
 #if EXPECT_TWIC || EXPECT_FULL
-#if !TC_ENABLE_SHA1 || !TC_RSA_ENABLE_1024 || !TC_ENABLE_AAMVA || !TC_ENABLE_TWIC_TPK ||           \
-    !TC_ENABLE_TWIC_CCL || !TC_ENABLE_TWIC_OBJECT_CRYPTO
+#if !TC_ENABLE_TWIC || !TC_ENABLE_TWIC_UUID || !TC_ENABLE_SHA1 || !TC_RSA_ENABLE_1024 ||           \
+    !TC_ENABLE_AAMVA || !TC_ENABLE_TWIC_TPK || !TC_ENABLE_TWIC_CCL ||                              \
+    !TC_ENABLE_TWIC_OBJECT_CRYPTO
 #error "Missing TWIC capability"
 #endif
 #endif
@@ -45,8 +46,9 @@
 #error "Algorithm outside the PIV or TWIC target enabled"
 #endif
 #endif
-#if EXPECT_PIV && (TC_ENABLE_SHA1 || TC_RSA_ENABLE_1024 || TC_ENABLE_AAMVA ||                      \
-                   TC_ENABLE_TWIC_TPK || TC_ENABLE_TWIC_CCL || TC_ENABLE_TWIC_OBJECT_CRYPTO)
+#if EXPECT_PIV &&                                                                                  \
+    (TC_ENABLE_TWIC || TC_ENABLE_TWIC_UUID || TC_ENABLE_SHA1 || TC_RSA_ENABLE_1024 ||              \
+     TC_ENABLE_AAMVA || TC_ENABLE_TWIC_TPK || TC_ENABLE_TWIC_CCL || TC_ENABLE_TWIC_OBJECT_CRYPTO)
 #error "TWIC capability enabled in the PIV target"
 #endif
 

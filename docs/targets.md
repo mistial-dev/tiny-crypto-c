@@ -38,7 +38,6 @@ modules build on.
 The target also enables TLV with BER, DER, the APDU channel, PIV commands, CHUID and
 object readers, FASC-N, X.509 parsing, path validation, CRL revocation, CMS and CMS
 validation, key challenges, PIV CVCs, VCI, the catalog, key proofs and the card check.
-The PIV object readers also build the cardholder UUID helpers in `twic_uuid.h`.
 
 SP 800-78-5 still lists two items that this target omits:
 

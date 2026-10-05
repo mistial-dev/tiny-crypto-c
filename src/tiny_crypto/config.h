@@ -307,8 +307,11 @@
 #if TC_ENABLE_CMS_VALIDATION && (!TC_ENABLE_CMS || !TC_ENABLE_X509_REVOCATION)
 #error "CMS validation requires CMS and X.509 revocation support"
 #endif
-#if TC_ENABLE_PIV_OBJECTS && (!TC_ENABLE_CMS || !TC_ENABLE_TWIC_UUID || !TC_ENABLE_PIV_OIDS)
-#error "PIV object readers require CMS, TWIC UUID, and PIV/TWIC identifiers"
+#if TC_ENABLE_PIV_OBJECTS && (!TC_ENABLE_CMS || !TC_ENABLE_FASCN || !TC_ENABLE_PIV_OIDS)
+#error "PIV object readers require CMS, FASC-N, and PIV identifiers"
+#endif
+#if TC_ENABLE_TWIC && TC_ENABLE_PIV_OBJECTS && !TC_ENABLE_TWIC_UUID
+#error "TWIC card objects require the TWIC UUID helpers"
 #endif
 #if TC_ENABLE_CREDENTIAL &&                                                                        \
     (!TC_ENABLE_PIV_OBJECTS || !TC_ENABLE_PIV_CHUID || !TC_ENABLE_CMS_VALIDATION)
