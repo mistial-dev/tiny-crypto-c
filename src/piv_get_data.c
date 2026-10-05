@@ -8,6 +8,7 @@
 #include "piv_container_internal.h"
 #include "piv_link_internal.h"
 #include "tlv_internal.h"
+#include "twic_command_internal.h"
 
 enum {
   GET_DATA = 0xcb,
@@ -65,60 +66,22 @@ static TC_TLV_result piv_frame(TC_bytes data, TC_bytes tag, const TC_TLV_limits*
   return TC_TLV_OK;
 }
 
-/* 1 when every byte after the object is an ISO/IEC 7816-4:2020 8.1.3 padding
- * byte. 00 and FF both pad when no data coding byte says otherwise. */
-static int padding_only(TC_bytes data, size_t used)
-{
-  for (size_t i = used; i < data.length; ++i)
-    if (!tc_tlv_padding(TC_TLV_ISO7816_PAD_ZERO_FF, data.data[i]))
-      return 0;
-  return 1;
-}
-
-/* TWIC answers: 53 or the requested tag. 53 00, TAG 00 and, for a
- * constructed tag, TAG 02 80 00 are empty (TWIC Part 2 v5 3.3.6). A 6282
- * answer may carry padding bytes after the object (TWIC Part 2 v5 5.2). */
-static TC_TLV_result twic_frame(TC_bytes data, uint16_t sw, TC_bytes tag,
-                                const TC_TLV_limits* limits, TC_PIV_data_object* out)
-{
-  static const uint8_t empty_template[] = {0x80, 0x00};
-  TC_TLV_element element;
-  const TC_TLV_result result = TC_TLV_read(data, TC_TLV_ISO7816, limits, &element);
-  if (result != TC_TLV_OK)
-    return result;
-  const int container = tc_tlv_tag_is(&element, CONTAINER);
-  const int framed = sw == TC_PIV_SW_END_OF_OBJECT_VALUE
-                         ? padding_only(data, element.encoded.length)
-                         : element.encoded.length == data.length;
-  if ((!container && !tc_tlv_tag_matches(&element, tag)) || !framed)
-    return TC_TLV_INVALID;
-  out->encoded = element.encoded;
-  out->value = element.value;
-  out->form = container ? TC_PIV_FORM_CONTAINER : TC_PIV_FORM_TEMPLATE;
-  if (!container && (tag.data[0] & CONSTRUCTED) && element.value.length == sizeof empty_template &&
-      !memcmp(element.value.data, empty_template, sizeof empty_template))
-    out->value.length = 0;
-  return TC_TLV_OK;
-}
-
 /* Frame the answer data of a 9000 or 6282. */
 static TC_TLV_result object_frame(const TC_PIV_link* link, TC_bytes data, uint16_t sw, TC_bytes tag,
                                   TC_PIV_data_object* out)
 {
   const TC_TLV_limits limits = {data.length, data.length, 1, 1};
-  if (!data.length) {
-    /* TWIC Part 2 v5 4.5: an uninitialized optional object may answer 9000
-     * without data. PIV requires the 53 container. */
-    if (link->application != TC_PIV_APPLICATION_TWIC || sw != TC_PIV_SW_SUCCESS_VALUE)
-      return TC_TLV_INVALID;
-    out->encoded = (TC_bytes){NULL, 0};
-    out->value = (TC_bytes){NULL, 0};
-    out->form = TC_PIV_FORM_NONE;
-    return TC_TLV_OK;
-  }
-  const TC_TLV_result result = link->application == TC_PIV_APPLICATION_TWIC
-                                   ? twic_frame(data, sw, tag, &limits, out)
-                                   : piv_frame(data, tag, &limits, out);
+  TC_TLV_result result;
+#if TC_ENABLE_TWIC
+  if (link->application == TC_PIV_APPLICATION_TWIC)
+    result = tc_twic_object_frame(data, sw, tag, &limits, out);
+  else
+#else
+  (void)link;
+  (void)sw;
+#endif
+    /* PIV requires the 53 container, so an empty answer is malformed. */
+    result = data.length ? piv_frame(data, tag, &limits, out) : TC_TLV_INVALID;
   /* The answer is complete, so a value past its end is malformed. */
   return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
 }

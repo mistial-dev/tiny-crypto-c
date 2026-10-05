@@ -45,7 +45,7 @@ set(tc_target_piv
 # AAMVA DL/ID Annex D), private-object encryption with AES-128 ECB, and the
 # canceled card list (Part 4).
 set(tc_target_twic ${tc_target_piv}
-  TC_ENABLE_SHA1 TC_RSA_ENABLE_1024
+  TC_ENABLE_TWIC TC_ENABLE_SHA1 TC_RSA_ENABLE_1024
   TC_ENABLE_AAMVA TC_ENABLE_TWIC_TPK TC_ENABLE_TWIC_CCL TC_ENABLE_TWIC_OBJECT_CRYPTO)
 
 # dfc-core uses AES-128 CBC and DES ECB and CBC with single DES, two-key

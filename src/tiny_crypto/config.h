@@ -142,6 +142,16 @@
 #error "TC_ENABLE_TWIC_CCL must be 0 or 1"
 #endif
 
+/* TWIC Legacy and NEXGEN card support in the PIV modules (TWIC Part 2 v5):
+ * the TWIC application, its card profiles and their object, key and
+ * credential rules. */
+#ifndef TC_ENABLE_TWIC
+#define TC_ENABLE_TWIC TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#if TC_ENABLE_TWIC != 0 && TC_ENABLE_TWIC != 1
+#error "TC_ENABLE_TWIC must be 0 or 1"
+#endif
+
 /* Standalone credential formats can be selected without certificate parsing. */
 #ifndef TC_ENABLE_AAMVA
 #define TC_ENABLE_AAMVA TC_PROFILE_VALUE(0, 0, 0, 1)

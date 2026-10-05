@@ -6,6 +6,7 @@
 #include "internal.h"
 #include "piv_link_internal.h"
 #include "tlv_internal.h"
+#include "twic_aid_internal.h"
 
 enum {
   SELECT = 0xa4,
@@ -31,9 +32,11 @@ enum {
 const uint8_t* tc_piv_aid_prefix(TC_PIV_application_id application)
 {
   if (application == TC_PIV_APPLICATION_PIV)
-    return tc_piv_aid_prefixes[0];
+    return tc_piv_aid;
+#if TC_ENABLE_TWIC
   if (application == TC_PIV_APPLICATION_TWIC)
-    return tc_piv_aid_prefixes[1];
+    return tc_twic_aid_prefix;
+#endif
   return NULL;
 }
 
@@ -198,17 +201,15 @@ static TC_TLV_result profile_get(const uint8_t* version, TC_PIV_application_id e
 {
   if (version[0] != TC_PIV_AID_VERSION)
     return TC_TLV_UNSUPPORTED;
-  if (expected == TC_PIV_APPLICATION_PIV) {
-    if (version[1])
-      return TC_TLV_UNSUPPORTED;
-    *out = TC_PIV_CARD;
-  } else if (version[1] == TC_TWIC_AID_SUBVERSION_NEXGEN)
-    *out = TC_TWIC_NEXGEN_CARD;
-  else if (version[1] == TC_TWIC_AID_SUBVERSION_LEGACY ||
-           (flags & TC_PIV_SELECT_TWIC_SUBVERSION_COMPATIBLE))
-    *out = TC_TWIC_LEGACY_CARD;
-  else
+#if TC_ENABLE_TWIC
+  if (expected == TC_PIV_APPLICATION_TWIC)
+    return tc_twic_aid_profile(version[1], flags, out);
+#endif
+  (void)expected;
+  (void)flags;
+  if (version[1])
     return TC_TLV_UNSUPPORTED;
+  *out = TC_PIV_CARD;
   return TC_TLV_OK;
 }
 

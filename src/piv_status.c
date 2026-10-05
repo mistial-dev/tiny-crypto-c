@@ -47,11 +47,15 @@ TC_PIV_status TC_PIV_status_classify(uint16_t sw, TC_PIV_command command,
   case 0x6a86:
     return TC_PIV_SW_WRONG_P1P2;
   case 0x6a88:
-    /* TWIC GET DATA reports a missing object with 6A88 (TWIC Part 2 v5 5.2).
-     * PIV uses it for a missing key or data reference. */
-    return command == TC_PIV_COMMAND_GET_DATA && application == TC_PIV_APPLICATION_TWIC
-               ? TC_PIV_SW_NOT_FOUND
-               : TC_PIV_SW_REFERENCE_NOT_FOUND;
+#if TC_ENABLE_TWIC
+    /* TWIC GET DATA reports a missing object with 6A88 (TWIC Part 2 v5 5.2). */
+    if (command == TC_PIV_COMMAND_GET_DATA && application == TC_PIV_APPLICATION_TWIC)
+      return TC_PIV_SW_NOT_FOUND;
+#else
+    (void)application;
+#endif
+    /* PIV uses 6A88 for a missing key or data reference. */
+    return TC_PIV_SW_REFERENCE_NOT_FOUND;
   default:
     return command == TC_PIV_COMMAND_VERIFY ? verify_status(sw, retries) : TC_PIV_SW_OTHER;
   }

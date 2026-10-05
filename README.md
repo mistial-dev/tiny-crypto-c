@@ -253,6 +253,7 @@ each dependency that `config.h` requires.
 | `TINY_CRYPTO_PIV_SM_ENABLE_CS2`         | ON      | ON    | ON   | ON      | Cipher suite 2 (P-256, AES-128)                   |
 | `TINY_CRYPTO_PIV_SM_ENABLE_CS7`         | ON      | ON    | ON   | ON      | Cipher suite 7 (P-384, AES-256)                   |
 | `TINY_CRYPTO_ENABLE_FASCN`              | OFF     | OFF   | OFF  | ON      | FASC-N readers and writers                        |
+| `TINY_CRYPTO_ENABLE_TWIC`               | OFF     | OFF   | OFF  | ON      | TWIC Legacy and NEXGEN cards in the PIV modules   |
 | `TINY_CRYPTO_ENABLE_TWIC_UUID`          | OFF     | OFF   | OFF  | ON      | TWIC NEXGEN UUID helpers                          |
 | `TINY_CRYPTO_ENABLE_TWIC_CCL`           | OFF     | OFF   | OFF  | ON      | TWIC canceled card list reader                    |
 | `TINY_CRYPTO_ENABLE_TWIC_TPK`           | OFF     | OFF   | OFF  | ON      | TWIC privacy-key container reader                 |

@@ -5,6 +5,7 @@
 #if TC_ENABLE_PIV_OBJECTS
 #include "internal.h"
 #include "piv_aid_internal.h"
+#include "twic_card_objects_internal.h"
 
 enum {
   DISCOVERY_TAG = 0x7e,
@@ -33,12 +34,13 @@ static int piv_policy(uint8_t policy, uint8_t preference)
   return preference == 0;
 }
 
-/* TWIC Part 2 v5 section 4.2 (40 00) and section 4.7.5 (04 00 in the PIV
- * application, 00 00 in the TWIC application). */
-static int twic_policy(uint8_t policy, uint8_t preference)
+static int profile_known(TC_PIV_discovery_profile profile)
 {
-  return preference == 0 && (policy == TC_PIV_POLICY_PIV_PIN ||
-                             policy == TC_PIV_POLICY_VCI_WITHOUT_PAIRING || policy == 0);
+#if TC_ENABLE_TWIC
+  if (profile == TC_PIV_DISCOVERY_TWIC)
+    return 1;
+#endif
+  return profile == TC_PIV_DISCOVERY_PIV;
 }
 
 static int piv_aid(TC_bytes aid)
@@ -50,8 +52,7 @@ TC_TLV_result TC_PIV_discovery_read(TC_bytes encoded, TC_PIV_discovery_profile p
                                     TC_PIV_discovery* out)
 {
   static const TC_TLV_limits limits = {DISCOVERY_BYTES, DISCOVERY_VALUE_BYTES, 1, 1};
-  if (!out || !tc_internal_span_valid(encoded.data, encoded.length) ||
-      (profile != TC_PIV_DISCOVERY_PIV && profile != TC_PIV_DISCOVERY_TWIC) ||
+  if (!out || !tc_internal_span_valid(encoded.data, encoded.length) || !profile_known(profile) ||
       !tc_internal_ranges_disjoint(encoded.data, encoded.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
   if (!encoded.length)
@@ -72,10 +73,13 @@ TC_TLV_result TC_PIV_discovery_read(TC_bytes encoded, TC_PIV_discovery_profile p
     return TC_TLV_INVALID;
   const TC_bytes aid = {bytes + AID_OFFSET, TC_PIV_AID_BYTES};
   const uint8_t policy = bytes[POLICY_OFFSET], preference = bytes[POLICY_OFFSET + 1];
-  const int accepted =
-      profile == TC_PIV_DISCOVERY_PIV
-          ? piv_aid(aid) && piv_policy(policy, preference)
-          : (piv_aid(aid) || tc_twic_aid_known(aid)) && twic_policy(policy, preference);
+#if TC_ENABLE_TWIC
+  const int accepted = profile == TC_PIV_DISCOVERY_TWIC
+                           ? tc_twic_discovery_accept(aid, policy, preference)
+                           : piv_aid(aid) && piv_policy(policy, preference);
+#else
+  const int accepted = piv_aid(aid) && piv_policy(policy, preference);
+#endif
   if (!accepted)
     return TC_TLV_INVALID;
   out->aid = aid;
