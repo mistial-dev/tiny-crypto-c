@@ -193,7 +193,10 @@ static void munit_logf_exv(MunitLogLevel level, FILE* fp, const char* filename, 
   fputs(": ", fp);
   if (filename != NULL)
     fprintf(fp, "%s:%d: ", filename, line);
-  vfprintf(fp, format, ap);
+  /* Every caller passes a format. The check keeps GCC's sanitizer builds
+   * from reporting a NULL format path (-Wformat-overflow). */
+  if (format != NULL)
+    vfprintf(fp, format, ap);
   fputc('\n', fp);
 }
 
