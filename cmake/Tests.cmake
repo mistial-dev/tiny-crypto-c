@@ -815,7 +815,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     src/common.c src/tlv.c src/tlv_walk.c src/piv_container_internal.c src/piv_aid.c
     src/piv_discovery.c src/piv_ccc.c src/piv_key_history.c src/piv_bit_group.c
     src/piv_pairing_code.c src/piv_certificate.c src/piv_certificate_decode.c
-    src/piv_card_objects_internal.c)
+    src/piv_card_objects_internal.c src/credential_text_internal.c)
   target_compile_definitions(tiny-crypto-c-test-piv-objects PUBLIC
     TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1
     TC_ENABLE_CMS=1 TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1

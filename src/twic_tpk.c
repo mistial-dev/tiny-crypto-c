@@ -65,13 +65,8 @@ TC_TLV_result TC_TWIC_tpk_read(TC_bytes input, TC_TWIC_tpk_encoding encoding, TC
   uint8_t decoded[CONTAINER_BYTES] = {0};
   TC_TLV_result result = TC_TLV_INVALID;
   const size_t length = input.length / 2;
-  for (size_t i = 0; i < length; ++i) {
-    const int high = tc_credential_hex_digit(input.data[2 * i]);
-    const int low = tc_credential_hex_digit(input.data[2 * i + 1]);
-    if (high < 0 || low < 0)
-      goto cleanup;
-    decoded[i] = (uint8_t)(high * 16 + low);
-  }
+  if (!tc_credential_hex_decode(input.data, length, decoded))
+    goto cleanup;
   /* The printed barcode example transposes the card-container prefix. */
   if (length >= 3 && decoded[0] == 0xdc && decoded[1] == 0xf1 && decoded[2] == 1) {
     decoded[0] = 0xdf;

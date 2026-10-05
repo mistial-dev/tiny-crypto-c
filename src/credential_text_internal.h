@@ -9,7 +9,12 @@
 /* Printed and encoded credential text helpers shared by PIV, TWIC and AAMVA
  * readers. Inputs are borrowed and only read. Outputs change on success only. */
 
+/* The value of one ASCII hex digit in either case, or -1. */
 int tc_credential_hex_digit(uint8_t value);
+
+/* Decode 2 * bytes ASCII hex digits into bytes octets. Return 0 on a
+ * non-digit, with out provisional. */
+int tc_credential_hex_decode(const uint8_t* text, size_t bytes, uint8_t* out);
 
 /* Return 1 when value holds one or more ASCII digits. */
 int tc_credential_digits(const uint8_t* value, size_t length);

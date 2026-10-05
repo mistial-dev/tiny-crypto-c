@@ -39,16 +39,17 @@ static TC_TLV_result uuid_read(TC_bytes text, uint8_t uuid[UUID_BYTES])
 {
   if (!text.data || text.length != UUID_URN_BYTES || !uuid_prefix(text))
     return TC_TLV_INVALID;
-  size_t position = UUID_PREFIX_BYTES;
-  for (size_t i = 0; i < UUID_BYTES; ++i) {
-    if (i == 4 || i == 6 || i == 8 || i == 10)
-      if (text.data[position++] != '-')
-        return TC_TLV_INVALID;
-    const int high = tc_credential_hex_digit(text.data[position++]);
-    const int low = tc_credential_hex_digit(text.data[position++]);
-    if (high < 0 || low < 0)
+  /* RFC 4122 section 3: five hyphen-separated groups of 4, 2, 2, 2 and 6
+   * octets. */
+  static const uint8_t groups[] = {4, 2, 2, 2, 6};
+  size_t position = UUID_PREFIX_BYTES, offset = 0;
+  for (size_t group = 0; group < sizeof groups; ++group) {
+    if (group && text.data[position++] != '-')
       return TC_TLV_INVALID;
-    uuid[i] = (uint8_t)(high * 16 + low);
+    if (!tc_credential_hex_decode(text.data + position, groups[group], uuid + offset))
+      return TC_TLV_INVALID;
+    position += 2u * groups[group];
+    offset += groups[group];
   }
   return TC_TLV_OK;
 }
