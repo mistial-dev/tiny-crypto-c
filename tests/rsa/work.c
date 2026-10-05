@@ -66,9 +66,9 @@ static const test_key* key_fixture(void)
   TC_RSA_workspace workspace = {words, KEYGEN_WORDS};
   TC_RSA_keygen_state state = {0};
   uint32_t rng = UINT32_C(0x2545f491);
-  munit_assert_int(TC_RSA_keygen_init(&state, BITS, TC_PERMIT_DISALLOWED, &output,
-                                      (TC_RSA_keygen_limits){4096, 16384}, &workspace),
-                   ==, TC_RSA_OK);
+  munit_assert_int(
+      TC_RSA_keygen_init(&state, BITS, &output, (TC_RSA_keygen_limits){4096, 16384}, &workspace),
+      ==, TC_RSA_OK);
   TC_RSA_result status;
   do {
     TC_work_budget budget = {50000};
@@ -653,9 +653,9 @@ TC_TEST(argument_order)
   TC_RSA_private_key all_zero_factor = fixture->key;
   all_zero_factor.p = (TC_bytes){zero_factor, sizeof zero_factor};
   TC_RSA_execution validation = {{two_random, &calls}, TC_RSA_VALIDATION_ROUNDS, {UINT32_MAX}};
-  munit_assert_int(TC_RSA_validate_private_key(&all_zero_factor, TC_RSA_EXPONENT_FIPS,
-                                               TC_PERMIT_DISALLOWED, &workspace, &validation),
-                   ==, TC_RSA_INVALID);
+  munit_assert_int(
+      TC_RSA_validate_private_key(&all_zero_factor, TC_RSA_EXPONENT_FIPS, &workspace, &validation),
+      ==, TC_RSA_INVALID);
   munit_assert_int(TC_RSA_sign_pss_digest(&fixture->key, &pss, (TC_bytes){digest, sizeof digest},
                                           (TC_buffer){output, sizeof output}, &workspace,
                                           &no_random),
@@ -667,9 +667,9 @@ TC_TEST(argument_order)
                                        (TC_buffer){output, sizeof output}, &length, &workspace,
                                        &no_random),
                    ==, TC_RSA_ARGUMENT);
-  munit_assert_int(TC_RSA_validate_private_key(&unchecked, TC_RSA_EXPONENT_FIPS,
-                                               TC_PERMIT_DISALLOWED, &workspace, &no_random),
-                   ==, TC_RSA_ARGUMENT);
+  munit_assert_int(
+      TC_RSA_validate_private_key(&unchecked, TC_RSA_EXPONENT_FIPS, &workspace, &no_random), ==,
+      TC_RSA_ARGUMENT);
   munit_assert_uint32(no_random.work.remaining, ==, UINT32_MAX);
   /* Raw operations: a NULL input with a wrong length. */
   munit_assert_int(TC_RSA_raw_public(key, (TC_bytes){NULL, BYTES + 1},

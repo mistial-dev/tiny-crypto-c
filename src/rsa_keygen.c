@@ -149,16 +149,15 @@ static int tc_rsa_keygen_storage_check(const TC_RSA_keygen_state* state,
 }
 
 TC_RSA_result TC_RSA_keygen_init(TC_RSA_keygen_state* state, size_t bits,
-                                 TC_approval_policy approval, const TC_RSA_keygen_output* output,
-                                 TC_RSA_keygen_limits limits, const TC_RSA_workspace* workspace)
+                                 const TC_RSA_keygen_output* output, TC_RSA_keygen_limits limits,
+                                 const TC_RSA_workspace* workspace)
 {
   if (!state || !output || !workspace)
     return TC_RSA_ARGUMENT;
   if (state->marker == TC_RSA_KEYGEN_MARKER ||
       !tc_rsa_keygen_storage_check(state, output, workspace))
     return TC_RSA_ARGUMENT;
-  if (!TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits) ||
-      !tc_rsa_key_pair_size_permitted(bits / 8, approval))
+  if (!TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits))
     return TC_RSA_UNSUPPORTED;
   if (!limits.candidate_attempts || !limits.random_requests)
     return TC_RSA_LIMIT;

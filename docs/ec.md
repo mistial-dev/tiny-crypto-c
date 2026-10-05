@@ -17,32 +17,6 @@ unknown or disabled in the build. Size buffers from it: a public key is
 `1 + 2 * width` bytes, a signature is `2 * width` bytes, and an ECDH secret is
 `width` bytes. `TC_EC_MAX_BYTES` is the largest width in the build.
 
-## P-192 restrictions
-
-SP 800-186 section 3.2.1.1 restricts P-192 to legacy use, and section 3.1.2 limits legacy use
-to processing already protected information, such as verifying a signature. With P-192
-enabled, `TC_ECDSA_verify_digest` and `TC_EC_validate_public_key` accept it.
-`TC_EC_public_key`, `TC_EC_generate_key_pair`, `TC_ECDH` and
-`TC_ECDSA_sign_digest_external_random` take a `TC_approval_policy` after the curve, and
-`TC_ECDSA_sign_digest` reads `TC_ECDSA_sign_options.approval`. These operations generate keys
-or apply protection, so they return `TC_EC_UNSUPPORTED` for P-192 unless the policy is
-`TC_PERMIT_DISALLOWED`. Other curves ignore the policy. See
-[disallowed parameters](api.md#disallowed-parameters).
-
-```c
-#include <tiny_crypto/ec.h>
-
-/* Sign with P-192 on request. */
-TC_EC_result p192_sign(TC_bytes private_key, TC_bytes public_key, TC_bytes digest,
-                       uint8_t signature[48], TC_ECDSA_workspace* workspace)
-{
-  const TC_ECDSA_sign_options options = {TC_HASH_SHA256, 4, TC_PERMIT_DISALLOWED};
-  TC_work_budget work = {UINT32_MAX};
-  return TC_ECDSA_sign_digest(TC_EC_P192, &options, private_key, public_key, digest,
-                              (TC_buffer){signature, 48}, workspace, &work);
-}
-```
-
 ## Calling conventions
 
 Every function returns a `TC_EC_result`:
@@ -53,7 +27,7 @@ Every function returns a `TC_EC_result`:
 | `TC_EC_INVALID`     | A key or signature whose length does not match the curve, a private scalar outside `[1, n-1]`, a point that is not on the curve, or a signature that does not verify. |
 | `TC_EC_LIMIT`       | An output buffer shorter than required, or the work budget or the random-attempt limit ran out.                                                                       |
 | `TC_EC_ARGUMENT`    | A NULL pointer, an empty digest or overlapping storage.                                                                                                               |
-| `TC_EC_UNSUPPORTED` | The curve is unknown or disabled in this build, or P-192 in a key or protection operation without `TC_PERMIT_DISALLOWED`.                                             |
+| `TC_EC_UNSUPPORTED` | The curve is unknown or disabled in this build.                                                                                                                       |
 | `TC_EC_ERROR`       | The random source failed, or a new signature failed its own verification.                                                                                             |
 
 Each function checks its arguments once and reports the first problem in
@@ -141,9 +115,7 @@ The C++11 equivalents are in `<tiny_crypto/ec.hpp>`, including
 `ec_coordinate_bytes`. They take `bytes` inputs, fixed-size output arrays and
 references to the workspace and budget. `ec_generate_key_pair` and
 `ecdsa_sign_digest_external_random` take an execution object, and
-`ecdsa_sign_digest` takes its options after the workspace. `ec_public_key`,
-`ec_generate_key_pair`, `ecdh` and `ecdsa_sign_digest_external_random` take a trailing
-`approval_policy` that defaults to `TC_APPROVED_ONLY`. They return the
+`ecdsa_sign_digest` takes its options after the workspace. They return the
 same `TC_EC_result` values, use no heap and are `noexcept`.
 
 ## Tests

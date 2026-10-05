@@ -20,10 +20,7 @@ It checks integer encoding and positivity. Apply key-strength policy and use
 the RSA API to check arithmetic constraints. X.509 key parsing uses this reader.
 
 The supported moduli are 1024, 2048, 3072 and 4096 bits. RSA enables 2048, 3072 and 4096 by
-default. RSA-1024 is disabled by default and needs `TINY_CRYPTO_RSA_ENABLE_1024=ON`. Verification,
-signing, encryption and decryption accept an enabled RSA-1024 key. Key generation and
-private-key validation also need `TC_PERMIT_DISALLOWED`, because FIPS 186-5 section 5.1 requires
-`nlen >= 2048` (see [disallowed parameters](api.md#disallowed-parameters)). Each size has a
+default. RSA-1024 needs `TINY_CRYPTO_RSA_ENABLE_1024=ON`. Each size has a
 `TINY_CRYPTO_RSA_ENABLE_<bits>` option. A disabled size returns `TC_RSA_UNSUPPORTED`, and the
 size and work helpers return zero for it. `TC_RSA_modulus_supported(bits)` reports whether a
 size is enabled, and `TC_RSA_MAX_MODULUS_BYTES` (512) sizes caller storage that holds one
@@ -232,10 +229,8 @@ certificates and CMS. See [testing](testing.md) for the OpenSSL cross-checks.
 
 ## Key generation
 
-`TC_RSA_keygen_init` and `TC_RSA_keygen_step` generate two-prime RSA-2048,
-RSA-3072, or RSA-4096 keys with public exponent 65537. FIPS 186-5 appendix A.1.3
-step 1 rejects `nlen < 2048`, so `TC_RSA_keygen_init` returns `TC_RSA_UNSUPPORTED`
-for RSA-1024 unless its `approval` argument is `TC_PERMIT_DISALLOWED`. The operation uses no
+`TC_RSA_keygen_init` and `TC_RSA_keygen_step` generate two-prime RSA-1024,
+RSA-2048, RSA-3072, or RSA-4096 keys with public exponent 65537. The operation uses no
 heap storage. Supply `TC_RSA_KEYGEN_WORKSPACE_WORDS(bits)` aligned limbs, or
 query `TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits)`, plus
 caller-owned output buffers.
@@ -256,7 +251,7 @@ setup, a Miller-Rabin round and the final derivation of `n` and `d`. A
 cancellation callback is checked between units. Cancellation returns
 `TC_RSA_CANCELLED` and wipes retained secrets.
 
-The generator follows FIPS 186-5 appendices A.1.1 and A.1.3:
+The generator follows FIPS 186-5 appendix A.1.1:
 
 - It sets the top two bits of each prime, which exceeds the
   `sqrt(2) * 2^(nlen/2 - 1)` lower bound.
@@ -314,9 +309,8 @@ Mathematical validation is a separate step. Multi-prime version 1 returns
 
 The compiled [key-loading example](../examples/rsa_read.c) has explicit PKCS #1
 and PKCS #8 entry points. Both validate the key's factors and CRT fields, then
-sign using the same caller-owned workspace. Each takes a `TC_approval_policy` for key
-validation, so an RSA-1024 key signs only with `TC_PERMIT_DISALLOWED`. The PKCS #8 entry point
-checks whether the key permits v1.5 signatures.
+sign using the same caller-owned workspace. The PKCS #8 entry point checks whether
+the key permits v1.5 signatures.
 `example_sign_rsa_pkcs8_pss_sha256` follows the same workflow with PSS,
 SHA-256/MGF1-SHA-256 and a 32-byte salt. It checks those choices against the
 imported key's restrictions before validation or RNG use.
@@ -342,9 +336,7 @@ width, then the FIPS 186-5 appendix A.1.1 criteria:
 `TC_RSA_EXPONENT_FIPS` requires an odd `2^16 < e < 2^256`, which
 `TC_RSA_exponent_in_fips_range` tests. `TC_RSA_EXPONENT_ANY_ODD` accepts any
 odd `3 <= e < n` for keys outside FIPS 186-5, such as test vectors with
-`e = 3`. Every other criterion applies under both policies. An RSA-1024 key returns
-`TC_RSA_UNSUPPORTED` under either policy unless the `approval` argument is
-`TC_PERMIT_DISALLOWED` (FIPS 186-5 section 5.1). The GCD, LCM and
+`e = 3`. Every other criterion applies under both policies. The GCD, LCM and
 comparisons on secret values run in time that depends only on the key size.
 Each factor then receives 65 Miller-Rabin rounds at the factor width. Three is
 handled exactly. Supply an independent cryptographically secure random source
@@ -378,8 +370,7 @@ The compiled [validation example](../examples/rsa_validate.c) shows workspace
 setup and budget calculation. Its [header](../examples/rsa_validate.h) exposes
 `example_validate_rsa_key`. Allocate a `TC_RSA_word` array with
 `TC_RSA_VALIDATE_WORKSPACE_WORDS(bits)` entries, keep it outside a small task
-stack, and pass its pointer and element count with the key, approval policy and RNG
-callback.
+stack, and pass its pointer and element count with the key and RNG callback.
 The example allows four requests per required round. Handle `TC_RSA_LIMIT`
 as an incomplete validation and accept the components only on `TC_RSA_OK`.
 

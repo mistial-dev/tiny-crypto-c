@@ -187,7 +187,6 @@ int TC_RSA_exponent_in_fips_range(TC_bytes exponent)
 
 TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,
                                           TC_RSA_exponent_policy exponent_policy,
-                                          TC_approval_policy approval,
                                           const TC_RSA_workspace* workspace,
                                           TC_RSA_execution* execution)
 {
@@ -204,9 +203,6 @@ TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,
     result = TC_RSA_ARGUMENT;
   if (result == TC_RSA_OK)
     result = tc_rsa_private_view_init(key, NULL, &view);
-  if (result == TC_RSA_OK &&
-      !tc_rsa_key_pair_size_permitted(key->public_key.modulus.length, approval))
-    result = TC_RSA_UNSUPPORTED;
   if (result != TC_RSA_OK)
     return result;
   const tc_rsa_random rng = {execution->random, execution->random_attempts};

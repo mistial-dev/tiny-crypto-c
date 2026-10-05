@@ -38,14 +38,13 @@ void tc_work_budget_types(TC_work_budget* budget, TC_RSA_execution* rsa, TC_EC_e
 
   /* Public entry points. Execution-based operations carry the budget in
    * TC_RSA_execution or TC_EC_execution, checked above. */
-  TC_EXPECT_FUNCTION(
-      TC_EC_public_key, TC_EC_result,
-      (TC_EC_curve, TC_approval_policy, TC_bytes, TC_buffer, TC_EC_workspace*, TC_work_budget*));
+  TC_EXPECT_FUNCTION(TC_EC_public_key, TC_EC_result,
+                     (TC_EC_curve, TC_bytes, TC_buffer, TC_EC_workspace*, TC_work_budget*));
   TC_EXPECT_FUNCTION(TC_EC_validate_public_key, TC_EC_result,
                      (TC_EC_curve, TC_bytes, TC_EC_workspace*, TC_work_budget*));
-  TC_EXPECT_FUNCTION(TC_ECDH, TC_EC_result,
-                     (TC_EC_curve, TC_approval_policy, TC_bytes, TC_bytes, TC_buffer,
-                      TC_EC_workspace*, TC_work_budget*));
+  TC_EXPECT_FUNCTION(
+      TC_ECDH, TC_EC_result,
+      (TC_EC_curve, TC_bytes, TC_bytes, TC_buffer, TC_EC_workspace*, TC_work_budget*));
   TC_EXPECT_FUNCTION(
       TC_ECDSA_verify_digest, TC_EC_result,
       (TC_EC_curve, TC_bytes, TC_bytes, TC_bytes, TC_ECDSA_workspace*, TC_work_budget*));
@@ -53,8 +52,8 @@ void tc_work_budget_types(TC_work_budget* budget, TC_RSA_execution* rsa, TC_EC_e
                      (TC_EC_curve, const TC_ECDSA_sign_options*, TC_bytes, TC_bytes, TC_bytes,
                       TC_buffer, TC_ECDSA_workspace*, TC_work_budget*));
   TC_EXPECT_FUNCTION(TC_ECDSA_sign_digest_external_random, TC_EC_result,
-                     (TC_EC_curve, TC_approval_policy, TC_bytes, TC_bytes, TC_bytes, TC_buffer,
-                      TC_ECDSA_workspace*, TC_EC_execution*));
+                     (TC_EC_curve, TC_bytes, TC_bytes, TC_bytes, TC_buffer, TC_ECDSA_workspace*,
+                      TC_EC_execution*));
   TC_EXPECT_FUNCTION(TC_key_challenge_prepare, TC_key_challenge_result,
                      (const TC_X509_public_key*, const TC_key_challenge_options*, TC_random_source,
                       TC_key_challenge_workspace*, TC_work_budget*, TC_bytes*));

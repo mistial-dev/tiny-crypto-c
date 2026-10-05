@@ -21,12 +21,6 @@ static TC_status failed_random(void* context, uint8_t* output, size_t length)
   return TC_ERROR;
 }
 
-/* RSA-1024 keys exercise the examples through TC_PERMIT_DISALLOWED. */
-static TC_approval_policy approval_for(size_t bits)
-{
-  return bits < 2048 ? TC_PERMIT_DISALLOWED : TC_APPROVED_ONLY;
-}
-
 static void rejected_key(TC_bytes der, size_t signature_length, size_t scratch_words,
                          TC_RSA_result expected, size_t expected_calls)
 {
@@ -37,8 +31,7 @@ static void rejected_key(TC_bytes der, size_t signature_length, size_t scratch_w
   memset(words, 0xa5, sizeof words);
   memset(signature, 0xa5, sizeof signature);
   memcpy(unchanged, signature, sizeof signature);
-  munit_assert_int(example_sign_rsa_der(der, approval_for(signature_length * 8), TC_HASH_SHA256,
-                                        (TC_bytes){digest, sizeof digest},
+  munit_assert_int(example_sign_rsa_der(der, TC_HASH_SHA256, (TC_bytes){digest, sizeof digest},
                                         (TC_buffer){signature, signature_length},
                                         (TC_random_source){failed_random, &calls},
                                         &(TC_RSA_workspace){words, scratch_words}),
@@ -74,10 +67,9 @@ static MunitResult generated_key(const MunitParameter params[], void* data)
   TC_RSA_workspace workspace = {words, TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits)};
   TC_RSA_keygen_state state = {0};
   (void)data;
-  munit_assert_int(TC_RSA_keygen_init(&state, bits,
-                                      bits < 2048 ? TC_PERMIT_DISALLOWED : TC_APPROVED_ONLY,
-                                      &output, (TC_RSA_keygen_limits){20000, 50000}, &workspace),
-                   ==, TC_RSA_OK);
+  munit_assert_int(
+      TC_RSA_keygen_init(&state, bits, &output, (TC_RSA_keygen_limits){20000, 50000}, &workspace),
+      ==, TC_RSA_OK);
   TC_RSA_result result;
   do {
     TC_work_budget work = {100000};
@@ -251,18 +243,18 @@ static MunitResult private_key(const MunitParameter params[], void* data)
   wrapped[parameters_tag] = 0x30;
   size_t calls = 0;
   memset(signature, 0xa5, sizeof signature);
-  munit_assert_int(example_sign_rsa_pkcs8(
-                       (TC_bytes){wrapped, (size_t)wrapped_length}, approval_for(bits),
-                       TC_HASH_SHA256, (TC_bytes){digest, sizeof digest},
-                       (TC_buffer){signature, bits / 8}, (TC_random_source){failed_random, &calls},
-                       &(TC_RSA_workspace){words, sizeof words / sizeof *words}),
+  munit_assert_int(example_sign_rsa_pkcs8((TC_bytes){wrapped, (size_t)wrapped_length},
+                                          TC_HASH_SHA256, (TC_bytes){digest, sizeof digest},
+                                          (TC_buffer){signature, bits / 8},
+                                          (TC_random_source){failed_random, &calls},
+                                          &(TC_RSA_workspace){words, sizeof words / sizeof *words}),
                    ==, TC_RSA_INVALID);
   munit_assert_size(calls, ==, 0);
   for (size_t i = 0; i < sizeof signature; ++i)
     munit_assert_uint(signature[i], ==, 0xa5);
   /* Empty PSS parameters select SHA-1, which conflicts with this example. */
   munit_assert_int(example_sign_rsa_pkcs8_pss_sha256(
-                       (TC_bytes){wrapped, (size_t)wrapped_length}, approval_for(bits),
+                       (TC_bytes){wrapped, (size_t)wrapped_length},
                        (TC_bytes){digest, sizeof digest}, (TC_buffer){signature, bits / 8},
                        (TC_random_source){failed_random, &calls},
                        &(TC_RSA_workspace){words, sizeof words / sizeof *words}),
@@ -293,8 +285,8 @@ static MunitResult private_key(const MunitParameter params[], void* data)
       const size_t last = (size_t)(crt[field].data - encoded) + crt[field].length - 1;
       encoded[last] ^= 1;
       memset(signature, 0xa5, sizeof signature);
-      munit_assert_int(example_sign_rsa_der((TC_bytes){encoded, (size_t)length}, approval_for(bits),
-                                            TC_HASH_SHA256, (TC_bytes){digest, sizeof digest},
+      munit_assert_int(example_sign_rsa_der((TC_bytes){encoded, (size_t)length}, TC_HASH_SHA256,
+                                            (TC_bytes){digest, sizeof digest},
                                             (TC_buffer){signature, bits / 8},
                                             (TC_random_source){random_bytes, NULL},
                                             &(TC_RSA_workspace){words, scratch_words}),
@@ -308,15 +300,14 @@ static MunitResult private_key(const MunitParameter params[], void* data)
   for (unsigned attempt = 0; attempt < 8 && signed_key == TC_RSA_LIMIT; ++attempt) {
     if (pss)
       signed_key = example_sign_rsa_pkcs8_pss_sha256(
-          (TC_bytes){wrapped, (size_t)wrapped_length}, approval_for(bits),
-          (TC_bytes){digest, sizeof digest}, (TC_buffer){signature, bits / 8},
-          (TC_random_source){random_bytes, NULL},
+          (TC_bytes){wrapped, (size_t)wrapped_length}, (TC_bytes){digest, sizeof digest},
+          (TC_buffer){signature, bits / 8}, (TC_random_source){random_bytes, NULL},
           &(TC_RSA_workspace){words, sizeof words / sizeof *words});
     else
       signed_key = (pkcs8 ? example_sign_rsa_pkcs8 : example_sign_rsa_der)(
           pkcs8 ? (TC_bytes){wrapped, (size_t)wrapped_length} : (TC_bytes){encoded, (size_t)length},
-          approval_for(bits), TC_HASH_SHA256, (TC_bytes){digest, sizeof digest},
-          (TC_buffer){signature, bits / 8}, (TC_random_source){random_bytes, NULL},
+          TC_HASH_SHA256, (TC_bytes){digest, sizeof digest}, (TC_buffer){signature, bits / 8},
+          (TC_random_source){random_bytes, NULL},
           &(TC_RSA_workspace){words, sizeof words / sizeof *words});
   }
   munit_assert_int(signed_key, ==, TC_RSA_OK);
@@ -370,8 +361,8 @@ static MunitResult restricted_pss(const MunitParameter params[], void* data)
   uint8_t digest[DIGEST_BYTES] = {0}, signature[TC_TEST_RSA_MAX_BYTES];
   size_t calls = 0;
   memset(signature, 0xa5, sizeof signature);
-  munit_assert_int(example_sign_rsa_pkcs8((TC_bytes){encoded, (size_t)length}, approval_for(bits),
-                                          TC_HASH_SHA256, (TC_bytes){digest, sizeof digest},
+  munit_assert_int(example_sign_rsa_pkcs8((TC_bytes){encoded, (size_t)length}, TC_HASH_SHA256,
+                                          (TC_bytes){digest, sizeof digest},
                                           (TC_buffer){signature, bits / 8},
                                           (TC_random_source){failed_random, &calls},
                                           &(TC_RSA_workspace){words, sizeof words / sizeof *words}),
@@ -382,7 +373,7 @@ static MunitResult restricted_pss(const MunitParameter params[], void* data)
   TC_RSA_result result = TC_RSA_LIMIT;
   for (unsigned attempt = 0; attempt < 8 && result == TC_RSA_LIMIT; ++attempt)
     result = example_sign_rsa_pkcs8_pss_sha256(
-        (TC_bytes){encoded, (size_t)length}, approval_for(bits), (TC_bytes){digest, sizeof digest},
+        (TC_bytes){encoded, (size_t)length}, (TC_bytes){digest, sizeof digest},
         (TC_buffer){signature, bits / 8}, (TC_random_source){random_bytes, NULL},
         &(TC_RSA_workspace){words, sizeof words / sizeof *words});
   munit_assert_int(result, ==, TC_RSA_OK);
@@ -394,7 +385,7 @@ static MunitResult restricted_pss(const MunitParameter params[], void* data)
   result = TC_RSA_LIMIT;
   for (unsigned attempt = 0; attempt < 8 && result == TC_RSA_LIMIT; ++attempt)
     result = example_sign_rsa_pkcs8_pss_sha256(
-        (TC_bytes){encoded, (size_t)length}, approval_for(bits), (TC_bytes){digest, sizeof digest},
+        (TC_bytes){encoded, (size_t)length}, (TC_bytes){digest, sizeof digest},
         (TC_buffer){signature, bits / 8}, (TC_random_source){fail_salt, &fault},
         &(TC_RSA_workspace){words, sizeof words / sizeof *words});
   munit_assert_int(result, ==, TC_RSA_ERROR);

@@ -51,9 +51,7 @@ TC_TEST(vectors)
       munit_assert_size(scalar_length, ==, width);
       munit_assert_size(strlen(fields[3]), ==, 2 * scalar_length);
       TC_work_budget work = {UINT32_MAX};
-      /* The P-192 KeyPair rows need TC_PERMIT_DISALLOWED (SP 800-186
-       * section 3.2.1.1). Other curves ignore the policy. */
-      TC_EC_result result = TC_EC_public_key(curve, TC_PERMIT_DISALLOWED, (TC_bytes){scalar, width},
+      TC_EC_result result = TC_EC_public_key(curve, (TC_bytes){scalar, width},
                                              (TC_buffer){actual, length}, &workspace, &work);
       if (result != TC_EC_OK || memcmp(actual, point, length))
         munit_errorf("NIST ECDSA KeyPair %zu: status %d or point mismatch", count, result);

@@ -45,8 +45,8 @@ static int measure(void)
     start = esp_timer_get_time();
     const TC_EC_curve curve = width == 32 ? TC_EC_P256 : TC_EC_P384;
     TC_work_budget work = {TC_EC_operation_work(curve, TC_EC_OPERATION_PUBLIC_KEY)};
-    if (TC_EC_public_key(curve, TC_APPROVED_ONLY, (TC_bytes){scalar, width},
-                         (TC_buffer){point, 1 + 2 * width}, &workspace, &work) != TC_EC_OK)
+    if (TC_EC_public_key(curve, (TC_bytes){scalar, width}, (TC_buffer){point, 1 + 2 * width},
+                         &workspace, &work) != TC_EC_OK)
       return 1;
     printf("P-%u public key: %" PRId64 " us\n", width * 8, esp_timer_get_time() - start);
     sink ^= point[1];

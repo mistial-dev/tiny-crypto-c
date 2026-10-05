@@ -50,8 +50,7 @@ static TC_RSA_result validate_private_key(const TC_RSA_private_key* key, TC_rand
                                           const TC_RSA_workspace* workspace, uint32_t work)
 {
   TC_RSA_execution execution = {{random, context}, attempts, {work}};
-  return TC_RSA_validate_private_key(key, TC_RSA_EXPONENT_FIPS, TC_PERMIT_DISALLOWED, workspace,
-                                     &execution);
+  return TC_RSA_validate_private_key(key, TC_RSA_EXPONENT_FIPS, workspace, &execution);
 }
 
 static TC_RSA_result sign_v15(const TC_RSA_private_key* key, TC_hash_algorithm hash,
@@ -107,7 +106,7 @@ TC_TEST(key_generation)
                     TC_RSA_KEYGEN_WORKSPACE_WORDS(3072));
   munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, 4096), ==,
                     TC_RSA_KEYGEN_WORKSPACE_WORDS(4096));
-  munit_assert_int(TC_RSA_keygen_init(&generation, BITS, TC_PERMIT_DISALLOWED, &output,
+  munit_assert_int(TC_RSA_keygen_init(&generation, BITS, &output,
                                       (TC_RSA_keygen_limits){4096, 16384}, &workspace),
                    ==, TC_RSA_OK);
   munit_assert_int(keygen_step(&generation, deterministic_random, &rng, NULL, NULL, 0), ==,
@@ -131,25 +130,6 @@ TC_TEST(key_generation)
       validate_private_key(&key, deterministic_random, &rng, 256, &validation, UINT32_MAX), ==,
       TC_RSA_OK);
   {
-    /* FIPS 186-5 section 5.1 sets nlen >= 2048. Without TC_PERMIT_DISALLOWED
-     * validation returns UNSUPPORTED under both exponent policies, before any
-     * work, RNG request or workspace write. */
-    const TC_approval_policy denied[] = {TC_APPROVED_ONLY, (TC_approval_policy)2};
-    const TC_RSA_exponent_policy exponents[] = {TC_RSA_EXPONENT_FIPS, TC_RSA_EXPONENT_ANY_ODD};
-    for (size_t i = 0; i < 2; ++i)
-      for (size_t j = 0; j < 2; ++j) {
-        TC_RSA_execution execution = {{deterministic_random, &rng}, 256, {UINT32_MAX}};
-        const uint32_t rng_before = rng;
-        memset(validation_words, 0xa5, sizeof validation_words);
-        munit_assert_int(
-            TC_RSA_validate_private_key(&key, exponents[j], denied[i], &validation, &execution), ==,
-            TC_RSA_UNSUPPORTED);
-        munit_assert_uint32(execution.work.remaining, ==, UINT32_MAX);
-        munit_assert_uint32(rng, ==, rng_before);
-        munit_assert_true(tc_test_all_value(validation_words, sizeof validation_words, 0xa5));
-      }
-  }
-  {
     /* TC_RSA_VALIDATE_WORK is checked in full before any arithmetic or RNG
      * request. One unit less returns LIMIT with the budget, workspace and
      * RNG unchanged. */
@@ -157,34 +137,34 @@ TC_TEST(key_generation)
     TC_RSA_execution execution = {{deterministic_random, &rng}, 256, {full - 1u}};
     const uint32_t rng_before = rng;
     memset(validation_words, 0xa5, sizeof validation_words);
-    munit_assert_int(TC_RSA_validate_private_key(&key, TC_RSA_EXPONENT_FIPS, TC_PERMIT_DISALLOWED,
-                                                 &validation, &execution),
-                     ==, TC_RSA_LIMIT);
+    munit_assert_int(
+        TC_RSA_validate_private_key(&key, TC_RSA_EXPONENT_FIPS, &validation, &execution), ==,
+        TC_RSA_LIMIT);
     munit_assert_uint32(execution.work.remaining, ==, full - 1u);
     munit_assert_uint32(rng, ==, rng_before);
     munit_assert_true(tc_test_all_value(validation_words, sizeof validation_words, 0xa5));
     execution.work.remaining = full;
-    munit_assert_int(TC_RSA_validate_private_key(&key, TC_RSA_EXPONENT_FIPS, TC_PERMIT_DISALLOWED,
-                                                 &validation, &execution),
-                     ==, TC_RSA_OK);
+    munit_assert_int(
+        TC_RSA_validate_private_key(&key, TC_RSA_EXPONENT_FIPS, &validation, &execution), ==,
+        TC_RSA_OK);
     munit_assert_uint32(execution.work.remaining, <, full);
     /* A request count whose full cost exceeds UINT32_MAX can never be
      * covered, so it returns LIMIT before any work or RNG request. */
     execution.random_attempts = SIZE_MAX;
     execution.work.remaining = UINT32_MAX;
     const uint32_t rng_unbounded = rng;
-    munit_assert_int(TC_RSA_validate_private_key(&key, TC_RSA_EXPONENT_FIPS, TC_PERMIT_DISALLOWED,
-                                                 &validation, &execution),
-                     ==, TC_RSA_LIMIT);
+    munit_assert_int(
+        TC_RSA_validate_private_key(&key, TC_RSA_EXPONENT_FIPS, &validation, &execution), ==,
+        TC_RSA_LIMIT);
     munit_assert_uint32(execution.work.remaining, ==, UINT32_MAX);
     munit_assert_uint32(rng, ==, rng_unbounded);
   }
   int cancelled = 1;
   memset(&generation, 0, sizeof generation);
   memset(words, 0xa5, sizeof words);
-  munit_assert_int(TC_RSA_keygen_init(&generation, BITS, TC_PERMIT_DISALLOWED, &output,
-                                      (TC_RSA_keygen_limits){1, 1}, &workspace),
-                   ==, TC_RSA_OK);
+  munit_assert_int(
+      TC_RSA_keygen_init(&generation, BITS, &output, (TC_RSA_keygen_limits){1, 1}, &workspace), ==,
+      TC_RSA_OK);
   munit_assert_int(
       keygen_step(&generation, deterministic_random, &rng, cancel_now, &cancelled, UINT32_MAX), ==,
       TC_RSA_CANCELLED);
@@ -193,9 +173,9 @@ TC_TEST(key_generation)
   uint8_t saved_modulus[sizeof modulus];
   memcpy(saved_modulus, modulus, sizeof modulus);
   memset(&generation, 0, sizeof generation);
-  munit_assert_int(TC_RSA_keygen_init(&generation, BITS, TC_PERMIT_DISALLOWED, &output,
-                                      (TC_RSA_keygen_limits){1, 1}, &workspace),
-                   ==, TC_RSA_OK);
+  munit_assert_int(
+      TC_RSA_keygen_init(&generation, BITS, &output, (TC_RSA_keygen_limits){1, 1}, &workspace), ==,
+      TC_RSA_OK);
   unsigned failed_calls = 0;
   munit_assert_int(keygen_step(&generation, random_bytes, &failed_calls, NULL, NULL, UINT32_MAX),
                    ==, TC_RSA_ERROR);
@@ -203,50 +183,12 @@ TC_TEST(key_generation)
   munit_assert_memory_equal(sizeof modulus, modulus, saved_modulus);
   uint8_t repeated = 0xff;
   memset(&generation, 0, sizeof generation);
-  munit_assert_int(TC_RSA_keygen_init(&generation, BITS, TC_PERMIT_DISALLOWED, &output,
-                                      (TC_RSA_keygen_limits){1, 2}, &workspace),
-                   ==, TC_RSA_OK);
+  munit_assert_int(
+      TC_RSA_keygen_init(&generation, BITS, &output, (TC_RSA_keygen_limits){1, 2}, &workspace), ==,
+      TC_RSA_OK);
   munit_assert_int(keygen_step(&generation, repeated_random, &repeated, NULL, NULL, UINT32_MAX), ==,
                    TC_RSA_LIMIT);
   munit_assert_memory_equal(sizeof modulus, modulus, saved_modulus);
-  return MUNIT_OK;
-}
-
-/* FIPS 186-5 section 5.1 and appendix A.1.3 step 1 reject nlen < 2048.
- * RSA-1024 generation needs TC_PERMIT_DISALLOWED. A refused init leaves the state,
- * outputs and scratch unchanged. RSA-2048 needs no permission. */
-TC_TEST(keygen_disallowed_size)
-{
-  enum { BITS = 2048, BYTES = BITS / 8, WORDS = TC_RSA_KEYGEN_WORKSPACE_WORDS(BITS) };
-  static TC_RSA_word words[WORDS];
-  static uint8_t modulus[BYTES], exponent[3], d[BYTES], p[BYTES / 2], q[BYTES / 2];
-  const TC_RSA_keygen_output output = {{modulus, sizeof modulus},
-                                       {exponent, sizeof exponent},
-                                       {d, sizeof d},
-                                       {p, sizeof p},
-                                       {q, sizeof q}};
-  const TC_RSA_workspace workspace = {words, WORDS};
-  const TC_RSA_keygen_limits limits = {1, 1};
-  TC_RSA_keygen_state state, state_before;
-  memset(&state, 0, sizeof state);
-  memcpy(&state_before, &state, sizeof state);
-  memset(words, 0xa5, sizeof words);
-  memset(modulus, 0xa5, sizeof modulus);
-  munit_assert_int(TC_RSA_keygen_init(&state, 1024, TC_APPROVED_ONLY, &output, limits, &workspace),
-                   ==, TC_RSA_UNSUPPORTED);
-  munit_assert_int(
-      TC_RSA_keygen_init(&state, 1024, (TC_approval_policy)2, &output, limits, &workspace), ==,
-      TC_RSA_UNSUPPORTED);
-  munit_assert_memory_equal(sizeof state, &state, &state_before);
-  munit_assert_true(tc_test_all_value(words, sizeof words, 0xa5));
-  munit_assert_true(tc_test_all_value(modulus, sizeof modulus, 0xa5));
-  munit_assert_int(
-      TC_RSA_keygen_init(&state, 1024, TC_PERMIT_DISALLOWED, &output, limits, &workspace), ==,
-      TC_RSA_OK);
-  TC_RSA_keygen_clear(&state);
-  munit_assert_int(TC_RSA_keygen_init(&state, BITS, TC_APPROVED_ONLY, &output, limits, &workspace),
-                   ==, TC_RSA_OK);
-  TC_RSA_keygen_clear(&state);
   return MUNIT_OK;
 }
 
@@ -288,27 +230,23 @@ TC_TEST(keygen_capacity)
         buffers[field]->data = NULL;
       else
         --buffers[field]->capacity;
-      munit_assert_int(
-          TC_RSA_keygen_init(&state, BITS, TC_PERMIT_DISALLOWED, &output, limits, &workspace), ==,
-          missing ? TC_RSA_ARGUMENT : TC_RSA_LIMIT);
+      munit_assert_int(TC_RSA_keygen_init(&state, BITS, &output, limits, &workspace), ==,
+                       missing ? TC_RSA_ARGUMENT : TC_RSA_LIMIT);
       /* A missing buffer is ARGUMENT whatever its capacity. */
       if (missing) {
         buffers[field]->capacity = 0;
-        munit_assert_int(
-            TC_RSA_keygen_init(&state, BITS, TC_PERMIT_DISALLOWED, &output, limits, &workspace), ==,
-            TC_RSA_ARGUMENT);
+        munit_assert_int(TC_RSA_keygen_init(&state, BITS, &output, limits, &workspace), ==,
+                         TC_RSA_ARGUMENT);
       }
       munit_assert_memory_equal(sizeof state, &state, &state_before);
     }
   }
   const TC_RSA_workspace short_workspace = {words, WORDS - 1};
-  munit_assert_int(
-      TC_RSA_keygen_init(&state, BITS, TC_PERMIT_DISALLOWED, &exact, limits, &short_workspace), ==,
-      TC_RSA_LIMIT);
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &exact, limits, &short_workspace), ==,
+                   TC_RSA_LIMIT);
   const TC_RSA_workspace no_words = {NULL, 0};
-  munit_assert_int(
-      TC_RSA_keygen_init(&state, BITS, TC_PERMIT_DISALLOWED, &exact, limits, &no_words), ==,
-      TC_RSA_ARGUMENT);
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &exact, limits, &no_words), ==,
+                   TC_RSA_ARGUMENT);
   munit_assert_memory_equal(sizeof state, &state, &state_before);
   const uint8_t* const untouched[] = {modulus, exponent, d, p, q};
   const size_t untouched_size[] = {sizeof modulus, sizeof exponent, sizeof d, sizeof p, sizeof q};
@@ -317,9 +255,7 @@ TC_TEST(keygen_capacity)
       munit_assert_uint(untouched[buffer][i], ==, 0xa5);
   for (size_t i = 0; i < sizeof words; ++i)
     munit_assert_uint(((const uint8_t*)words)[i], ==, 0xa5);
-  munit_assert_int(
-      TC_RSA_keygen_init(&state, BITS, TC_PERMIT_DISALLOWED, &exact, limits, &workspace), ==,
-      TC_RSA_OK);
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &exact, limits, &workspace), ==, TC_RSA_OK);
   TC_RSA_keygen_clear(&state);
   return MUNIT_OK;
 }
@@ -360,9 +296,8 @@ TC_TEST(keygen_metadata_overlap)
   memset(&scratch, 0xa5, sizeof scratch);
   scratch.output = exact;
   memcpy(before, &scratch, sizeof scratch);
-  munit_assert_int(
-      TC_RSA_keygen_init(&state, BITS, TC_PERMIT_DISALLOWED, &scratch.output, limits, &workspace),
-      ==, TC_RSA_ARGUMENT);
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &scratch.output, limits, &workspace), ==,
+                   TC_RSA_ARGUMENT);
   munit_assert_memory_equal(sizeof scratch, &scratch, before);
   munit_assert_uint32(state.marker, ==, 0);
 
@@ -370,9 +305,8 @@ TC_TEST(keygen_metadata_overlap)
   memset(&scratch, 0xa5, sizeof scratch);
   scratch.workspace = workspace;
   memcpy(before, &scratch, sizeof scratch);
-  munit_assert_int(
-      TC_RSA_keygen_init(&state, BITS, TC_PERMIT_DISALLOWED, &exact, limits, &scratch.workspace),
-      ==, TC_RSA_ARGUMENT);
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &exact, limits, &scratch.workspace), ==,
+                   TC_RSA_ARGUMENT);
   munit_assert_memory_equal(sizeof scratch, &scratch, before);
   munit_assert_uint32(state.marker, ==, 0);
 
@@ -380,16 +314,13 @@ TC_TEST(keygen_metadata_overlap)
   memset(&scratch, 0xa5, sizeof scratch);
   memset(&shared, 0, sizeof shared);
   shared.output = exact;
-  munit_assert_int(TC_RSA_keygen_init(&shared.state, BITS, TC_PERMIT_DISALLOWED, &shared.output,
-                                      limits, &workspace),
-                   ==, TC_RSA_ARGUMENT);
+  munit_assert_int(TC_RSA_keygen_init(&shared.state, BITS, &shared.output, limits, &workspace), ==,
+                   TC_RSA_ARGUMENT);
   munit_assert_ptr_equal(shared.output.modulus.data, modulus);
   for (size_t i = 0; i < sizeof scratch; ++i)
     munit_assert_uint(((const uint8_t*)&scratch)[i], ==, 0xa5);
 
-  munit_assert_int(
-      TC_RSA_keygen_init(&state, BITS, TC_PERMIT_DISALLOWED, &exact, limits, &workspace), ==,
-      TC_RSA_OK);
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &exact, limits, &workspace), ==, TC_RSA_OK);
   TC_RSA_keygen_clear(&state);
   return MUNIT_OK;
 }
@@ -638,7 +569,6 @@ int main(int argc, char** argv)
 {
   MunitTest tests[] = {
       {"/key-generation", key_generation, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-      {"/keygen-disallowed-size", keygen_disallowed_size, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/keygen-capacity", keygen_capacity, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/keygen-metadata-overlap", keygen_metadata_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE,
        NULL},

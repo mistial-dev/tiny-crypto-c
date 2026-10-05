@@ -130,12 +130,12 @@ rsa_raw_private(const rsa_public_key& key, bytes private_exponent, bytes input,
   return rsa_raw_private(key, private_exponent, input, workspace, buffer{output, N}, execution);
 }
 
-TC_CPP_NODISCARD inline rsa_result
-rsa_keygen_init(rsa_keygen_state& state, size_t bits, const rsa_keygen_output& output,
-                rsa_keygen_limits limits, const rsa_workspace& workspace,
-                approval_policy approval = TC_APPROVED_ONLY) noexcept
+TC_CPP_NODISCARD inline rsa_result rsa_keygen_init(rsa_keygen_state& state, size_t bits,
+                                                   const rsa_keygen_output& output,
+                                                   rsa_keygen_limits limits,
+                                                   const rsa_workspace& workspace) noexcept
 {
-  return ::TC_RSA_keygen_init(&state, bits, approval, &output, limits, &workspace);
+  return ::TC_RSA_keygen_init(&state, bits, &output, limits, &workspace);
 }
 
 TC_CPP_NODISCARD inline rsa_result rsa_keygen_step(rsa_keygen_state& state, TC_random_source random,
@@ -217,10 +217,9 @@ rsa_encode_pss_digest(const rsa_pss_options& options, bytes digest, bytes salt,
 TC_CPP_NODISCARD inline rsa_result
 rsa_validate_private_key(const rsa_private_key& key, const rsa_workspace& workspace,
                          rsa_execution& execution,
-                         TC_RSA_exponent_policy exponent_policy = TC_RSA_EXPONENT_FIPS,
-                         approval_policy approval = TC_APPROVED_ONLY) noexcept
+                         TC_RSA_exponent_policy exponent_policy = TC_RSA_EXPONENT_FIPS) noexcept
 {
-  return ::TC_RSA_validate_private_key(&key, exponent_policy, approval, &workspace, &execution);
+  return ::TC_RSA_validate_private_key(&key, exponent_policy, &workspace, &execution);
 }
 
 TC_CPP_NODISCARD inline rsa_result rsa_verify_pss_digest(const rsa_public_key& key,

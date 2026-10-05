@@ -34,8 +34,6 @@ struct kdf_family {
   kdf_counter_fn counter;
   kdf_feedback_fn feedback;
   kdf_pipeline_fn pipeline;
-  /* TC_PERMIT_DISALLOWED for the TDEA-CMAC PRF (SP 800-131A Rev. 2 Table 7). */
-  TC_approval_policy approval;
 };
 
 #if TC_AES_KEY_BITS == 128
@@ -49,31 +47,31 @@ struct kdf_family {
 static const struct kdf_family kdf_families[] = {
 #if TC_KBKDF_HAVE_HMAC_SHA1
     {"HMAC-SHA-1", KBKDF_PRF_HMAC_SHA1, TC_SHA1_DIGESTLEN, 32, TC_KBKDF_HMAC_SHA1_counter,
-     TC_KBKDF_HMAC_SHA1_feedback, TC_KBKDF_HMAC_SHA1_pipeline, TC_APPROVED_ONLY},
+     TC_KBKDF_HMAC_SHA1_feedback, TC_KBKDF_HMAC_SHA1_pipeline},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA224
     {"HMAC-SHA-224", KBKDF_PRF_HMAC_SHA224, TC_SHA224_DIGESTLEN, 32, TC_KBKDF_HMAC_SHA224_counter,
-     TC_KBKDF_HMAC_SHA224_feedback, TC_KBKDF_HMAC_SHA224_pipeline, TC_APPROVED_ONLY},
+     TC_KBKDF_HMAC_SHA224_feedback, TC_KBKDF_HMAC_SHA224_pipeline},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA256
     {"HMAC-SHA-256", KBKDF_PRF_HMAC_SHA256, TC_SHA256_DIGESTLEN, 32, TC_KBKDF_HMAC_SHA256_counter,
-     TC_KBKDF_HMAC_SHA256_feedback, TC_KBKDF_HMAC_SHA256_pipeline, TC_APPROVED_ONLY},
+     TC_KBKDF_HMAC_SHA256_feedback, TC_KBKDF_HMAC_SHA256_pipeline},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA384
     {"HMAC-SHA-384", KBKDF_PRF_HMAC_SHA384, TC_SHA384_DIGESTLEN, 32, TC_KBKDF_HMAC_SHA384_counter,
-     TC_KBKDF_HMAC_SHA384_feedback, TC_KBKDF_HMAC_SHA384_pipeline, TC_APPROVED_ONLY},
+     TC_KBKDF_HMAC_SHA384_feedback, TC_KBKDF_HMAC_SHA384_pipeline},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA512
     {"HMAC-SHA-512", KBKDF_PRF_HMAC_SHA512, TC_SHA512_DIGESTLEN, 32, TC_KBKDF_HMAC_SHA512_counter,
-     TC_KBKDF_HMAC_SHA512_feedback, TC_KBKDF_HMAC_SHA512_pipeline, TC_APPROVED_ONLY},
+     TC_KBKDF_HMAC_SHA512_feedback, TC_KBKDF_HMAC_SHA512_pipeline},
 #endif
 #if TC_KBKDF_HAVE_AES_CMAC
     {"AES-CMAC", KDF_AES_PRF_ID, TC_AES_CMAC_TAG_MAX, TC_AES_KEYLEN, TC_KBKDF_AES_CMAC_counter,
-     TC_KBKDF_AES_CMAC_feedback, TC_KBKDF_AES_CMAC_pipeline, TC_APPROVED_ONLY},
+     TC_KBKDF_AES_CMAC_feedback, TC_KBKDF_AES_CMAC_pipeline},
 #endif
 #if TC_KBKDF_HAVE_DES_CMAC
     {"TDEA-CMAC", KBKDF_PRF_CMAC_TDES3, TC_DES_CMAC_TAG_MAX, 24, TC_KBKDF_DES_CMAC_counter,
-     TC_KBKDF_DES_CMAC_feedback, TC_KBKDF_DES_CMAC_pipeline, TC_PERMIT_DISALLOWED},
+     TC_KBKDF_DES_CMAC_feedback, TC_KBKDF_DES_CMAC_pipeline},
 #endif
 };
 #define KDF_FAMILY_COUNT (sizeof(kdf_families) / sizeof(kdf_families[0]))
@@ -86,7 +84,7 @@ TC_TEST_SHARED(test_kbkdf_known)
 {
 #if TC_KBKDF_HAVE_HMAC_SHA256
   {
-    const struct TC_KBKDF_params p = {TC_KBKDF_COUNTER_32, 0, 0, TC_APPROVED_ONLY};
+    const struct TC_KBKDF_params p = {TC_KBKDF_COUNTER_32, 0, 0};
     uint8_t fixed[TC_KBKDF_FIXED_INPUT_LEN(sizeof(kbkdf_known_label), sizeof(kbkdf_known_context))];
     uint8_t out[32];
     uint8_t out2[32];
@@ -327,7 +325,7 @@ TC_TEST_SHARED(test_kbkdf_counter_encoding)
 
 TC_TEST_SHARED(test_kbkdf_cmac_first_block)
 {
-  const struct TC_KBKDF_params p = {TC_KBKDF_COUNTER_8, 0, 0, TC_APPROVED_ONLY};
+  const struct TC_KBKDF_params p = {TC_KBKDF_COUNTER_8, 0, 0};
   uint8_t fixed[1 + 37];
   uint8_t key[32];
   int ran = 0;
@@ -353,15 +351,13 @@ TC_TEST_SHARED(test_kbkdf_cmac_first_block)
 #endif
 #if TC_KBKDF_HAVE_DES_CMAC
   {
-    /* Every TDEA-CMAC key needs TC_PERMIT_DISALLOWED. */
     static const size_t key_lens[] = {8, 16, 24};
-    const struct TC_KBKDF_params permitted = {TC_KBKDF_COUNTER_8, 0, 0, TC_PERMIT_DISALLOWED};
     size_t k;
     for (k = 0; k < 3; ++k) {
       uint8_t out[TC_DES_CMAC_TAG_MAX];
       uint8_t tag[TC_DES_CMAC_TAG_MAX];
       munit_assert_int(TC_KBKDF_DES_CMAC_counter(
-                           (TC_bytes){key, key_lens[k]}, &permitted, (TC_bytes){NULL, 0},
+                           (TC_bytes){key, key_lens[k]}, &p, (TC_bytes){NULL, 0},
                            (TC_bytes){fixed + 1, sizeof(fixed) - 1}, (TC_buffer){out, sizeof(out)}),
                        ==, TC_OK);
       munit_assert_int(TC_DES_CMAC((TC_bytes){key, key_lens[k]}, (TC_bytes){fixed, sizeof(fixed)},
@@ -412,7 +408,6 @@ TC_TEST_SHARED(test_kbkdf_generated)
     p.counter_bits = v->counter_bits;
     p.counter_location = v->location;
     p.use_counter = v->use_counter;
-    p.approval = f->approval;
 
     switch (v->mode) {
     case KBKDF_MODE_COUNTER:
@@ -542,7 +537,6 @@ TC_TEST_SHARED(test_kbkdf_api)
     const struct kdf_family* f = &kdf_families[fi];
     const size_t klen = f->key_len;
     struct TC_KBKDF_params p;
-    p.approval = f->approval;
 
     p.counter_bits = TC_KBKDF_COUNTER_32;
     p.counter_location = TC_KBKDF_CTR_BEFORE_ITER;
@@ -664,8 +658,7 @@ TC_TEST_SHARED(test_kbkdf_api)
         uint8_t bytes[96];
         struct TC_KBKDF_params params[2];
       } shared;
-      const struct TC_KBKDF_params layout = {TC_KBKDF_COUNTER_8, TC_KBKDF_CTR_BEFORE_ITER, 1,
-                                             f->approval};
+      const struct TC_KBKDF_params layout = {TC_KBKDF_COUNTER_8, TC_KBKDF_CTR_BEFORE_ITER, 1};
       uint8_t expected[96];
       munit_assert_int(f->feedback((TC_bytes){key, klen}, &layout, (TC_bytes){iv, sizeof(iv)},
                                    (TC_bytes){fixed, sizeof(fixed)},
@@ -710,7 +703,7 @@ TC_TEST_SHARED(test_kbkdf_api)
 
 #if TC_KBKDF_HAVE_AES_CMAC
   {
-    const struct TC_KBKDF_params p = {TC_KBKDF_COUNTER_32, 0, 0, TC_APPROVED_ONLY};
+    const struct TC_KBKDF_params p = {TC_KBKDF_COUNTER_32, 0, 0};
     munit_assert_int(TC_KBKDF_AES_CMAC_counter((TC_bytes){key, TC_AES_KEYLEN + 1}, &p,
                                                (TC_bytes){NULL, 0}, (TC_bytes){fixed, 8},
                                                (TC_buffer){out, 16}),
@@ -727,7 +720,7 @@ TC_TEST_SHARED(test_kbkdf_api)
   {
     /* kdf.h derives the key-control value K(0) = PRF(KDK, fixed input) as a
      * feedback derivation with an empty IV and no counter. */
-    const struct TC_KBKDF_params p = {0, 0, 0, TC_APPROVED_ONLY};
+    const struct TC_KBKDF_params p = {0, 0, 0};
     uint8_t k0[16];
     munit_assert_int(TC_KBKDF_AES_CMAC_feedback((TC_bytes){key, TC_AES_KEYLEN}, &p,
                                                 (TC_bytes){NULL, 0}, (TC_bytes){fixed, 8},
@@ -741,51 +734,18 @@ TC_TEST_SHARED(test_kbkdf_api)
 #endif
 #if TC_KBKDF_HAVE_DES_CMAC
   {
-    /* SP 800-131A Rev. 2 Table 7 disallows CMAC-based KDF with two-key TDEA,
-     * and with three-key TDEA after December 31, 2023. SP 800-38B section 5.2
-     * excludes single DES. TC_PERMIT_DISALLOWED accepts 8, 16 and 24 bytes.
-     * Any other policy value behaves as TC_APPROVED_ONLY. */
-    const struct TC_KBKDF_params p = {TC_KBKDF_COUNTER_32, 0, 0, TC_APPROVED_ONLY};
-    const struct TC_KBKDF_params unknown = {TC_KBKDF_COUNTER_32, 0, 0, (TC_approval_policy)2};
-    const struct TC_KBKDF_params permitted = {TC_KBKDF_COUNTER_32, 0, 0, TC_PERMIT_DISALLOWED};
+    const struct TC_KBKDF_params p = {TC_KBKDF_COUNTER_32, 0, 0};
     static const size_t bad[] = {7, 9, 15, 17, 32};
-    static const size_t disallowed[] = {8, 16, 24};
+    static const size_t good[] = {8, 16, 24};
     size_t i;
-    for (i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
+    for (i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i)
       munit_assert_int(TC_KBKDF_DES_CMAC_counter((TC_bytes){key, bad[i]}, &p, (TC_bytes){NULL, 0},
                                                  (TC_bytes){fixed, 8}, (TC_buffer){out, 8}),
                        ==, TC_ERROR);
-      munit_assert_int(TC_KBKDF_DES_CMAC_counter((TC_bytes){key, bad[i]}, &permitted,
-                                                 (TC_bytes){NULL, 0}, (TC_bytes){fixed, 8},
-                                                 (TC_buffer){out, 8}),
-                       ==, TC_ERROR);
-    }
-    for (i = 0; i < sizeof(disallowed) / sizeof(disallowed[0]); ++i) {
-      memset(out, 0xa5, 8);
-      munit_assert_int(TC_KBKDF_DES_CMAC_counter((TC_bytes){key, disallowed[i]}, &p,
-                                                 (TC_bytes){NULL, 0}, (TC_bytes){fixed, 8},
-                                                 (TC_buffer){out, 8}),
-                       ==, TC_ERROR);
-      munit_assert_int(TC_KBKDF_DES_CMAC_feedback((TC_bytes){key, disallowed[i]}, &unknown,
-                                                  (TC_bytes){NULL, 0}, (TC_bytes){fixed, 8},
-                                                  (TC_buffer){out, 8}),
-                       ==, TC_ERROR);
-      munit_assert_int(TC_KBKDF_DES_CMAC_pipeline((TC_bytes){key, disallowed[i]}, &p,
-                                                  (TC_bytes){fixed, 8}, (TC_buffer){out, 8}),
-                       ==, TC_ERROR);
-      munit_assert_true(tc_test_all_value(out, 8, 0xa5));
-      munit_assert_int(TC_KBKDF_DES_CMAC_counter((TC_bytes){key, disallowed[i]}, &permitted,
-                                                 (TC_bytes){NULL, 0}, (TC_bytes){fixed, 8},
-                                                 (TC_buffer){out, 8}),
+    for (i = 0; i < sizeof(good) / sizeof(good[0]); ++i)
+      munit_assert_int(TC_KBKDF_DES_CMAC_counter((TC_bytes){key, good[i]}, &p, (TC_bytes){NULL, 0},
+                                                 (TC_bytes){fixed, 8}, (TC_buffer){out, 8}),
                        ==, TC_OK);
-    }
-    /* Three-key TDEA is disallowed after December 31, 2023 as well. */
-    munit_assert_int(TC_KBKDF_DES_CMAC_counter((TC_bytes){key, 24}, &p, (TC_bytes){NULL, 0},
-                                               (TC_bytes){fixed, 8}, (TC_buffer){out, 8}),
-                     ==, TC_ERROR);
-    munit_assert_int(TC_KBKDF_DES_CMAC_counter((TC_bytes){key, 24}, &permitted, (TC_bytes){NULL, 0},
-                                               (TC_bytes){fixed, 8}, (TC_buffer){out, 8}),
-                     ==, TC_OK);
   }
 #endif
   return MUNIT_OK;
@@ -809,7 +769,6 @@ TC_TEST_SHARED(test_kbkdf_limits)
     const struct kdf_family* f = &kdf_families[fi];
     const size_t h = f->h;
     struct TC_KBKDF_params p;
-    p.approval = f->approval;
 
     p.counter_location = TC_KBKDF_CTR_AFTER_FIXED;
     p.use_counter = 1;
@@ -881,7 +840,6 @@ TC_TEST_SHARED(test_kbkdf_truncation)
     static const size_t fractions[] = {1, 2, 3}; /* h + 1, 2h - 1, and 1 byte */
     struct TC_KBKDF_params p;
     size_t k;
-    p.approval = f->approval;
 
     p.counter_bits = TC_KBKDF_COUNTER_24;
     p.counter_location = TC_KBKDF_CTR_AFTER_ITER;

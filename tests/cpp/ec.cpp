@@ -64,7 +64,7 @@ TEST_CASE("EC wrappers")
   tiny_crypto::ec_execution execution = {{counter_random, &counter}, 4, {100000}};
   REQUIRE(tiny_crypto::ec_generate_key_pair(TC_EC_P256, private_key, generated, workspace,
                                             execution) == TC_EC_OK);
-  const tiny_crypto::ecdsa_sign_options sign_options = {TC_HASH_SHA256, 4, TC_APPROVED_ONLY};
+  const tiny_crypto::ecdsa_sign_options sign_options = {TC_HASH_SHA256, 4};
   TC_work_budget sign_work = {100000};
   CHECK(tiny_crypto::ecdsa_sign_digest(TC_EC_P256, {scalar, sizeof scalar},
                                        {public_key, sizeof public_key}, {digest, sizeof digest},
@@ -113,7 +113,7 @@ TEST_CASE("EC wrappers reject short arrays, bad lengths and exhausted randomness
                                           execution) == TC_EC_LIMIT);
   CHECK(tiny_crypto::ec_generate_key_pair(TC_EC_P256, private_key, short_point, workspace,
                                           execution) == TC_EC_LIMIT);
-  const tiny_crypto::ecdsa_sign_options sign_options = {TC_HASH_SHA256, 4, TC_APPROVED_ONLY};
+  const tiny_crypto::ecdsa_sign_options sign_options = {TC_HASH_SHA256, 4};
   TC_work_budget sign_work = {100000};
   CHECK(tiny_crypto::ecdsa_sign_digest(TC_EC_P256, {scalar, sizeof scalar},
                                        {public_key, sizeof public_key}, {digest, sizeof digest},
@@ -156,34 +156,3 @@ TEST_CASE("EC wrappers reject short arrays, bad lengths and exhausted randomness
   CHECK(short_work.remaining ==
         tiny_crypto::ec_operation_work(TC_EC_P256, TC_EC_OPERATION_VERIFY) - 1);
 }
-
-#if TC_EC_ENABLE_P192
-TEST_CASE("EC wrappers refuse P-192 protection by default")
-{
-  tiny_crypto::ec_workspace workspace;
-  uint8_t scalar[24] = {}, public_key[49], shared[24];
-  scalar[23] = 1;
-  TC_work_budget work = {100000};
-  CHECK(tiny_crypto::ec_public_key(TC_EC_P192, {scalar, sizeof scalar}, public_key, workspace,
-                                   work) == TC_EC_UNSUPPORTED);
-  REQUIRE(tiny_crypto::ec_public_key(TC_EC_P192, {scalar, sizeof scalar}, public_key, workspace,
-                                     work, TC_PERMIT_DISALLOWED) == TC_EC_OK);
-  CHECK(tiny_crypto::ec_validate_public_key(TC_EC_P192, {public_key, sizeof public_key}, workspace,
-                                            work) == TC_EC_OK);
-  CHECK(tiny_crypto::ecdh(TC_EC_P192, {scalar, sizeof scalar}, {public_key, sizeof public_key},
-                          shared, workspace, work) == TC_EC_UNSUPPORTED);
-  CHECK(tiny_crypto::ecdh(TC_EC_P192, {scalar, sizeof scalar}, {public_key, sizeof public_key},
-                          shared, workspace, work, TC_PERMIT_DISALLOWED) == TC_EC_OK);
-  tiny_crypto::ecdsa_workspace signature_workspace;
-  uint8_t digest[32] = {}, signature[48];
-  tiny_crypto::ecdsa_sign_options options = {TC_HASH_SHA256, 4, TC_APPROVED_ONLY};
-  CHECK(tiny_crypto::ecdsa_sign_digest(TC_EC_P192, {scalar, sizeof scalar},
-                                       {public_key, sizeof public_key}, {digest, sizeof digest},
-                                       signature, signature_workspace, options,
-                                       work) == TC_EC_UNSUPPORTED);
-  options.approval = TC_PERMIT_DISALLOWED;
-  CHECK(tiny_crypto::ecdsa_sign_digest(TC_EC_P192, {scalar, sizeof scalar},
-                                       {public_key, sizeof public_key}, {digest, sizeof digest},
-                                       signature, signature_workspace, options, work) == TC_EC_OK);
-}
-#endif

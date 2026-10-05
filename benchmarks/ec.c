@@ -14,8 +14,8 @@ static TC_status public_key(size_t unused)
   TC_status status;
   (void)unused;
   TC_work_budget work = {UINT32_MAX};
-  status = TC_EC_public_key(curve, TC_APPROVED_ONLY, (TC_bytes){scalar, width},
-                            (TC_buffer){output, 2 * width + 1}, &workspace, &work) == TC_EC_OK
+  status = TC_EC_public_key(curve, (TC_bytes){scalar, width}, (TC_buffer){output, 2 * width + 1},
+                            &workspace, &work) == TC_EC_OK
                ? TC_OK
                : TC_ERROR;
   tc_benchmark_consume(output);
@@ -40,11 +40,10 @@ static TC_status shared_secret(size_t unused)
   TC_status status;
   (void)unused;
   TC_work_budget work = {UINT32_MAX};
-  status =
-      TC_ECDH(curve, TC_APPROVED_ONLY, (TC_bytes){scalar, width}, (TC_bytes){peer, 2 * width + 1},
-              (TC_buffer){output, width}, &workspace, &work) == TC_EC_OK
-          ? TC_OK
-          : TC_ERROR;
+  status = TC_ECDH(curve, (TC_bytes){scalar, width}, (TC_bytes){peer, 2 * width + 1},
+                   (TC_buffer){output, width}, &workspace, &work) == TC_EC_OK
+               ? TC_OK
+               : TC_ERROR;
   tc_benchmark_consume(output);
   return status;
 }
@@ -55,8 +54,8 @@ static int measure(TC_EC_curve selected, size_t bytes)
   width = bytes;
   memset(scalar, 0x42, width);
   TC_work_budget work = {UINT32_MAX};
-  if (TC_EC_public_key(curve, TC_APPROVED_ONLY, (TC_bytes){scalar, width},
-                       (TC_buffer){peer, 2 * width + 1}, &workspace, &work) != TC_EC_OK)
+  if (TC_EC_public_key(curve, (TC_bytes){scalar, width}, (TC_buffer){peer, 2 * width + 1},
+                       &workspace, &work) != TC_EC_OK)
     return 1;
   printf("EC curve=P-%lu small=%d workspace=%lu bytes\n", (unsigned long)(8 * width), TC_EC_SMALL,
          (unsigned long)sizeof workspace);

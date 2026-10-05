@@ -78,7 +78,7 @@ static MunitResult native_signature(const MunitParameter params[], void* context
   TC_X509_public_key key;
   scalar[scalar_bytes - 1] = 1;
   TC_work_budget work = {UINT32_MAX};
-  munit_assert_int(TC_EC_public_key(p384 ? TC_EC_P384 : TC_EC_P256, TC_APPROVED_ONLY,
+  munit_assert_int(TC_EC_public_key(p384 ? TC_EC_P384 : TC_EC_P256,
                                     (TC_bytes){scalar, scalar_bytes},
                                     (TC_buffer){spki + point_offset, point_bytes}, &ec, &work),
                    ==, TC_EC_OK);

@@ -16,8 +16,8 @@ int main(void)
                                    {p, sizeof p},
                                    {q, sizeof q}};
     TC_RSA_keygen_state state = {0};
-    if (TC_RSA_keygen_init(&state, 2048, TC_APPROVED_ONLY, &output, (TC_RSA_keygen_limits){1, 1},
-                           &workspace) != TC_RSA_OK)
+    if (TC_RSA_keygen_init(&state, 2048, &output, (TC_RSA_keygen_limits){1, 1}, &workspace) !=
+        TC_RSA_OK)
       return 1;
     TC_RSA_keygen_clear(&state);
     {
@@ -165,8 +165,8 @@ int main(void)
     return 1;
   key[31] = 1;
   TC_work_budget work = {UINT32_MAX};
-  if (TC_EC_public_key(TC_EC_P256, TC_APPROVED_ONLY, (TC_bytes){key, sizeof key},
-                       (TC_buffer){point, sizeof point}, &workspace, &work) != TC_EC_OK)
+  if (TC_EC_public_key(TC_EC_P256, (TC_bytes){key, sizeof key}, (TC_buffer){point, sizeof point},
+                       &workspace, &work) != TC_EC_OK)
     return 1;
   if (TC_EC_validate_public_key(TC_EC_P256, (TC_bytes){point, sizeof point}, &workspace, &work) !=
       TC_EC_OK)

@@ -2,8 +2,8 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "rsa_validate.h"
 
-TC_RSA_result example_validate_rsa_key(const TC_RSA_private_key* key, TC_approval_policy approval,
-                                       TC_random_source random, const TC_RSA_workspace* workspace)
+TC_RSA_result example_validate_rsa_key(const TC_RSA_private_key* key, TC_random_source random,
+                                       const TC_RSA_workspace* workspace)
 {
   enum { MAX_KEY_BITS = 4096, REQUESTS_PER_FACTOR = 4 * TC_RSA_VALIDATION_ROUNDS };
   if (!key)
@@ -16,5 +16,5 @@ TC_RSA_result example_validate_rsa_key(const TC_RSA_private_key* key, TC_approva
   TC_RSA_execution execution = {random, REQUESTS_PER_FACTOR, {work}};
   /* Applications that accept keys outside FIPS 186-5, such as e = 3, pass
    * TC_RSA_EXPONENT_ANY_ODD instead. */
-  return TC_RSA_validate_private_key(key, TC_RSA_EXPONENT_FIPS, approval, workspace, &execution);
+  return TC_RSA_validate_private_key(key, TC_RSA_EXPONENT_FIPS, workspace, &execution);
 }

@@ -64,14 +64,12 @@ TC_TEST(vectors)
     const TC_RSA_exponent_policy policy = TC_RSA_exponent_in_fips_range(key.public_key.exponent)
                                               ? TC_RSA_EXPONENT_FIPS
                                               : TC_RSA_EXPONENT_ANY_ODD;
-    TC_RSA_result result =
-        TC_RSA_validate_private_key(&key, policy, TC_PERMIT_DISALLOWED, &workspace, &execution);
+    TC_RSA_result result = TC_RSA_validate_private_key(&key, policy, &workspace, &execution);
     if (result != TC_RSA_OK)
       munit_errorf("NIST RSA KeyGen record %s: status %d", fields[5], result);
     if (count == 0) {
       p[pl - 1] ^= 1u;
-      result =
-          TC_RSA_validate_private_key(&key, policy, TC_PERMIT_DISALLOWED, &workspace, &execution);
+      result = TC_RSA_validate_private_key(&key, policy, &workspace, &execution);
       munit_assert_int(result, !=, TC_RSA_OK);
       p[pl - 1] ^= 1u;
     }

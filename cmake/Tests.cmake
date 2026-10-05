@@ -337,7 +337,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_test_library(tiny-crypto-c-test-ec-rfc6979
     src/common.c src/hash_core.c src/hash.c src/sha512.c src/ec.c)
   target_compile_definitions(tiny-crypto-c-test-ec-rfc6979 PUBLIC
-    TC_ENABLE_EC=1 TC_EC_ENABLE_P192=1 TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
+    TC_ENABLE_EC=1 TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
     TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1)
   tc_add_c_test(test_ec_rfc6979 tiny-crypto-c-test-ec-rfc6979 tests/ec/rfc6979.c)
   tc_add_test_library(tiny-crypto-c-test-sskdf src/common.c ${tc_hash_sources} src/sskdf.c)

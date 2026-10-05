@@ -142,38 +142,38 @@ each dependency that `config.h` requires.
 
 ### Algorithms
 
-| Option                           | Default | micro | mini | desktop | Purpose                                                                |
-| -------------------------------- | ------- | ----- | ---- | ------- | ---------------------------------------------------------------------- |
-| `TINY_CRYPTO_ENABLE_AES`         | ON      | ON    | ON   | ON      | AES block cipher with the key size from `TINY_CRYPTO_AES_KEY_BITS`     |
-| `TINY_CRYPTO_AES_ENABLE_DYNAMIC` | OFF     | OFF   | OFF  | ON      | Per-context AES-128/192/256 keys, CBC and CMAC                         |
-| `TINY_CRYPTO_ENABLE_DES`         | OFF     | OFF   | OFF  | ON      | DES, with TDEA and the DES modes below                                 |
-| `TINY_CRYPTO_DES_ENABLE_TDES`    | ON      | ON    | ON   | ON      | Two- and three-key TDEA                                                |
-| `TINY_CRYPTO_ENABLE_EC`          | OFF     | OFF   | OFF  | ON      | ECDH, ECDSA and key generation on the enabled curves                   |
-| `TINY_CRYPTO_EC_ENABLE_P192`     | OFF     | OFF   | OFF  | OFF     | P-192 verification, with signing and key use on `TC_PERMIT_DISALLOWED` |
-| `TINY_CRYPTO_EC_ENABLE_P256`     | ON      | ON    | ON   | ON      | P-256                                                                  |
-| `TINY_CRYPTO_EC_ENABLE_P384`     | ON      | ON    | ON   | ON      | P-384                                                                  |
-| `TINY_CRYPTO_EC_SMALL`           | OFF     | ON    | OFF  | OFF     | Byte limbs for EC arithmetic (always used on AVR)                      |
-| `TINY_CRYPTO_ENABLE_RSA`         | OFF     | OFF   | OFF  | ON      | RSA verification, signing, OAEP, key validation and key generation     |
-| `TINY_CRYPTO_RSA_ENABLE_1024`    | OFF     | OFF   | OFF  | OFF     | RSA-1024 keys, requires an explicit override                           |
-| `TINY_CRYPTO_RSA_ENABLE_2048`    | ON      | ON    | ON   | ON      | RSA-2048                                                               |
-| `TINY_CRYPTO_RSA_ENABLE_3072`    | ON      | ON    | ON   | ON      | RSA-3072                                                               |
-| `TINY_CRYPTO_RSA_ENABLE_4096`    | ON      | ON    | ON   | ON      | RSA-4096                                                               |
-| `TINY_CRYPTO_RSA_SMALL`          | OFF     | ON    | OFF  | OFF     | Byte limbs for RSA arithmetic (always used on AVR)                     |
-| `TINY_CRYPTO_ENABLE_SHA1`        | OFF     | OFF   | OFF  | ON      | SHA-1                                                                  |
-| `TINY_CRYPTO_ENABLE_SHA224`      | OFF     | OFF   | OFF  | ON      | SHA-224 on the SHA-256 core                                            |
-| `TINY_CRYPTO_ENABLE_SHA256`      | ON      | ON    | ON   | ON      | SHA-256                                                                |
-| `TINY_CRYPTO_ENABLE_SHA384`      | OFF     | OFF   | OFF  | ON      | SHA-384 on the SHA-512 core                                            |
-| `TINY_CRYPTO_ENABLE_SHA512`      | OFF     | OFF   | OFF  | ON      | SHA-512                                                                |
-| `TINY_CRYPTO_ENABLE_MD5`         | OFF     | OFF   | OFF  | ON      | MD5 checksums (RFC 1321)                                               |
-| `TINY_CRYPTO_ENABLE_HMAC`        | OFF     | OFF   | OFF  | ON      | HMAC over the enabled SHA algorithms                                   |
-| `TINY_CRYPTO_ENABLE_KMAC256`     | OFF     | OFF   | OFF  | ON      | Fixed-output KMAC256 with customization                                |
-| `TINY_CRYPTO_ENABLE_KDF`         | OFF     | OFF   | OFF  | ON      | SP 800-108r1 KBKDF over the enabled HMAC and CMAC PRFs                 |
-| `TINY_CRYPTO_ENABLE_HKDF`        | OFF     | OFF   | OFF  | ON      | RFC 5869 HKDF over the enabled HMAC-SHA algorithms                     |
-| `TINY_CRYPTO_ENABLE_SSKDF`       | OFF     | OFF   | OFF  | ON      | SP 800-56C one-step hash KDF over the enabled SHA algorithms           |
-| `TINY_CRYPTO_ENABLE_DRBG`        | OFF     | OFF   | OFF  | ON      | [SP 800-90A DRBGs](docs/drbg.md)                                       |
-| `TINY_CRYPTO_DRBG_ENABLE_HASH`   | OFF     | OFF   | OFF  | ON      | Hash_DRBG over the enabled SHA algorithms                              |
-| `TINY_CRYPTO_DRBG_ENABLE_HMAC`   | OFF     | OFF   | OFF  | ON      | HMAC_DRBG, requires HMAC                                               |
-| `TINY_CRYPTO_DRBG_ENABLE_CTR`    | OFF     | OFF   | OFF  | ON      | CTR_DRBG, requires `TINY_CRYPTO_AES_ENABLE_DYNAMIC`                    |
+| Option                           | Default | micro | mini | desktop | Purpose                                                            |
+| -------------------------------- | ------- | ----- | ---- | ------- | ------------------------------------------------------------------ |
+| `TINY_CRYPTO_ENABLE_AES`         | ON      | ON    | ON   | ON      | AES block cipher with the key size from `TINY_CRYPTO_AES_KEY_BITS` |
+| `TINY_CRYPTO_AES_ENABLE_DYNAMIC` | OFF     | OFF   | OFF  | ON      | Per-context AES-128/192/256 keys, CBC and CMAC                     |
+| `TINY_CRYPTO_ENABLE_DES`         | OFF     | OFF   | OFF  | ON      | DES, with TDEA and the DES modes below                             |
+| `TINY_CRYPTO_DES_ENABLE_TDES`    | ON      | ON    | ON   | ON      | Two- and three-key TDEA                                            |
+| `TINY_CRYPTO_ENABLE_EC`          | OFF     | OFF   | OFF  | ON      | ECDH, ECDSA and key generation on the enabled curves               |
+| `TINY_CRYPTO_EC_ENABLE_P192`     | OFF     | OFF   | OFF  | OFF     | P-192                                                              |
+| `TINY_CRYPTO_EC_ENABLE_P256`     | ON      | ON    | ON   | ON      | P-256                                                              |
+| `TINY_CRYPTO_EC_ENABLE_P384`     | ON      | ON    | ON   | ON      | P-384                                                              |
+| `TINY_CRYPTO_EC_SMALL`           | OFF     | ON    | OFF  | OFF     | Byte limbs for EC arithmetic (always used on AVR)                  |
+| `TINY_CRYPTO_ENABLE_RSA`         | OFF     | OFF   | OFF  | ON      | RSA verification, signing, OAEP, key validation and key generation |
+| `TINY_CRYPTO_RSA_ENABLE_1024`    | OFF     | OFF   | OFF  | OFF     | RSA-1024 keys, requires an explicit override                       |
+| `TINY_CRYPTO_RSA_ENABLE_2048`    | ON      | ON    | ON   | ON      | RSA-2048                                                           |
+| `TINY_CRYPTO_RSA_ENABLE_3072`    | ON      | ON    | ON   | ON      | RSA-3072                                                           |
+| `TINY_CRYPTO_RSA_ENABLE_4096`    | ON      | ON    | ON   | ON      | RSA-4096                                                           |
+| `TINY_CRYPTO_RSA_SMALL`          | OFF     | ON    | OFF  | OFF     | Byte limbs for RSA arithmetic (always used on AVR)                 |
+| `TINY_CRYPTO_ENABLE_SHA1`        | OFF     | OFF   | OFF  | ON      | SHA-1                                                              |
+| `TINY_CRYPTO_ENABLE_SHA224`      | OFF     | OFF   | OFF  | ON      | SHA-224 on the SHA-256 core                                        |
+| `TINY_CRYPTO_ENABLE_SHA256`      | ON      | ON    | ON   | ON      | SHA-256                                                            |
+| `TINY_CRYPTO_ENABLE_SHA384`      | OFF     | OFF   | OFF  | ON      | SHA-384 on the SHA-512 core                                        |
+| `TINY_CRYPTO_ENABLE_SHA512`      | OFF     | OFF   | OFF  | ON      | SHA-512                                                            |
+| `TINY_CRYPTO_ENABLE_MD5`         | OFF     | OFF   | OFF  | ON      | MD5 checksums (RFC 1321)                                           |
+| `TINY_CRYPTO_ENABLE_HMAC`        | OFF     | OFF   | OFF  | ON      | HMAC over the enabled SHA algorithms                               |
+| `TINY_CRYPTO_ENABLE_KMAC256`     | OFF     | OFF   | OFF  | ON      | Fixed-output KMAC256 with customization                            |
+| `TINY_CRYPTO_ENABLE_KDF`         | OFF     | OFF   | OFF  | ON      | SP 800-108r1 KBKDF over the enabled HMAC and CMAC PRFs             |
+| `TINY_CRYPTO_ENABLE_HKDF`        | OFF     | OFF   | OFF  | ON      | RFC 5869 HKDF over the enabled HMAC-SHA algorithms                 |
+| `TINY_CRYPTO_ENABLE_SSKDF`       | OFF     | OFF   | OFF  | ON      | SP 800-56C one-step hash KDF over the enabled SHA algorithms       |
+| `TINY_CRYPTO_ENABLE_DRBG`        | OFF     | OFF   | OFF  | ON      | [SP 800-90A DRBGs](docs/drbg.md)                                   |
+| `TINY_CRYPTO_DRBG_ENABLE_HASH`   | OFF     | OFF   | OFF  | ON      | Hash_DRBG over the enabled SHA algorithms                          |
+| `TINY_CRYPTO_DRBG_ENABLE_HMAC`   | OFF     | OFF   | OFF  | ON      | HMAC_DRBG, requires HMAC                                           |
+| `TINY_CRYPTO_DRBG_ENABLE_CTR`    | OFF     | OFF   | OFF  | ON      | CTR_DRBG, requires `TINY_CRYPTO_AES_ENABLE_DYNAMIC`                |
 
 ### Block-cipher modes
 
@@ -321,12 +321,9 @@ function in counter, feedback and double-pipeline mode. It needs at least one
 PRF: HMAC with an enabled SHA digest, `TINY_CRYPTO_AES_ENABLE_CMAC`, or
 `TINY_CRYPTO_DES_ENABLE_CMAC`. Each PRF gets its own function family
 (`TC_KBKDF_HMAC_SHA256_counter`, `TC_KBKDF_AES_CMAC_feedback`, ...), so unused
-PRFs compile out. TDEA-CMAC is kept for CAVP and interoperability. By default it accepts
-only 24-byte three-key bundles. SP 800-131A Rev. 2 Table 7 disallows CMAC-based KDF with
-two-key TDEA, and with three-key TDEA after 2023, and SP 800-38B section 5.2 excludes single
-DES. `TC_KBKDF_params.approval = TC_PERMIT_DISALLOWED` accepts 16- and 8-byte keys on request
-(see [disallowed parameters](docs/api.md#disallowed-parameters)). `kdf.h` describes the
-SP 800-108r1 key-control mitigations for the CMAC PRFs.
+PRFs compile out. SP 800-131A Rev. 2 Table 7 disallows the TDEA-CMAC PRF after 2023, so
+enable it only for protocols that still derive keys with TDEA. `kdf.h`
+describes the SP 800-108r1 key-control mitigations for the CMAC PRFs.
 
 `TINY_CRYPTO_ENABLE_HKDF` needs HMAC and at least one enabled SHA family.
 The C and C++ APIs provide extract, expand, and one-shot derive operations.
@@ -620,8 +617,7 @@ span layouts, state transitions and every result.
 
 The underlying `TC_ECDH`, `TC_EC_public_key`, and `TC_EC_validate_public_key`
 APIs take fixed-width scalars and uncompressed SEC1 public keys as spans, plus a
-work budget, and return a `TC_EC_result`. They support P-256 and P-384, and an enabled P-192
-with `TC_PERMIT_DISALLOWED`. See
+work budget, and return a `TC_EC_result`. They support P-256 and P-384. See
 [Elliptic-curve operations](docs/ec.md). `TC_SSKDF_SHA1` through
 `TC_SSKDF_SHA512` implement the SP 800-56C Rev. 2 one-step KDF, one function
 per enabled SHA. They accept FixedInfo as spans, avoiding a concatenation

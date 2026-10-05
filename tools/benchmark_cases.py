@@ -88,16 +88,16 @@ FEATURES = [
      "uint8_t d[64]; CHECK(TC_HMAC_SHA512_digest((TC_bytes){key, 32}, (TC_bytes){buf, 64}, (TC_buffer){d, 64})); consume(d, 64);",
      NO256 + " -DTC_ENABLE_SHA512=1 -DTC_ENABLE_HMAC=1"),
     ("KBKDF counter mode, HMAC-SHA-1",
-     "struct TC_KBKDF_params p = { 32, 0, 0, TC_APPROVED_ONLY }; CHECK(TC_KBKDF_HMAC_SHA1_counter((TC_bytes){key, 32}, &p, (TC_bytes){NULL, 0}, (TC_bytes){buf, 34}, (TC_buffer){tag, 32})); consume(tag, 32);",
+     "struct TC_KBKDF_params p = { 32, 0, 0 }; CHECK(TC_KBKDF_HMAC_SHA1_counter((TC_bytes){key, 32}, &p, (TC_bytes){NULL, 0}, (TC_bytes){buf, 34}, (TC_buffer){tag, 32})); consume(tag, 32);",
      NO256 + " -DTC_ENABLE_SHA1=1 -DTC_ENABLE_HMAC=1 -DTC_ENABLE_KDF=1"),
     ("KBKDF counter mode, HMAC-SHA-256",
-     "struct TC_KBKDF_params p = { 32, 0, 0, TC_APPROVED_ONLY }; CHECK(TC_KBKDF_HMAC_SHA256_counter((TC_bytes){key, 32}, &p, (TC_bytes){NULL, 0}, (TC_bytes){buf, 34}, (TC_buffer){tag, 32})); consume(tag, 32);",
+     "struct TC_KBKDF_params p = { 32, 0, 0 }; CHECK(TC_KBKDF_HMAC_SHA256_counter((TC_bytes){key, 32}, &p, (TC_bytes){NULL, 0}, (TC_bytes){buf, 34}, (TC_buffer){tag, 32})); consume(tag, 32);",
      OFF + " -DTC_ENABLE_HMAC=1 -DTC_ENABLE_KDF=1"),
     ("KBKDF feedback mode, HMAC-SHA-256",
-     "struct TC_KBKDF_params p = { 32, 1, 1, TC_APPROVED_ONLY }; CHECK(TC_KBKDF_HMAC_SHA256_feedback((TC_bytes){key, 32}, &p, (TC_bytes){iv, 16}, (TC_bytes){buf, 34}, (TC_buffer){tag, 32})); consume(tag, 32);",
+     "struct TC_KBKDF_params p = { 32, 1, 1 }; CHECK(TC_KBKDF_HMAC_SHA256_feedback((TC_bytes){key, 32}, &p, (TC_bytes){iv, 16}, (TC_bytes){buf, 34}, (TC_buffer){tag, 32})); consume(tag, 32);",
      OFF + " -DTC_ENABLE_HMAC=1 -DTC_ENABLE_KDF=1"),
     ("KBKDF counter mode, AES-128 CMAC",
-     "struct TC_KBKDF_params p = { 32, 0, 0, TC_APPROVED_ONLY }; CHECK(TC_KBKDF_AES_CMAC_counter((TC_bytes){key, 16}, &p, (TC_bytes){NULL, 0}, (TC_bytes){buf, 34}, (TC_buffer){tag, 32})); consume(tag, 32);",
+     "struct TC_KBKDF_params p = { 32, 0, 0 }; CHECK(TC_KBKDF_AES_CMAC_counter((TC_bytes){key, 16}, &p, (TC_bytes){NULL, 0}, (TC_bytes){buf, 34}, (TC_buffer){tag, 32})); consume(tag, 32);",
      AES + " -DTC_AES_ENABLE_CMAC=1 -DTC_ENABLE_KDF=1"),
 ]
 
@@ -174,8 +174,8 @@ for bits in (256, 384):
         width = bits // 8
         body = (f"static TC_EC_workspace work; uint8_t scalar[{width}]={{0}}, point[{2*width+1}], secret[{width}]; "
                 f"scalar[{width-1}]=1; TC_work_budget budget={{UINT32_MAX}}; "
-                f"CHECK(TC_EC_public_key(TC_EC_P{bits},TC_APPROVED_ONLY,(TC_bytes){{scalar,sizeof scalar}},(TC_buffer){{point,sizeof point}},&work,&budget)); "
-                f"CHECK(TC_ECDH(TC_EC_P{bits},TC_APPROVED_ONLY,(TC_bytes){{scalar,sizeof scalar}},(TC_bytes){{point,sizeof point}},(TC_buffer){{secret,sizeof secret}},&work,&budget)); "
+                f"CHECK(TC_EC_public_key(TC_EC_P{bits},(TC_bytes){{scalar,sizeof scalar}},(TC_buffer){{point,sizeof point}},&work,&budget)); "
+                f"CHECK(TC_ECDH(TC_EC_P{bits},(TC_bytes){{scalar,sizeof scalar}},(TC_bytes){{point,sizeof point}},(TC_buffer){{secret,sizeof secret}},&work,&budget)); "
                 "if(memcmp(secret,point+1,sizeof secret)) return 1; consume(secret,sizeof secret);")
         flags = (NO256 + f" -DTC_ENABLE_EC=1 -DTC_EC_SMALL={small}"
                  f" -DTC_EC_ENABLE_P256={int(bits == 256)} -DTC_EC_ENABLE_P384={int(bits == 384)}")

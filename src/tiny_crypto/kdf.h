@@ -34,7 +34,7 @@
  *   TC_KBKDF_HMAC_SHA384_*  TC_ENABLE_HMAC && TC_ENABLE_SHA384
  *   TC_KBKDF_HMAC_SHA512_*  TC_ENABLE_HMAC && TC_ENABLE_SHA512
  *   TC_KBKDF_AES_CMAC_*     TC_ENABLE_AES && TC_AES_ENABLE_CMAC (key = TC_AES_KEYLEN)
- *   TC_KBKDF_DES_CMAC_*     TC_ENABLE_DES && TC_DES_ENABLE_CMAC (64-bit PRF, see below)
+ *   TC_KBKDF_DES_CMAC_*     TC_ENABLE_DES && TC_DES_ENABLE_CMAC (64-bit PRF)
  */
 
 /* PRF availability, resolved once so kdf.c, kdf.hpp and tests share it. Each
@@ -104,14 +104,12 @@
  * the before/after split of the fixed input (see the *_counter contract).
  * Feedback and double-pipeline mode read use_counter and, when it is
  * non-zero, counter_bits and counter_location as well. Ignored fields may
- * hold any value. Every mode reads approval, which only the TDEA-CMAC PRF
- * uses (see TC_KBKDF_DES_CMAC_*). Zero-initialize it for TC_APPROVED_ONLY.
+ * hold any value.
  */
 struct TC_KBKDF_params {
-  uint8_t counter_bits;        /**< TC_KBKDF_COUNTER_8 / 16 / 24 / 32 */
-  uint8_t counter_location;    /**< TC_KBKDF_CTR_* (feedback / pipeline with counter) */
-  uint8_t use_counter;         /**< 0 or 1 (feedback / pipeline only) */
-  TC_approval_policy approval; /**< TC_PERMIT_DISALLOWED admits the TDEA-CMAC PRF */
+  uint8_t counter_bits;     /**< TC_KBKDF_COUNTER_8 / 16 / 24 / 32 */
+  uint8_t counter_location; /**< TC_KBKDF_CTR_* (feedback / pipeline with counter) */
+  uint8_t use_counter;      /**< 0 or 1 (feedback / pipeline only) */
 };
 
 /* Exact size of the buffer TC_KBKDF_fixed_input writes. */
@@ -150,10 +148,8 @@ TC_status TC_KBKDF_fixed_input(TC_bytes label, TC_bytes context, size_t out_len,
  *
  * key             The KDK. key.data must be non-NULL and key.length non-zero.
  *                 AES-CMAC requires key.length == TC_AES_KEYLEN (the key size
- *                 is fixed by TC_AES_KEY_BITS). DES-CMAC needs
- *                 params->approval = TC_PERMIT_DISALLOWED and then accepts
- *                 24 (three-key TDEA), 16 (two-key TDEA, K1 || K2 used as
- *                 K1, K2, K1) or 8 (single DES). HMAC accepts any
+ *                 is fixed by TC_AES_KEY_BITS). DES-CMAC accepts 8, 16 (2-key
+ *                 TDEA, K1 || K2 used as K1, K2, K1) or 24. HMAC accepts any
  *                 non-zero length. Keys longer than a block are hashed.
  * params          Non-NULL. counter_bits must be 8, 16, 24 or 32 whenever a
  *                 counter is used. counter_location must be a TC_KBKDF_CTR_*
@@ -274,14 +270,9 @@ TC_status TC_KBKDF_AES_CMAC_pipeline(TC_bytes key, const struct TC_KBKDF_params*
 
 #if TC_KBKDF_HAVE_DES_CMAC
 /*
- * TDEA-CMAC is a 64-bit-block PRF kept for CAVP and interoperability.
- * SP 800-108r1-upd1 section 4 takes CMAC from SP 800-38B, whose section 5.2
- * names AES and TDEA, so single DES is outside the approved PRFs. SP 800-131A
- * Rev. 2 Table 7 disallows CMAC-based KDF with two-key TDEA, and with
- * three-key TDEA after December 31, 2023 unless other NIST guidance allows
- * it. Every call therefore needs params->approval = TC_PERMIT_DISALLOWED,
- * which accepts key.length 24, 16 or 8 and performs the derivation on
- * request. A refused call returns TC_ERROR with out unchanged.
+ * TDEA-CMAC is a 64-bit-block PRF for protocols that derive keys with TDEA.
+ * SP 800-131A Rev. 2 Table 7 disallows it after 2023. key.length is 8, 16
+ * or 24.
  */
 /** @brief KBKDF counter mode with DES/TDEA-CMAC (h = 8). */
 TC_status TC_KBKDF_DES_CMAC_counter(TC_bytes key, const struct TC_KBKDF_params* params,

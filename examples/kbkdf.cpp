@@ -22,7 +22,7 @@ static int kbkdf_known_answer(void)
                                        0x45, 0xb2, 0xe8, 0x41, 0x31, 0x3d, 0x0d, 0x41,
                                        0x72, 0xa1, 0xb3, 0xc5, 0x2a, 0xa8, 0xd0, 0x49,
                                        0x30, 0x2b, 0x40, 0x1a, 0xeb, 0x9e, 0xdf, 0xb6};
-  const struct TC_KBKDF_params params = {TC_KBKDF_COUNTER_32, 0, 0, TC_APPROVED_ONLY};
+  const struct TC_KBKDF_params params = {TC_KBKDF_COUNTER_32, 0, 0};
   uint8_t fixed[TC_KBKDF_FIXED_INPUT_LEN(sizeof(label) - 1, sizeof(context) - 1)];
   uint8_t out[32];
 

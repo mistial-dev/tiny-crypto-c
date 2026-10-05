@@ -19,8 +19,7 @@
 namespace tiny_crypto {
 
 /* Plain aggregate. Brace-initialize as {counter_bits, counter_location,
- * use_counter, approval}, e.g. kbkdf_params{TC_KBKDF_COUNTER_32, 0, 0,
- * TC_APPROVED_ONLY} for counter mode. */
+ * use_counter}, e.g. kbkdf_params{TC_KBKDF_COUNTER_32, 0, 0} for counter mode. */
 typedef ::TC_KBKDF_params kbkdf_params;
 
 /* Label || 0x00 || Context || [8 * out_len]_32. See TC_KBKDF_fixed_input. */

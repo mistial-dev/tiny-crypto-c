@@ -51,7 +51,7 @@ PROFILES = {
       return TC_AES_KWP_unwrap(kek, (TC_bytes){out, 16}, (TC_buffer){iv, 8}, &length) != TC_OK;
     """, "TC_AES_KWP_unwrap"),
     "kdf_sha256": (["TC_ENABLE_HMAC=1", "TC_ENABLE_KDF=1"], """
-      struct TC_KBKDF_params p = {32, 1, 0, TC_APPROVED_ONLY};
+      struct TC_KBKDF_params p = {32, 1, 0};
       return TC_KBKDF_HMAC_SHA256_counter((TC_bytes){key, sizeof(key)}, &p, (TC_bytes){NULL, 0}, (TC_bytes){iv, sizeof(iv)}, (TC_buffer){out, sizeof(out)}) != TC_OK;
     """, "TC_KBKDF_HMAC_SHA256_counter"),
     "kdf_mixed": ([
@@ -59,7 +59,7 @@ PROFILES = {
         "TC_ENABLE_SHA224=1", "TC_ENABLE_SHA384=1", "TC_ENABLE_SHA512=1",
         "TC_ENABLE_DES=1", "TC_DES_ENABLE_CMAC=1", "TC_AES_ENABLE_CMAC=1",
     ], """
-      struct TC_KBKDF_params p = {32, 1, 0, TC_APPROVED_ONLY};
+      struct TC_KBKDF_params p = {32, 1, 0};
       return TC_KBKDF_HMAC_SHA256_counter((TC_bytes){key, sizeof(key)}, &p, (TC_bytes){NULL, 0}, (TC_bytes){iv, sizeof(iv)}, (TC_buffer){out, sizeof(out)}) != TC_OK;
     """, "TC_KBKDF_HMAC_SHA256_counter"),
     "drbg_hmac_sha256": ([
@@ -79,7 +79,7 @@ PROFILES = {
       static TC_ECDSA_workspace workspace;
       static uint8_t public_key[65], signature[64];
       TC_work_budget work = {UINT32_MAX};
-      const TC_ECDSA_sign_options options = {TC_HASH_SHA256, 4, TC_APPROVED_ONLY};
+      const TC_ECDSA_sign_options options = {TC_HASH_SHA256, 4};
       const TC_bytes point = {public_key, sizeof(public_key)};
       const TC_bytes digest = {key, sizeof(key)};
       if (TC_ECDSA_sign_digest(TC_EC_P256, &options, (TC_bytes){key, sizeof(key)}, point, digest, (TC_buffer){signature, sizeof(signature)}, &workspace, &work) != TC_EC_OK) return 1;

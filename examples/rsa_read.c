@@ -7,7 +7,6 @@
 #include <tiny_crypto/key.h>
 
 static TC_RSA_result sign_components(const TC_DER_rsa_private_key* parsed,
-                                     TC_approval_policy approval,
                                      const TC_signature_algorithm* operation, TC_bytes digest,
                                      TC_buffer signature, TC_random_source random,
                                      const TC_RSA_workspace* workspace)
@@ -22,7 +21,7 @@ static TC_RSA_result sign_components(const TC_DER_rsa_private_key* parsed,
                                   {parsed->prime1.data, parsed->prime1.length},
                                   {parsed->prime2.data, parsed->prime2.length},
                                   &crt};
-  const TC_RSA_result valid = example_validate_rsa_key(&key, approval, random, workspace);
+  const TC_RSA_result valid = example_validate_rsa_key(&key, random, workspace);
   if (valid != TC_RSA_OK)
     return valid;
   /* CRT validation costs 32 work units per modulus byte, plus one. */
@@ -49,9 +48,9 @@ static TC_RSA_result import_error(TC_TLV_result result)
   }
 }
 
-TC_RSA_result example_sign_rsa_der(TC_bytes der, TC_approval_policy approval,
-                                   TC_hash_algorithm hash, TC_bytes digest, TC_buffer signature,
-                                   TC_random_source random, const TC_RSA_workspace* workspace)
+TC_RSA_result example_sign_rsa_der(TC_bytes der, TC_hash_algorithm hash, TC_bytes digest,
+                                   TC_buffer signature, TC_random_source random,
+                                   const TC_RSA_workspace* workspace)
 {
   TC_DER_rsa_private_key parsed;
   const TC_signature_algorithm operation = {TC_SIGNATURE_RSA_V15, hash, TC_HASH_UNKNOWN, 0};
@@ -60,12 +59,11 @@ TC_RSA_result example_sign_rsa_der(TC_bytes der, TC_approval_policy approval,
   const TC_TLV_result read = TC_DER_rsa_private(der, &parsed);
   if (read != TC_TLV_OK)
     return import_error(read);
-  return sign_components(&parsed, approval, &operation, digest, signature, random, workspace);
+  return sign_components(&parsed, &operation, digest, signature, random, workspace);
 }
 
-static TC_RSA_result sign_pkcs8(TC_bytes der, TC_approval_policy approval,
-                                const TC_signature_algorithm* operation, TC_bytes digest,
-                                TC_buffer signature, TC_random_source random,
+static TC_RSA_result sign_pkcs8(TC_bytes der, const TC_signature_algorithm* operation,
+                                TC_bytes digest, TC_buffer signature, TC_random_source random,
                                 const TC_RSA_workspace* workspace)
 {
   TC_KEY_rsa_private_key parsed;
@@ -77,24 +75,22 @@ static TC_RSA_result sign_pkcs8(TC_bytes der, TC_approval_policy approval,
   result = TC_KEY_rsa_private_signature_check(&parsed, operation);
   if (result != TC_TLV_OK)
     return import_error(result);
-  return sign_components(&parsed.components, approval, operation, digest, signature, random,
-                         workspace);
+  return sign_components(&parsed.components, operation, digest, signature, random, workspace);
 }
 
-TC_RSA_result example_sign_rsa_pkcs8(TC_bytes der, TC_approval_policy approval,
-                                     TC_hash_algorithm hash, TC_bytes digest, TC_buffer signature,
-                                     TC_random_source random, const TC_RSA_workspace* workspace)
+TC_RSA_result example_sign_rsa_pkcs8(TC_bytes der, TC_hash_algorithm hash, TC_bytes digest,
+                                     TC_buffer signature, TC_random_source random,
+                                     const TC_RSA_workspace* workspace)
 {
   const TC_signature_algorithm operation = {TC_SIGNATURE_RSA_V15, hash, TC_HASH_UNKNOWN, 0};
-  return sign_pkcs8(der, approval, &operation, digest, signature, random, workspace);
+  return sign_pkcs8(der, &operation, digest, signature, random, workspace);
 }
 
-TC_RSA_result example_sign_rsa_pkcs8_pss_sha256(TC_bytes der, TC_approval_policy approval,
-                                                TC_bytes digest, TC_buffer signature,
+TC_RSA_result example_sign_rsa_pkcs8_pss_sha256(TC_bytes der, TC_bytes digest, TC_buffer signature,
                                                 TC_random_source random,
                                                 const TC_RSA_workspace* workspace)
 {
   const TC_signature_algorithm operation = {TC_SIGNATURE_RSA_PSS, TC_HASH_SHA256, TC_HASH_SHA256,
                                             EXAMPLE_RSA_PSS_SHA256_BYTES};
-  return sign_pkcs8(der, approval, &operation, digest, signature, random, workspace);
+  return sign_pkcs8(der, &operation, digest, signature, random, workspace);
 }

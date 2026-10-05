@@ -4,9 +4,7 @@
  * public-key derivation and validation, ECDH and ECDSA.
  * Standards: FIPS 186-5, SP 800-186, SP 800-56A Rev. 3, SEC 1.
  * Configuration: TC_ENABLE_EC, TC_EC_ENABLE_P192/P256/P384 and TC_EC_SMALL.
- * Limitations: uncompressed SEC 1 points only. P-192 is off by default, and
- * an enabled P-192 creates keys, derives shared secrets and signs only with
- * TC_PERMIT_DISALLOWED (SP 800-186 section 3.2.1.1).
+ * Limitations: uncompressed SEC 1 points only. P-192 is off by default.
  * Contracts: docs/api.md, including its TC_work_budget units. Guide: docs/ec.md. */
 #ifndef TINY_CRYPTO_EC_H_
 #define TINY_CRYPTO_EC_H_
@@ -48,9 +46,7 @@ extern "C" {
  * reports the first problem it finds:
  *
  *   TC_EC_ARGUMENT     NULL pointers, an empty digest and overlapping storage.
- *   TC_EC_UNSUPPORTED  a curve that is unknown or disabled in this build, or
- *                      P-192 in an operation that creates a key or applies
- *                      protection without TC_PERMIT_DISALLOWED.
+ *   TC_EC_UNSUPPORTED  a curve that is unknown or disabled in this build.
  *   TC_EC_INVALID      a private key, public key or signature whose length
  *                      does not match the curve.
  *   TC_EC_LIMIT        a caller output buffer shorter than required, then
@@ -88,8 +84,6 @@ typedef enum {
 typedef struct {
   TC_hash_algorithm hash;
   size_t candidate_attempts;
-  /* TC_PERMIT_DISALLOWED permits P-192 signing. The zero value refuses it. */
-  TC_approval_policy approval;
 } TC_ECDSA_sign_options;
 
 #if TC_ENABLE_EC
@@ -116,15 +110,7 @@ size_t TC_EC_coordinate_bytes(TC_EC_curve curve);
  * budget or execution descriptor are pairwise disjoint and disjoint from every
  * input. The workspace is wiped after arithmetic starts, on success and
  * failure. Each call first checks its cost from TC_EC_operation_work. After
- * that check, the charged work stays consumed whatever the result.
- *
- * SP 800-186 section 3.2.1.1 restricts P-192 to legacy use, which section
- * 3.1.2 limits to processing already protected data. Key derivation and
- * generation, ECDH and signing take an approval policy, as a parameter after
- * the curve or as TC_ECDSA_sign_options.approval, and return
- * TC_EC_UNSUPPORTED for P-192 unless it is TC_PERMIT_DISALLOWED. Verification
- * and public-key validation accept an enabled P-192 without a policy. Other
- * curves ignore the policy. */
+ * that check, the charged work stays consumed whatever the result. */
 
 #if TC_ENABLE_EC
 /* Derive the SEC 1 public key Q = dG for private scalar d (SEC 1 section
@@ -132,17 +118,15 @@ size_t TC_EC_coordinate_bytes(TC_EC_curve curve);
  * written, only on TC_EC_OK. Point multiplication runs in constant work.
  *
  * TC_EC_ARGUMENT     NULL workspace, work or span data, or overlap.
- * TC_EC_UNSUPPORTED  unknown or disabled curve, or P-192 without
- *                    TC_PERMIT_DISALLOWED.
+ * TC_EC_UNSUPPORTED  unknown or disabled curve.
  * TC_EC_INVALID      private_key.length differs from w, or, after the work
  *                    charge, d lies outside [1, n - 1].
  * TC_EC_LIMIT        short public_key, or work below
  *                    TC_EC_operation_work(curve, TC_EC_OPERATION_PUBLIC_KEY).
  *
  * Work: TC_EC_OPERATION_PUBLIC_KEY, 2 units per curve bit. */
-TC_EC_result TC_EC_public_key(TC_EC_curve curve, TC_approval_policy approval, TC_bytes private_key,
-                              TC_buffer public_key, TC_EC_workspace* workspace,
-                              TC_work_budget* work);
+TC_EC_result TC_EC_public_key(TC_EC_curve curve, TC_bytes private_key, TC_buffer public_key,
+                              TC_EC_workspace* workspace, TC_work_budget* work);
 
 /* Generate a private scalar uniform in [1, n - 1] and its SEC 1 public key
  * (SEC 1 section 3.2.1). Each attempt draws w bytes from execution->random
@@ -154,16 +138,14 @@ TC_EC_result TC_EC_public_key(TC_EC_curve curve, TC_approval_policy approval, TC
  *
  * TC_EC_ARGUMENT     NULL workspace, execution, random.fill or buffer data,
  *                    or overlap.
- * TC_EC_UNSUPPORTED  unknown or disabled curve, or P-192 without
- *                    TC_PERMIT_DISALLOWED.
+ * TC_EC_UNSUPPORTED  unknown or disabled curve.
  * TC_EC_LIMIT        a short output, zero random_attempts, work below one
  *                    attempt's cost, or every allowed attempt rejected.
  * TC_EC_ERROR        a random request failed.
  *
  * Work: TC_EC_OPERATION_GENERATE per attempt, charged before its RNG
  * request. */
-TC_EC_result TC_EC_generate_key_pair(TC_EC_curve curve, TC_approval_policy approval,
-                                     TC_buffer private_key, TC_buffer public_key,
+TC_EC_result TC_EC_generate_key_pair(TC_EC_curve curve, TC_buffer private_key, TC_buffer public_key,
                                      TC_EC_workspace* workspace, TC_EC_execution* execution);
 
 /* Validate an uncompressed public key (SEC 1 section 3.2.2.1, SP 800-56A
@@ -190,8 +172,7 @@ TC_EC_result TC_EC_validate_public_key(TC_EC_curve curve, TC_bytes public_key,
  * function before use.
  *
  * TC_EC_ARGUMENT     NULL workspace, work or span data, or overlap.
- * TC_EC_UNSUPPORTED  unknown or disabled curve, or P-192 without
- *                    TC_PERMIT_DISALLOWED.
+ * TC_EC_UNSUPPORTED  unknown or disabled curve.
  * TC_EC_INVALID      private_key.length differs from w, peer_public_key has
  *                    another length or a first byte other than 04, or,
  *                    after the work charge, d outside [1, n - 1], a peer point
@@ -200,9 +181,8 @@ TC_EC_result TC_EC_validate_public_key(TC_EC_curve curve, TC_bytes public_key,
  *                    TC_EC_operation_work(curve, TC_EC_OPERATION_ECDH).
  *
  * Work: TC_EC_OPERATION_ECDH, 2 units per curve bit plus 1. */
-TC_EC_result TC_ECDH(TC_EC_curve curve, TC_approval_policy approval, TC_bytes private_key,
-                     TC_bytes peer_public_key, TC_buffer shared_secret, TC_EC_workspace* workspace,
-                     TC_work_budget* work);
+TC_EC_result TC_ECDH(TC_EC_curve curve, TC_bytes private_key, TC_bytes peer_public_key,
+                     TC_buffer shared_secret, TC_EC_workspace* workspace, TC_work_budget* work);
 
 /* Verify an ECDSA signature over a precomputed digest (FIPS 186-5 section
  * 6.4.2). Convert DER signatures to r || s first. A digest longer than w
@@ -238,8 +218,7 @@ TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_b
  *
  * TC_EC_ARGUMENT     NULL workspace, execution, random.fill or span data, an
  *                    empty digest, or overlap.
- * TC_EC_UNSUPPORTED  unknown or disabled curve, or P-192 without
- *                    TC_PERMIT_DISALLOWED.
+ * TC_EC_UNSUPPORTED  unknown or disabled curve.
  * TC_EC_INVALID      private or public key of the wrong length, or, after
  *                    the LIMIT preflight, d outside [1, n - 1].
  * TC_EC_LIMIT        short signature, zero random_attempts, work below one
@@ -250,9 +229,9 @@ TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_b
  * The LIMIT preflight for the first attempt runs before any workspace write.
  * Work: TC_EC_OPERATION_SIGN per attempt, 3 units per curve bit plus 1, and
  * 4 units per curve bit plus 1 more with TC_ECDSA_SIGN_VERIFY. */
-TC_EC_result TC_ECDSA_sign_digest_external_random(TC_EC_curve curve, TC_approval_policy approval,
-                                                  TC_bytes private_key, TC_bytes public_key,
-                                                  TC_bytes digest, TC_buffer signature,
+TC_EC_result TC_ECDSA_sign_digest_external_random(TC_EC_curve curve, TC_bytes private_key,
+                                                  TC_bytes public_key, TC_bytes digest,
+                                                  TC_buffer signature,
                                                   TC_ECDSA_workspace* workspace,
                                                   TC_EC_execution* execution);
 
@@ -266,8 +245,7 @@ TC_EC_result TC_ECDSA_sign_digest_external_random(TC_EC_curve curve, TC_approval
  *
  * TC_EC_ARGUMENT     NULL options, workspace, work or span data, an empty
  *                    digest, a digest length unlike options.hash, or overlap.
- * TC_EC_UNSUPPORTED  unknown or disabled curve or hash, or P-192 without
- *                    options.approval = TC_PERMIT_DISALLOWED.
+ * TC_EC_UNSUPPORTED  unknown or disabled curve or hash.
  * TC_EC_INVALID      private or public key of the wrong length, or d outside
  *                    [1, n - 1].
  * TC_EC_LIMIT        short signature, zero candidate_attempts, insufficient
