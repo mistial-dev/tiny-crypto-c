@@ -593,7 +593,7 @@ static void check_source_layout(TC_bytes bytes, const TC_X509_crl* parsed)
     TC_X509_crl loaded;
     munit_assert_int(tc_x509_crl_source_metadata(&reader, &layout,
                                                  (TC_buffer){metadata, sizeof metadata}, &limits,
-                                                 &tree, &loaded),
+                                                 &tree, &loaded, NULL),
                      ==, TC_TLV_OK);
     munit_assert_uint(loaded.version, ==, parsed->version);
     munit_assert_int(loaded.has_next_update, ==, parsed->has_next_update);
@@ -610,7 +610,7 @@ static void check_source_layout(TC_bytes bytes, const TC_X509_crl* parsed)
     munit_assert_size(loaded.revoked.length, ==, 0);
     TC_X509_crl saved = loaded;
     munit_assert_int(tc_x509_crl_source_metadata(&reader, &layout, (TC_buffer){metadata, 1},
-                                                 &limits, &tree, &loaded),
+                                                 &limits, &tree, &loaded, NULL),
                      ==, TC_TLV_LIMIT);
     munit_assert_memory_equal(sizeof loaded, &loaded, &saved);
     if (bytes.length > FIXTURE_CAPACITY)
@@ -765,8 +765,8 @@ TC_TEST(source_batch)
                                                      (TC_buffer){NULL, 0}, &revoked),
                      ==, TC_TLV_OK);
     munit_assert_int(
-        tc_x509_crl_source_scan_init(&reader, &revoked, queries, 3, provisional, 3, &scan), ==,
-        TC_TLV_OK);
+        tc_x509_crl_source_scan_init(&reader, &revoked, queries, 3, provisional, 3, NULL, &scan),
+        ==, TC_TLV_OK);
     munit_assert_int(tc_x509_crl_source_scan_finish(&scan, output, 3), ==, TC_TLV_ARGUMENT);
     TC_TLV_frame frames[FRAME_CAPACITY];
     TC_bytes oids[2];
@@ -781,7 +781,7 @@ TC_TEST(source_batch)
     unsigned steps = 0;
     while (!complete && result == TC_TLV_OK) {
       work = WORK_BUDGET;
-      result = tc_x509_crl_source_scan_step(&scan, 1, (TC_buffer){scratch, sizeof scratch},
+      result = tc_x509_crl_source_scan_step(&scan, 1, 1, (TC_buffer){scratch, sizeof scratch},
                                             &(tc_x509_crl_decode){&limits, &tree, &names, oids, 2},
                                             &complete);
       munit_assert_uint(++steps, <=, 4);

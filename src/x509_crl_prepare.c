@@ -3,19 +3,18 @@
 #include <tiny_crypto/x509_crl_source.h>
 #if TC_ENABLE_X509_REVOCATION
 #include "x509_crl_source_internal.h"
-#include "source_hash_internal.h"
 #include "pki_signature_internal.h"
 #include "pki_storage_internal.h"
 #include "internal.h"
 
-enum { CRL_JOB_EMPTY, CRL_JOB_SCANNING, CRL_JOB_HASHING, CRL_JOB_COMPLETE, CRL_JOB_FAILED };
+enum { CRL_JOB_EMPTY, CRL_JOB_SCANNING, CRL_JOB_COMPLETE, CRL_JOB_FAILED };
 enum { CRL_DIGEST_BYTES = 64 };
 struct TC_X509_crl_job {
   TC_X509_crl_prepare_options options;
   TC_X509_crl_prepare_workspace workspace;
   tc_source_reader reader;
   tc_x509_crl_source_scan scan;
-  tc_source_hash hash;
+  tc_x509_crl_tbs_hash tbs;
   TC_X509_crl_record record;
   TC_X509_crl_prepared prepared;
   uint8_t digest[CRL_DIGEST_BYTES];
@@ -100,8 +99,9 @@ TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source, const TC_X509_c
     return result;
   const tc_pki_tree_workspace tree = {workspace->parsing.frames.data,
                                       workspace->parsing.frames.capacity, work};
+  tc_x509_crl_fields copies;
   result = tc_x509_crl_source_metadata(&job->reader, &layout, workspace->metadata,
-                                       &options->parsing, &tree, &job->record.crl);
+                                       &options->parsing, &tree, &job->record.crl, &copies);
   if (result != TC_TLV_OK)
     return result;
   result = tc_x509_crl_extension_info_read(
@@ -120,23 +120,23 @@ TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source, const TC_X509_c
                                            &options->parsing, &tree, &algorithm);
   if (result != TC_TLV_OK)
     return result;
-  TC_result hash = tc_source_hash_init(&job->hash, &job->reader, algorithm.hash, layout.tbs.offset,
-                                       layout.tbs.length);
-  if (hash != TC_RESULT_OK)
-    return tc_source_status(hash);
   /* Entries of a CRL with unusable extensions cannot be interpreted. The zero
-   * iterator yields no entries, so every target completes unmatched. */
+   * iterator yields no entries, so every target completes unmatched, and the
+   * hash covers the entry bytes without a scan. */
   tc_x509_crl_source_revoked revoked = {0};
   if (job->record.policy == TC_TLV_OK)
     result = tc_x509_crl_source_revoked_init(&job->reader, layout.revoked, &job->record.crl,
                                              &job->record.extensions, options->max_entries,
                                              workspace->issuer, &revoked);
   if (result == TC_TLV_OK)
+    result = tc_x509_crl_tbs_hash_init(&job->tbs, &job->reader, algorithm.hash, &layout, &copies,
+                                       &revoked.entries);
+  if (result == TC_TLV_OK)
     result =
         tc_x509_crl_source_scan_init(&job->reader, &revoked, targets, count, workspace->matches,
-                                     workspace->match_capacity, &job->scan);
+                                     workspace->match_capacity, &job->tbs, &job->scan);
   if (result != TC_TLV_OK) {
-    TC_secure_zero(&job->hash, sizeof job->hash);
+    TC_secure_zero(&job->tbs, sizeof job->tbs);
     return result;
   }
   job->prepared.targets = targets;
@@ -173,8 +173,7 @@ static void prepare_plan_inputs(tc_pki_storage_plan* plan, const TC_X509_crl_job
 TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries, size_t max_bytes,
                                        size_t* work, int* complete)
 {
-  if (!job || !work || !complete || !max_entries || !max_bytes ||
-      (job->phase != CRL_JOB_SCANNING && job->phase != CRL_JOB_HASHING))
+  if (!job || !work || !complete || !max_entries || !max_bytes || job->phase != CRL_JOB_SCANNING)
     return TC_TLV_ARGUMENT;
   TC_bytes writes[2];
   tc_pki_storage_plan plan;
@@ -188,42 +187,29 @@ TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries,
     return result;
   const tc_pki_tree_workspace tree = {job->workspace.parsing.frames.data,
                                       job->workspace.parsing.frames.capacity, work};
+  /* One pass scans the entries and hashes the TBSCertList bytes it reads. */
   int done = 0;
-  if (job->phase == CRL_JOB_SCANNING) {
-    result = tc_x509_crl_source_scan_step(
-        &job->scan, max_entries, job->workspace.entry,
-        &(tc_x509_crl_decode){&job->options.parsing, &tree, &job->workspace.names,
-                              job->workspace.parsing.extension_oids,
-                              job->workspace.parsing.extension_capacity},
-        &done);
-    if (result == TC_TLV_OK && done)
-      job->phase = CRL_JOB_HASHING;
-  }
-  if (result == TC_TLV_OK && job->phase == CRL_JOB_HASHING) {
-    const uint64_t remaining = job->hash.end - job->hash.offset;
-    const size_t bytes = remaining < max_bytes ? (size_t)remaining : max_bytes;
-    result = tc_pki_work_charge(work, bytes);
-    TC_result hashed = TC_RESULT_OK;
-    if (result == TC_TLV_OK)
-      hashed = tc_source_hash_step(&job->hash, max_bytes, &done);
-    if (hashed != TC_RESULT_OK)
-      result = tc_source_status(hashed);
-    if (result == TC_TLV_OK && done) {
-      tc_hash_info info;
-      if (!tc_hash_info_get(job->prepared.hash, &info) ||
-          tc_source_hash_final(&job->hash, (TC_buffer){job->digest, sizeof job->digest}) !=
-              TC_RESULT_OK)
-        result = TC_TLV_INVALID;
-      else {
-        job->prepared.digest = (TC_bytes){job->digest, info.digest_length};
-        job->record.crl.prepared = &job->prepared;
-        job->phase = CRL_JOB_COMPLETE;
-      }
+  result = tc_x509_crl_source_scan_step(
+      &job->scan, max_entries, max_bytes, job->workspace.entry,
+      &(tc_x509_crl_decode){&job->options.parsing, &tree, &job->workspace.names,
+                            job->workspace.parsing.extension_oids,
+                            job->workspace.parsing.extension_capacity},
+      &done);
+  if (result == TC_TLV_OK && done) {
+    tc_hash_info info;
+    if (!tc_hash_info_get(job->prepared.hash, &info) ||
+        tc_source_hash_final(&job->tbs.hash, (TC_buffer){job->digest, sizeof job->digest}) !=
+            TC_RESULT_OK)
+      result = TC_TLV_INVALID;
+    else {
+      job->prepared.digest = (TC_bytes){job->digest, info.digest_length};
+      job->record.crl.prepared = &job->prepared;
+      job->phase = CRL_JOB_COMPLETE;
     }
   }
   if (result != TC_TLV_OK) {
     job->phase = CRL_JOB_FAILED;
-    TC_secure_zero(&job->hash, sizeof job->hash);
+    TC_secure_zero(&job->tbs, sizeof job->tbs);
     return result;
   }
   *complete = job->phase == CRL_JOB_COMPLETE;

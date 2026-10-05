@@ -69,19 +69,23 @@ TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source, const TC_X509_c
                                         size_t count, const TC_X509_crl_prepare_options* options,
                                         const TC_X509_crl_prepare_workspace* workspace,
                                         size_t* work, TC_X509_crl_job** out);
-/* Advance a job by at most max_entries entries and max_bytes hash input.
- * Both limits are nonzero. Refill the per-call work budget between calls.
- * The source I/O budgets span the whole job.
+/* Advance a job by at most max_entries entries and max_bytes of the
+ * TBSCertList bytes around the entries. Both limits are nonzero. One pass
+ * scans the entries and hashes the TBSCertList: each entry is hashed from the
+ * bytes its parser reads, and every other byte is read once and compared with
+ * the metadata, crlExtensions and DER headers that begin read. Refill the
+ * per-call work budget between calls. The source I/O budgets span the whole
+ * job.
  *
  * Work: one unit per storage comparison, the entry passes and the hashed
  * bytes.
  * Returns OK and writes complete as 1 when TC_X509_crl_prepare_finish can
  * return the record and 0 when more steps are needed. ARGUMENT for NULL
- * arguments, a zero limit, a job outside the scanning and hashing phases, or
+ * arguments, a zero limit, a job outside the scanning phase, or
  * overlap, with the job unchanged. LIMIT when work cannot cover the storage
  * comparisons, with the job and work unchanged. LIMIT, IO, INVALID and
  * UNSUPPORTED for exhausted budgets, failed reads and rejected entries during
- * the step. Those step failures mark the job failed and wipe its hash state,
+ * the step. INVALID also when a byte differs from the copy that begin read. Those step failures mark the job failed and wipe its hash state,
  * and a new job is needed. complete changes only on OK. */
 TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries, size_t max_bytes,
                                        size_t* work, int* complete);

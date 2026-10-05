@@ -121,11 +121,17 @@ provides alignment for static storage. The remaining workspace contains a read
 window, metadata buffer, entry scratch, retained issuer storage, parser/name
 scratch and one match slot per target.
 
-Call `TC_X509_crl_prepare_step` until `complete` is set. Each call has explicit
-entry and hash-byte limits and consumes a per-call work budget. Refill that
-budget before the next call. Physical read-byte and callback limits apply to the
-whole job. Preparation scans entries, then hashes the exact signed encoding.
-Individual metadata and entry limits stay independent of the complete CRL size.
+Call `TC_X509_crl_prepare_step` until `complete` is set. Each call consumes a
+per-call work budget. Refill that budget before the next call. Physical
+read-byte and callback limits apply to the whole job. Preparation hashes the
+TBSCertList in the same pass that scans the entries. Each entry is hashed from
+the bytes its parser reads. The other TBSCertList bytes are read once, hashed and
+compared with the metadata and crlExtensions copied by begin, or with the DER
+headers that begin located. A source that returns different bytes on a later
+read then yields `TC_TLV_INVALID` or a digest that fails signature
+verification. `max_entries` bounds the entries scanned per call and `max_bytes`
+bounds the TBSCertList bytes hashed around them. Individual metadata and entry
+limits stay independent of the complete CRL size.
 A CRL whose extensions fail policy, such as an unknown critical extension,
 still prepares. Its record keeps `TC_TLV_INVALID` or `TC_TLV_UNSUPPORTED` in
 `policy`, its entries are left unscanned and every target is unmatched. The

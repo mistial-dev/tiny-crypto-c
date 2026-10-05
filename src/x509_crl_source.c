@@ -113,6 +113,163 @@ TC_TLV_result tc_x509_crl_source_layout(tc_source_reader* reader, tc_x509_crl_la
   *out = parsed;
   return TC_TLV_OK;
 }
+
+/* Hash bytes read at offset, which must be the next TBSCertList byte. */
+static TC_TLV_result tbs_hash_update(tc_x509_crl_tbs_hash* tbs, uint64_t offset, TC_bytes bytes,
+                                     size_t* work)
+{
+  tc_source_hash* hash = &tbs->hash;
+  if (!hash->active || offset != hash->offset || bytes.length > hash->end - offset)
+    return TC_TLV_INVALID;
+  TC_TLV_result result = tc_pki_work_charge(work, bytes.length);
+  if (result != TC_TLV_OK)
+    return result;
+  if (tc_hash_update(hash->algorithm, &hash->hash, bytes) != TC_OK)
+    return TC_TLV_ARGUMENT;
+  hash->offset += bytes.length;
+  return TC_TLV_OK;
+}
+
+/* Hash the segments that start before limit, reading each byte once and
+ * comparing it with the expected copy. *budget bounds the bytes read. OK
+ * when the hash reached limit, MORE when the budget ran out first. */
+static TC_TLV_result tbs_hash_segments(tc_x509_crl_tbs_hash* tbs, tc_source_reader* reader,
+                                       uint64_t limit, size_t* budget, size_t* work)
+{
+  while (tbs->next < tbs->count && tbs->segments[tbs->next].offset < limit) {
+    const tc_x509_crl_tbs_segment* segment = &tbs->segments[tbs->next];
+    const uint64_t end = segment->offset + segment->length;
+    while (tbs->hash.offset < end) {
+      if (!*budget)
+        return TC_TLV_MORE;
+      const uint64_t remaining = end - tbs->hash.offset;
+      const size_t request = remaining < *budget ? (size_t)remaining : *budget;
+      const uint64_t offset = tbs->hash.offset;
+      TC_bytes chunk;
+      TC_TLV_result result =
+          tc_source_status(tc_source_reader_view(reader, offset, request, &chunk));
+      if (result != TC_TLV_OK)
+        return result;
+      if (segment->expected &&
+          memcmp(chunk.data, segment->expected + (offset - segment->offset), chunk.length))
+        return TC_TLV_INVALID;
+      result = tbs_hash_update(tbs, offset, chunk, work);
+      if (result != TC_TLV_OK)
+        return result;
+      *budget -= chunk.length;
+    }
+    tbs->next++;
+  }
+  return tbs->hash.offset == limit ? TC_TLV_OK : TC_TLV_INVALID;
+}
+
+/* Write the DER header of an element with tag and a value of length bytes
+ * (X.690 section 10.1). Returns the header size. */
+static size_t der_header(uint8_t out[TC_CRL_TBS_HEADER_BYTES], uint8_t tag, uint64_t length)
+{
+  size_t size = 0, octets = 0;
+  out[size++] = tag;
+  if (length < 0x80) {
+    out[size++] = (uint8_t)length;
+    return size;
+  }
+  for (uint64_t rest = length; rest; rest >>= 8)
+    ++octets;
+  out[size++] = (uint8_t)(0x80 | octets);
+  while (octets--)
+    out[size++] = (uint8_t)(length >> (8 * octets));
+  return size;
+}
+
+/* Segments are appended in source order from position. */
+typedef struct {
+  tc_x509_crl_tbs_hash* tbs;
+  uint64_t position;
+  size_t headers;
+  TC_TLV_result result;
+} tbs_tiling;
+
+/* Append the segment at the current position. */
+static void tbs_segment(tbs_tiling* tiling, uint64_t length, const uint8_t* expected)
+{
+  tc_x509_crl_tbs_hash* tbs = tiling->tbs;
+  if (tiling->result != TC_TLV_OK || !length)
+    return;
+  if (tbs->count == TC_CRL_TBS_SEGMENTS) {
+    tiling->result = TC_TLV_INVALID;
+    return;
+  }
+  tbs->segments[tbs->count++] = (tc_x509_crl_tbs_segment){tiling->position, length, expected};
+  tiling->position += length;
+}
+
+/* Append a copied field, which must start at the current position. */
+static void tbs_field(tbs_tiling* tiling, tc_source_span span, TC_bytes copy)
+{
+  if (tiling->result == TC_TLV_OK &&
+      (span.length != copy.length || (span.length && span.offset != tiling->position)))
+    tiling->result = TC_TLV_INVALID;
+  tbs_segment(tiling, span.length, copy.data);
+}
+
+/* Append the header of the element at the current position whose value
+ * starts at value and ends at end. */
+static void tbs_header(tbs_tiling* tiling, uint8_t tag, uint64_t value, uint64_t end)
+{
+  if (tiling->result != TC_TLV_OK)
+    return;
+  if (tiling->headers == TC_CRL_TBS_HEADERS || value < tiling->position || end < value) {
+    tiling->result = TC_TLV_INVALID;
+    return;
+  }
+  uint8_t* header = tiling->tbs->headers[tiling->headers++];
+  if (der_header(header, tag, end - value) != value - tiling->position) {
+    tiling->result = TC_TLV_INVALID;
+    return;
+  }
+  tbs_segment(tiling, value - tiling->position, header);
+}
+
+TC_TLV_result tc_x509_crl_tbs_hash_init(tc_x509_crl_tbs_hash* out, tc_source_reader* reader,
+                                        TC_hash_algorithm algorithm,
+                                        const tc_x509_crl_layout* layout,
+                                        const tc_x509_crl_fields* copies,
+                                        const tc_x509_crl_source_entries* entries)
+{
+  if (!out || !reader || !layout || !copies || !entries)
+    return TC_TLV_ARGUMENT;
+  memset(out, 0, sizeof *out);
+  const tc_source_span* first =
+      layout->version.length ? &layout->version : &layout->inner_algorithm;
+  const uint64_t tbs_end = layout->tbs.offset + layout->tbs.length;
+  tbs_tiling tiling = {out, layout->tbs.offset, 0, TC_TLV_OK};
+  tbs_header(&tiling, 0x30, first->offset, tbs_end);
+  tbs_field(&tiling, layout->version, copies->version);
+  tbs_field(&tiling, layout->inner_algorithm, copies->inner_algorithm);
+  tbs_field(&tiling, layout->issuer, copies->issuer);
+  tbs_field(&tiling, layout->this_update, copies->this_update);
+  tbs_field(&tiling, layout->next_update, copies->next_update);
+  if (layout->revoked.length && entries->end) {
+    /* The scan reads and hashes [cursor, end). */
+    tbs_header(&tiling, 0x30, entries->cursor, entries->end);
+    out->entries_begin = tiling.position;
+    tiling.position = entries->end;
+  } else {
+    /* Entries of an unusable CRL are hashed without a scan. */
+    tbs_segment(&tiling, layout->revoked.length, NULL);
+    out->entries_begin = tiling.position;
+  }
+  if (layout->extensions.length)
+    tbs_header(&tiling, 0xa0, layout->extensions.offset, tbs_end);
+  tbs_field(&tiling, layout->extensions, copies->extensions);
+  if (tiling.result != TC_TLV_OK)
+    return tiling.result;
+  if (tiling.position != tbs_end)
+    return TC_TLV_INVALID;
+  return tc_source_status(
+      tc_source_hash_init(&out->hash, reader, algorithm, layout->tbs.offset, layout->tbs.length));
+}
+
 TC_TLV_result tc_x509_crl_source_entries_init(tc_source_reader* reader, tc_source_span encoded,
                                               unsigned version, uint64_t max_entries,
                                               tc_x509_crl_source_entries* out)
@@ -120,7 +277,7 @@ TC_TLV_result tc_x509_crl_source_entries_init(tc_source_reader* reader, tc_sourc
   if (!reader || !out || (version != 1 && version != 2) || encoded.offset > reader->source.length ||
       encoded.length > reader->source.length - encoded.offset)
     return TC_TLV_ARGUMENT;
-  tc_x509_crl_source_entries parsed = {0, 0, max_entries, version};
+  tc_x509_crl_source_entries parsed = {0, 0, max_entries, version, NULL};
   if (encoded.length) {
     tc_source_der_element element;
     TC_TLV_result result = tc_source_der_read(
@@ -172,6 +329,11 @@ TC_TLV_result tc_x509_crl_source_entry_next(tc_source_reader* reader,
     if (result != TC_TLV_OK)
       return result;
     encoded = (TC_bytes){scratch.data, (size_t)size};
+  }
+  if (entries->tbs) {
+    result = tbs_hash_update(entries->tbs, element.offset, encoded, tree->work);
+    if (result != TC_TLV_OK)
+      return result;
   }
   TC_TLV_reader bounded;
   result = TC_TLV_reader_init(&bounded, encoded, TC_TLV_DER, limits);
@@ -249,7 +411,7 @@ TC_TLV_result tc_x509_crl_source_scan_init(tc_source_reader* reader,
                                            const tc_x509_crl_source_revoked* revoked,
                                            const TC_X509_crl_target* queries, size_t count,
                                            TC_X509_crl_match* matches, size_t capacity,
-                                           tc_x509_crl_source_scan* out)
+                                           tc_x509_crl_tbs_hash* tbs, tc_x509_crl_source_scan* out)
 {
   if (!reader || !revoked || !out || (count && (!queries || !matches)) ||
       count > SIZE_MAX / sizeof *matches || count > SIZE_MAX / sizeof *queries)
@@ -260,57 +422,98 @@ TC_TLV_result tc_x509_crl_source_scan_init(tc_source_reader* reader,
     if (!queries[i].serial.data || !queries[i].serial.length || !queries[i].issuer.data ||
         !queries[i].issuer.length)
       return TC_TLV_ARGUMENT;
-  const tc_x509_crl_source_scan parsed = {reader,  *revoked, queries,
-                                          matches, count,    TC_CRL_SCAN_ACTIVE};
+  tc_x509_crl_source_scan parsed = {reader, *revoked, queries,           matches,
+                                    count,  tbs,      TC_CRL_SCAN_ACTIVE};
+  parsed.revoked.entries.tbs = tbs;
   if (count)
     memset(matches, 0, count * sizeof *matches);
   *out = parsed;
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_source_scan_step(tc_x509_crl_source_scan* scan, size_t max_entries,
-                                           TC_buffer scratch, const tc_x509_crl_decode* decode,
-                                           int* complete)
+/* Scan at most max_entries entries. OK with *done set after the last one. */
+static TC_TLV_result scan_entries(tc_x509_crl_source_scan* scan, size_t max_entries,
+                                  TC_buffer scratch, const tc_x509_crl_decode* decode, int* done)
 {
-  if (!decode)
-    return TC_TLV_ARGUMENT;
   const TC_TLV_limits* limits = decode->limits;
   const tc_pki_tree_workspace* tree = decode->tree;
-  const TC_X509_name_workspace* names = decode->names;
-  TC_bytes* oids = decode->oids;
-  const size_t capacity = decode->oid_capacity;
-  if (!scan || !complete || !max_entries || scan->phase != TC_CRL_SCAN_ACTIVE)
-    return TC_TLV_ARGUMENT;
   for (size_t step = 0; step < max_entries; ++step) {
     tc_x509_crl_revoked_entry entry;
-    TC_TLV_result result = tc_x509_crl_source_revoked_next(scan->reader, &scan->revoked, scratch,
-                                                           limits, tree, oids, capacity, &entry);
+    TC_TLV_result result =
+        tc_x509_crl_source_revoked_next(scan->reader, &scan->revoked, scratch, limits, tree,
+                                        decode->oids, decode->oid_capacity, &entry);
     if (result == TC_TLV_END) {
-      scan->phase = TC_CRL_SCAN_COMPLETE;
-      *complete = 1;
+      *done = 1;
       return TC_TLV_OK;
     }
-    if (result == TC_TLV_OK) {
-      for (size_t i = 0; i < scan->count; ++i) {
-        result = tc_x509_crl_match_update(&entry, &scan->queries[i], limits, tree, names,
-                                          &scan->matches[i]);
-        if (result != TC_TLV_OK)
-          break;
-      }
-    }
-    if (result != TC_TLV_OK) {
-      scan->phase = TC_CRL_SCAN_FAILED;
+    for (size_t i = 0; result == TC_TLV_OK && i < scan->count; ++i)
+      result = tc_x509_crl_match_update(&entry, &scan->queries[i], limits, tree, decode->names,
+                                        &scan->matches[i]);
+    if (result != TC_TLV_OK)
       return result;
-    }
   }
-  *complete = 0;
+  *done = 0;
+  return TC_TLV_OK;
+}
+
+/* One scan step in phase order: the hashed bytes before the entries, the
+ * entries, then the hashed bytes after them. MORE when a budget ends the
+ * step early. */
+static TC_TLV_result scan_advance(tc_x509_crl_source_scan* scan, size_t max_entries,
+                                  size_t max_bytes, TC_buffer scratch,
+                                  const tc_x509_crl_decode* decode)
+{
+  tc_x509_crl_tbs_hash* tbs = scan->tbs;
+  size_t* work = decode->tree->work;
+  size_t budget = max_bytes;
+  TC_TLV_result result = TC_TLV_OK;
+  if (scan->phase == TC_CRL_SCAN_ACTIVE) {
+    int done = 0;
+    if (tbs && tbs->hash.offset < tbs->entries_begin)
+      result = tbs_hash_segments(tbs, scan->reader, tbs->entries_begin, &budget, work);
+    if (result == TC_TLV_OK)
+      result = scan_entries(scan, max_entries, scratch, decode, &done);
+    if (result != TC_TLV_OK)
+      return result;
+    if (!done)
+      return TC_TLV_MORE;
+    scan->phase = tbs ? TC_CRL_SCAN_TRAILER : TC_CRL_SCAN_COMPLETE;
+  }
+  if (scan->phase == TC_CRL_SCAN_TRAILER) {
+    result = tbs_hash_segments(tbs, scan->reader, tbs->hash.end, &budget, work);
+    if (result != TC_TLV_OK)
+      return result;
+    scan->phase = TC_CRL_SCAN_COMPLETE;
+  }
+  return TC_TLV_OK;
+}
+
+TC_TLV_result tc_x509_crl_source_scan_step(tc_x509_crl_source_scan* scan, size_t max_entries,
+                                           size_t max_bytes, TC_buffer scratch,
+                                           const tc_x509_crl_decode* decode, int* complete)
+{
+  if (!scan || !decode || !decode->limits || !decode->tree || !decode->tree->work || !complete ||
+      !max_entries || (scan->tbs && !max_bytes) ||
+      (scan->phase != TC_CRL_SCAN_ACTIVE && scan->phase != TC_CRL_SCAN_TRAILER))
+    return TC_TLV_ARGUMENT;
+  TC_TLV_result result = scan_advance(scan, max_entries, max_bytes, scratch, decode);
+  if (result == TC_TLV_MORE) {
+    *complete = 0;
+    return TC_TLV_OK;
+  }
+  if (result != TC_TLV_OK) {
+    scan->phase = TC_CRL_SCAN_FAILED;
+    return result;
+  }
+  *complete = 1;
   return TC_TLV_OK;
 }
 
 TC_TLV_result tc_x509_crl_source_metadata(tc_source_reader* reader,
                                           const tc_x509_crl_layout* layout, TC_buffer storage,
                                           const TC_TLV_limits* limits,
-                                          const tc_pki_tree_workspace* tree, TC_X509_crl* out)
+                                          const tc_pki_tree_workspace* tree, TC_X509_crl* out,
+                                          tc_x509_crl_fields* copies)
 {
   if (!reader || !layout || !storage.data || !out || !limits || !tree || !tree->work)
     return TC_TLV_ARGUMENT;
@@ -342,6 +545,9 @@ TC_TLV_result tc_x509_crl_source_metadata(tc_source_reader* reader,
       return copied;
     used += length;
   }
-  return tc_x509_crl_metadata_read(&fields, limits, tree, out);
+  TC_TLV_result result = tc_x509_crl_metadata_read(&fields, limits, tree, out);
+  if (result == TC_TLV_OK && copies)
+    *copies = fields;
+  return result;
 }
 #endif

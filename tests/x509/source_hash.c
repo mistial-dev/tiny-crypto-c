@@ -92,10 +92,12 @@ TC_TEST(hashing)
   return MUNIT_OK;
 }
 
+/* A file whose byte at flip reads flipped while corrupt is nonzero. Each read
+ * that covers flip counts in reads and consumes one corrupt count.
+ * UINT64_MAX corrupts every read. */
 typedef struct {
   FILE* file;
-  uint64_t flip;
-  int corrupt;
+  uint64_t flip, corrupt, reads;
 } file_source;
 
 TC_TEST(preparation)
@@ -291,9 +293,133 @@ static TC_status file_read(void* context, uint64_t offset, uint8_t* output, size
   if (offset > LONG_MAX || fseek(source->file, (long)offset, SEEK_SET) ||
       fread(output, 1, length, source->file) != length)
     return TC_ERROR;
-  if (source->corrupt && source->flip >= offset && source->flip - offset < length)
+  if (source->flip < offset || source->flip - offset >= length)
+    return TC_OK;
+  source->reads++;
+  if (source->corrupt) {
     output[(size_t)(source->flip - offset)] ^= 1;
+    if (source->corrupt != UINT64_MAX)
+      source->corrupt--;
+  }
   return TC_OK;
+}
+
+/* A v2 CRL from issuer CN=A revoking serials 5, 7 and 9, with a cRLNumber.
+ * The signature is a placeholder. The tests compare digests. */
+static const uint8_t three_entries[] = {
+    0x30, 0x81, 0x92, 0x30, 0x7d, 0x02, 0x01, 0x01, 0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48,
+    0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b, 0x05, 0x00, 0x30, 0x0c, 0x31, 0x0a, 0x30, 0x08, 0x06,
+    0x03, 0x55, 0x04, 0x03, 0x0c, 0x01, 0x41, 0x17, 0x0d, 0x32, 0x36, 0x30, 0x31, 0x30, 0x31,
+    0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x5a, 0x30, 0x3c, 0x30, 0x12, 0x02, 0x01, 0x05, 0x17,
+    0x0d, 0x32, 0x36, 0x30, 0x31, 0x30, 0x31, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x5a, 0x30,
+    0x12, 0x02, 0x01, 0x07, 0x17, 0x0d, 0x32, 0x36, 0x30, 0x31, 0x30, 0x31, 0x30, 0x30, 0x30,
+    0x30, 0x30, 0x30, 0x5a, 0x30, 0x12, 0x02, 0x01, 0x09, 0x17, 0x0d, 0x32, 0x36, 0x30, 0x31,
+    0x30, 0x31, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x5a, 0xa0, 0x0e, 0x30, 0x0c, 0x30, 0x0a,
+    0x06, 0x03, 0x55, 0x1d, 0x14, 0x04, 0x03, 0x02, 0x01, 0x01, 0x30, 0x0d, 0x06, 0x09, 0x2a,
+    0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b, 0x05, 0x00, 0x03, 0x02, 0x00, 0x01};
+enum {
+  THREE_TBS_OFFSET = 3,
+  THREE_TBS_LENGTH = 127,
+  THREE_ISSUER_OFFSET = 23,
+  THREE_ISSUER_LENGTH = 14,
+  THREE_THIS_UPDATE_DIGIT = 40,
+  THREE_SERIAL_SEVEN = 78,
+  THREE_CRL_NUMBER = 128
+};
+
+/* Prepare three_entries from file for serial 7 with a 16-byte window. The
+ * byte at file->flip reads flipped corrupt_begin times during begin and
+ * corrupt_steps times during the steps (see file_source). */
+static TC_TLV_result prepare_flipped(file_source* file, uint64_t corrupt_begin,
+                                     uint64_t corrupt_steps, TC_X509_crl_record* record,
+                                     TC_X509_crl_match* match)
+{
+  static const uint8_t serial[] = {7};
+  const TC_X509_crl_target target = {{serial, sizeof serial},
+                                     {three_entries + THREE_ISSUER_OFFSET, THREE_ISSUER_LENGTH}};
+  TC_source source = {file_read, file, sizeof three_entries};
+  static TC_X509_crl_storage state[256];
+  static uint8_t window[16], metadata[256], scratch[256], issuer[64];
+  static TC_TLV_frame frames[16];
+  static TC_bytes oids[8];
+  static uint32_t left[32], right[32];
+  static uint8_t names[8];
+  const TC_X509_crl_prepare_workspace workspace = {{(uint8_t*)state, sizeof state},
+                                                   {window, sizeof window},
+                                                   {metadata, sizeof metadata},
+                                                   {scratch, sizeof scratch},
+                                                   {issuer, sizeof issuer},
+                                                   {{frames, 16}, oids, 8},
+                                                   {left, right, 32, names, 8},
+                                                   match,
+                                                   1};
+  const TC_X509_crl_prepare_options options = {
+      {256, 256, 128, 16}, sizeof three_entries, 4096, 4096, 4};
+  TC_X509_crl_job* job = NULL;
+  size_t work = 60000;
+  file->corrupt = corrupt_begin;
+  TC_TLV_result result =
+      TC_X509_crl_prepare_begin(&source, &target, 1, &options, &workspace, &work, &job);
+  file->corrupt = corrupt_steps;
+  file->reads = 0;
+  int complete = 0;
+  while (result == TC_TLV_OK && !complete) {
+    work = 60000;
+    result = TC_X509_crl_prepare_step(job, 1, 8, &work, &complete);
+  }
+  if (result == TC_TLV_OK)
+    result = TC_X509_crl_prepare_finish(job, record);
+  return result;
+}
+
+/* Preparation authenticates the TBSCertList bytes it parsed. The source
+ * contract requires stable bytes, and this hardens file sources that change
+ * between reads. During the steps every TBSCertList byte is read once, so a
+ * serial flipped on one read changes the digest with the entry set. A
+ * metadata byte that reads differently in begin and in the steps fails the
+ * comparison with the copy. */
+TC_TEST(single_pass)
+{
+  FILE* stream = tmpfile();
+  munit_assert_not_null(stream);
+  munit_assert_size(fwrite(three_entries, 1, sizeof three_entries, stream), ==,
+                    sizeof three_entries);
+  file_source file = {stream, THREE_SERIAL_SEVEN, 0, 0};
+  TC_X509_crl_record record;
+  TC_X509_crl_match match;
+  uint8_t original[TC_SHA256_DIGESTLEN], flipped[TC_SHA256_DIGESTLEN];
+  uint8_t changed[sizeof three_entries];
+  TC_hash_context hash;
+  const TC_bytes tbs = {three_entries + THREE_TBS_OFFSET, THREE_TBS_LENGTH};
+  munit_assert_int(tc_hash_digest_parts(TC_HASH_SHA256, &tbs, 1, original, &hash), ==, TC_OK);
+
+  /* Stable bytes: serial 7 matches and the digest covers the CRL. */
+  munit_assert_int(prepare_flipped(&file, 0, 0, &record, &match), ==, TC_TLV_OK);
+  munit_assert_true(match.found);
+  munit_assert_uint64(file.reads, ==, 1);
+  munit_assert_memory_equal(sizeof original, record.crl.prepared->digest.data, original);
+
+  /* Serial 7 reads as 6 once during the steps. The scan misses the target
+   * and the digest covers serial 6, so the signature over serial 7 fails. */
+  memcpy(changed, three_entries, sizeof changed);
+  changed[THREE_SERIAL_SEVEN] ^= 1;
+  const TC_bytes changed_tbs = {changed + THREE_TBS_OFFSET, THREE_TBS_LENGTH};
+  munit_assert_int(tc_hash_digest_parts(TC_HASH_SHA256, &changed_tbs, 1, flipped, &hash), ==,
+                   TC_OK);
+  munit_assert_int(prepare_flipped(&file, 0, 1, &record, &match), ==, TC_TLV_OK);
+  munit_assert_false(match.found);
+  munit_assert_uint64(file.reads, ==, 1);
+  munit_assert_memory_equal(sizeof flipped, record.crl.prepared->digest.data, flipped);
+
+  /* thisUpdate, the issuer and the cRLNumber read flipped throughout begin
+   * and stable during the steps. */
+  const uint64_t metadata[] = {THREE_THIS_UPDATE_DIGIT, THREE_ISSUER_OFFSET + 13, THREE_CRL_NUMBER};
+  for (size_t i = 0; i < sizeof metadata / sizeof *metadata; ++i) {
+    file.flip = metadata[i];
+    munit_assert_int(prepare_flipped(&file, UINT64_MAX, 0, &record, &match), ==, TC_TLV_INVALID);
+  }
+  munit_assert_int(fclose(stream), ==, 0);
+  return MUNIT_OK;
 }
 
 TC_TEST(public_crl)
@@ -327,7 +453,7 @@ TC_TEST(public_crl)
   munit_assert_int(
       TC_X509_read((TC_bytes){certificate, certificate_length}, &limits, &workspace, &issuer), ==,
       TC_TLV_OK);
-  file_source file = {fopen(crl_path, "rb"), 0, 0};
+  file_source file = {fopen(crl_path, "rb"), 0, 0, 0};
   munit_assert_not_null(file.file);
   munit_assert_int(fseek(file.file, 0, SEEK_END), ==, 0);
   const long length = ftell(file.file);
@@ -344,7 +470,7 @@ TC_TEST(public_crl)
   munit_assert_int(tc_x509_crl_source_layout(&reader, &layout), ==, TC_TLV_OK);
   munit_assert_int(tc_x509_crl_source_metadata(&reader, &layout,
                                                (TC_buffer){metadata, sizeof metadata}, &limits,
-                                               &tree, &crl),
+                                               &tree, &crl, NULL),
                    ==, TC_TLV_OK);
   TC_X509_crl_extensions extensions;
   munit_assert_int(
@@ -358,13 +484,13 @@ TC_TEST(public_crl)
                        (TC_buffer){issuer_storage, sizeof issuer_storage}, &entries),
                    ==, TC_TLV_OK);
   tc_x509_crl_source_scan scan;
-  munit_assert_int(tc_x509_crl_source_scan_init(&reader, &entries, NULL, 0, NULL, 0, &scan), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_crl_source_scan_init(&reader, &entries, NULL, 0, NULL, 0, NULL, &scan),
+                   ==, TC_TLV_OK);
   int scan_complete = 0;
   while (!scan_complete) {
     work = 60000;
     munit_assert_int(
-        tc_x509_crl_source_scan_step(&scan, 1, (TC_buffer){entry_scratch, sizeof entry_scratch},
+        tc_x509_crl_source_scan_step(&scan, 1, 1, (TC_buffer){entry_scratch, sizeof entry_scratch},
                                      &(tc_x509_crl_decode){&limits, &tree, NULL, oids, OID_COUNT},
                                      &scan_complete),
         ==, TC_TLV_OK);
@@ -384,7 +510,7 @@ TC_TEST(public_crl)
   uint8_t matched_names[32];
   const TC_X509_name_workspace names = {left, right, 128, matched_names, 32};
   for (int corrupt = 0; corrupt <= 1; ++corrupt) {
-    file.corrupt = corrupt;
+    file.corrupt = corrupt ? UINT64_MAX : 0;
     file.flip = layout.tbs.offset + layout.tbs.length / 2;
     munit_assert_int(tc_source_reader_init(&reader, &source, (TC_buffer){window, sizeof window},
                                            source.length + sizeof window, source.length),
@@ -535,6 +661,7 @@ static MunitTest tests[] = {
     {"/hashing", hashing, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/preparation", preparation, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/public-crl", public_crl, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/single-pass", single_pass, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 static const MunitSuite suite = {"/source-hash", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
 int main(int argc, char* argv[])
