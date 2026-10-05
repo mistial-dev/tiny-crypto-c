@@ -151,7 +151,7 @@ TC_result TC_validation_workspace_init(const TC_validation_capacity* capacity, T
   size_t size;
   if (!out || !capacity || !arena.data ||
       (uintptr_t)arena.data % TC_validation_workspace_alignment() ||
-      arena.capacity > UINTPTR_MAX - (uintptr_t)arena.data ||
+      !tc_internal_span_valid(arena.data, arena.capacity) ||
       !tc_internal_ranges_disjoint(arena.data, arena.capacity, out, sizeof *out) ||
       !tc_internal_ranges_disjoint(arena.data, arena.capacity, capacity, sizeof *capacity) ||
       !tc_internal_ranges_disjoint(out, sizeof *out, capacity, sizeof *capacity))

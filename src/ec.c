@@ -431,19 +431,6 @@ static int scalar_valid(ec_state* s, const word* scalar)
          tc_mp_subtract(s->w->reduced, scalar, F(s, EC_N), s->words);
 }
 
-static int spans_disjoint(const TC_bytes* spans, size_t count)
-{
-  for (size_t i = 0; i < count; ++i) {
-    if (!tc_internal_span_valid(spans[i].data, spans[i].length))
-      return 0;
-    for (size_t j = 0; j < i; ++j)
-      if (!tc_internal_ranges_disjoint(spans[i].data, spans[i].length, spans[j].data,
-                                       spans[j].length))
-        return 0;
-  }
-  return 1;
-}
-
 /* Public key or ECDH on validated arguments. output holds the full encoding.
  * The workspace is wiped. */
 static TC_EC_result key_operation(size_t bytes, const uint8_t* scalar, const uint8_t* peer,
@@ -489,7 +476,8 @@ TC_EC_result TC_EC_public_key(TC_EC_curve curve, TC_approval_policy approval, TC
                             {public_key.data, public_key.capacity},
                             {(const uint8_t*)workspace, sizeof *workspace},
                             {(const uint8_t*)work, sizeof *work}};
-  if (!workspace || !work || !private_key.data || !public_key.data || !spans_disjoint(spans, 4))
+  if (!workspace || !work || !private_key.data || !public_key.data ||
+      !tc_internal_writes_disjoint(spans, 4, NULL, 0))
     return TC_EC_ARGUMENT;
   if (!bytes)
     return TC_EC_UNSUPPORTED;
@@ -519,7 +507,7 @@ TC_EC_result TC_EC_generate_key_pair(TC_EC_curve curve, TC_approval_policy appro
                             {(const uint8_t*)workspace, sizeof *workspace},
                             {(const uint8_t*)execution, sizeof *execution}};
   if (!workspace || !execution || !execution->random.fill || !private_key.data ||
-      !public_key.data || !spans_disjoint(spans, 4))
+      !public_key.data || !tc_internal_writes_disjoint(spans, 4, NULL, 0))
     return TC_EC_ARGUMENT;
   if (!bytes)
     return TC_EC_UNSUPPORTED;
@@ -559,7 +547,7 @@ TC_EC_result TC_ECDH(TC_EC_curve curve, TC_approval_policy approval, TC_bytes pr
                             {(const uint8_t*)workspace, sizeof *workspace},
                             {(const uint8_t*)work, sizeof *work}};
   if (!workspace || !work || !private_key.data || !peer_public_key.data || !shared_secret.data ||
-      !spans_disjoint(spans, 4) ||
+      !tc_internal_writes_disjoint(spans, 4, NULL, 0) ||
       !tc_internal_ranges_disjoint(peer_public_key.data, peer_public_key.length, shared_secret.data,
                                    shared_secret.capacity) ||
       !tc_internal_ranges_disjoint(peer_public_key.data, peer_public_key.length, workspace,
@@ -713,7 +701,7 @@ TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_b
   const TC_bytes writes[] = {{(const uint8_t*)workspace, sizeof *workspace},
                              {(const uint8_t*)work, sizeof *work}};
   const TC_bytes inputs[] = {public_key, digest, signature};
-  if (!spans_disjoint(writes, 2))
+  if (!tc_internal_writes_disjoint(writes, 2, NULL, 0))
     return TC_EC_ARGUMENT;
   for (size_t i = 0; i < 3; ++i)
     for (size_t j = 0; j < 2; ++j)
@@ -837,7 +825,7 @@ static int sign_storage_valid(TC_bytes private_key, TC_bytes public_key, TC_byte
                             {(const uint8_t*)workspace, sizeof *workspace},
                             {(const uint8_t*)execution, execution ? sizeof *execution : 0}};
   return workspace && private_key.data && public_key.data && digest.data && digest.length &&
-         signature.data && spans_disjoint(spans, 5) &&
+         signature.data && tc_internal_writes_disjoint(spans, 5, NULL, 0) &&
          tc_internal_ranges_disjoint(public_key.data, public_key.length, signature.data,
                                      signature.capacity) &&
          tc_internal_ranges_disjoint(public_key.data, public_key.length, workspace,

@@ -77,13 +77,15 @@ static int unprotect_disjoint(const TC_PIV_SM* session, const TC_PIV_SM_unprotec
       plaintext && plaintext == request->ciphertext.data && capacity <= request->ciphertext.length;
   size_t i;
   if (!in_place)
-    return tc_sm_disjoint(writable, 4, input, 4) &&
-           tc_sm_disjoint(writable, 4, request->authenticated, request->authenticated_count);
+    return tc_internal_writes_disjoint(writable, 4, input, 4) &&
+           tc_internal_writes_disjoint(writable, 4, request->authenticated,
+                                       request->authenticated_count);
   /* The plaintext is checked last, against every input except the
    * ciphertext and the spans that hold it. */
-  if (!tc_sm_disjoint(writable, 3, input, 4) ||
-      !tc_sm_disjoint(writable, 3, request->authenticated, request->authenticated_count) ||
-      !tc_sm_disjoint(writable, 4, input, 3))
+  if (!tc_internal_writes_disjoint(writable, 3, input, 4) ||
+      !tc_internal_writes_disjoint(writable, 3, request->authenticated,
+                                   request->authenticated_count) ||
+      !tc_internal_writes_disjoint(writable, 4, input, 3))
     return 0;
   for (i = 0; i < request->authenticated_count; ++i)
     if (!span_contains(request->authenticated[i], request->ciphertext) &&
@@ -120,7 +122,7 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request*
       ((!request->plaintext.data) && request->plaintext.length) ||
       ((!request->ciphertext.data) && request->ciphertext.capacity) ||
       request->authenticated_count > TC_PIV_SM_AUTHENTICATED_SPANS_MAX ||
-      !tc_sm_disjoint(NULL, 0, request->authenticated, request->authenticated_count) ||
+      !tc_internal_writes_disjoint(NULL, 0, request->authenticated, request->authenticated_count) ||
       session->state != TC_PIV_SM_READY ||
       TC_PIV_SM_ciphertext_size(request->plaintext.length, &needed) != TC_OK ||
       request->ciphertext.capacity < needed ||
@@ -137,10 +139,12 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request*
                               request->plaintext,
                               {(const uint8_t*)request->authenticated,
                                request->authenticated_count * sizeof *request->authenticated}};
-    if (!tc_sm_disjoint(writable, 5, input, 3))
+    if (!tc_internal_writes_disjoint(writable, 5, input, 3))
       return TC_ERROR;
-    if (!tc_sm_disjoint(writable, 2, request->authenticated, request->authenticated_count) ||
-        !tc_sm_disjoint(writable + 3, 2, request->authenticated, request->authenticated_count))
+    if (!tc_internal_writes_disjoint(writable, 2, request->authenticated,
+                                     request->authenticated_count) ||
+        !tc_internal_writes_disjoint(writable + 3, 2, request->authenticated,
+                                     request->authenticated_count))
       return TC_ERROR;
   }
   suite = tc_sm_suite_get(session->suite);
@@ -210,7 +214,7 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_requ
       ((!request->ciphertext.data) && request->ciphertext.length) || !request->tag.data ||
       request->tag.length != 8 ||
       request->authenticated_count > TC_PIV_SM_AUTHENTICATED_SPANS_MAX ||
-      !tc_sm_disjoint(NULL, 0, request->authenticated, request->authenticated_count) ||
+      !tc_internal_writes_disjoint(NULL, 0, request->authenticated, request->authenticated_count) ||
       ((!plaintext.data) && plaintext.capacity) || request->ciphertext.length % 16 ||
       !spans_contain(request->authenticated, request->authenticated_count, request->ciphertext) ||
       session->state != TC_PIV_SM_PENDING)

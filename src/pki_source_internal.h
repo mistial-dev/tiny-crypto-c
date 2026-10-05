@@ -30,7 +30,7 @@ static inline TC_TLV_result tc_pki_record_read(const tc_pki_record_source* sourc
   if (result != TC_TLV_OK)
     return result == TC_TLV_LIMIT || result == TC_TLV_UNSUPPORTED ? result : TC_TLV_ARGUMENT;
   if (!candidate.data || !candidate.length ||
-      candidate.length > UINTPTR_MAX - (uintptr_t)candidate.data)
+      !tc_internal_span_valid(candidate.data, candidate.length))
     return TC_TLV_ARGUMENT;
   *out = candidate;
   return TC_TLV_OK;

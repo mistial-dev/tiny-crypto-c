@@ -13,7 +13,7 @@ static inline TC_TLV_result tc_pki_storage_span(const void* data, size_t count, 
   if (!width || count > SIZE_MAX / width)
     return TC_TLV_ARGUMENT;
   length = count * width;
-  if ((length && !data) || length > UINTPTR_MAX - (uintptr_t)data)
+  if (!tc_internal_span_valid(data, length))
     return TC_TLV_ARGUMENT;
   span->data = (const uint8_t*)data;
   span->length = length;
@@ -34,7 +34,7 @@ static inline TC_TLV_result tc_pki_storage_input(const TC_bytes* writes, size_t 
                                                  TC_bytes input, size_t* work)
 {
   size_t i;
-  if ((input.length && !input.data) || input.length > UINTPTR_MAX - (uintptr_t)input.data)
+  if (!tc_internal_span_valid(input.data, input.length))
     return TC_TLV_ARGUMENT;
   for (i = 0; i < count; ++i) {
     if (!*work)
