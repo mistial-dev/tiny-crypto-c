@@ -49,6 +49,23 @@ TC_TEST(pinned_answers)
         ==, TC_EC_OK);
     munit_assert_memory_equal(2 * width, signature, expected);
     munit_assert_true(tc_test_all_zero(&sign_workspace, sizeof sign_workspace));
+
+    /* NULL spans are argument errors found before any RFC 6979 work, with the
+     * signature and work unchanged. */
+    memset(signature, 0xa5, sizeof signature);
+    sign_work.remaining = UINT32_MAX;
+    munit_assert_int(
+        TC_ECDSA_sign_digest(answers[i].curve, &options, (TC_bytes){key, width},
+                             (TC_bytes){public_key, 1 + 2 * width}, (TC_bytes){NULL, width},
+                             (TC_buffer){signature, 2 * width}, &sign_workspace, &sign_work),
+        ==, TC_EC_ARGUMENT);
+    munit_assert_int(
+        TC_ECDSA_sign_digest(answers[i].curve, &options, (TC_bytes){NULL, width},
+                             (TC_bytes){public_key, 1 + 2 * width}, (TC_bytes){digest, width},
+                             (TC_buffer){signature, 2 * width}, &sign_workspace, &sign_work),
+        ==, TC_EC_ARGUMENT);
+    munit_assert_true(tc_test_all_value(signature, sizeof signature, 0xa5));
+    munit_assert_uint32(sign_work.remaining, ==, UINT32_MAX);
   }
   return MUNIT_OK;
 }

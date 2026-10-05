@@ -870,12 +870,36 @@ static TC_status tc_rfc6979_init(tc_rfc6979* state, TC_hash_algorithm algorithm,
 }
 #endif
 
+/* Storage rules shared by both signing entry points: every span present,
+ * and the inputs, signature, workspace and execution pairwise disjoint.
+ * execution is NULL when the caller owns it internally. */
+static int sign_storage_valid(TC_bytes private_key, TC_bytes public_key, TC_bytes digest,
+                              TC_buffer signature, const TC_ECDSA_workspace* workspace,
+                              const TC_EC_execution* execution)
+{
+  const TC_bytes spans[] = {private_key,
+                            digest,
+                            {signature.data, signature.capacity},
+                            {(const uint8_t*)workspace, sizeof *workspace},
+                            {(const uint8_t*)execution, execution ? sizeof *execution : 0}};
+  return workspace && private_key.data && public_key.data && digest.data && digest.length &&
+         signature.data && spans_disjoint(spans, 5) &&
+         tc_internal_ranges_disjoint(public_key.data, public_key.length, signature.data,
+                                     signature.capacity) &&
+         tc_internal_ranges_disjoint(public_key.data, public_key.length, workspace,
+                                     sizeof *workspace) &&
+         (!execution || tc_internal_ranges_disjoint(public_key.data, public_key.length, execution,
+                                                    sizeof *execution));
+}
+
 TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, const TC_ECDSA_sign_options* options,
                                   TC_bytes private_key, TC_bytes public_key, TC_bytes digest,
                                   TC_buffer signature, TC_ECDSA_workspace* workspace,
                                   TC_work_budget* work)
 {
-  if (!options || !work)
+  /* Check storage before RFC 6979 reads the key and digest. */
+  if (!options || !work ||
+      !sign_storage_valid(private_key, public_key, digest, signature, workspace, NULL))
     return TC_EC_ARGUMENT;
   const size_t bytes = TC_EC_coordinate_bytes(curve);
   if (!bytes)
@@ -919,20 +943,8 @@ TC_EC_result TC_ECDSA_sign_digest_external_random(TC_EC_curve curve, TC_bytes pr
   const size_t bytes = TC_EC_coordinate_bytes(curve);
   uint8_t nonce[TC_EC_MAX_BYTES];
   uint8_t candidate[2 * TC_EC_MAX_BYTES];
-  const TC_bytes spans[] = {private_key,
-                            digest,
-                            {signature.data, signature.capacity},
-                            {(const uint8_t*)workspace, sizeof *workspace},
-                            {(const uint8_t*)execution, sizeof *execution}};
-  if (!workspace || !execution || !execution->random.fill || !private_key.data ||
-      !public_key.data || !digest.data || !digest.length || !signature.data ||
-      !spans_disjoint(spans, 5) ||
-      !tc_internal_ranges_disjoint(public_key.data, public_key.length, signature.data,
-                                   signature.capacity) ||
-      !tc_internal_ranges_disjoint(public_key.data, public_key.length, workspace,
-                                   sizeof *workspace) ||
-      !tc_internal_ranges_disjoint(public_key.data, public_key.length, execution,
-                                   sizeof *execution))
+  if (!execution || !execution->random.fill ||
+      !sign_storage_valid(private_key, public_key, digest, signature, workspace, execution))
     return TC_EC_ARGUMENT;
   if (!bytes)
     return TC_EC_UNSUPPORTED;
