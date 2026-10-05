@@ -65,22 +65,25 @@ response as in `TC_X509_ocsp_verify_request`. Leave `ocsp` zeroed to use CRLs
 only. [X.509 OCSP](x509-ocsp.md) describes response verification and responder
 authorization.
 
-Each response is verified with `TC_X509_ocsp_response_verify` against the
+Each response is verified as by `TC_X509_ocsp_response_verify` against the
 member's issuer: the selected anchor for the first member and the previous
 member otherwise. Delegate candidates come from `source`, after the certs in
-the response. The composed check verifies responses without a nonce. An
-accepted REVOKED response settles the member. After an accepted GOOD response
-the member's CRLs are also consulted, and a CRL that lists the member revoked
-takes precedence. A GOOD response signed by a delegate without
-`id-pkix-ocsp-nocheck` is accepted only when the CRL index proves the delegate
-unrevoked (RFC 6960 section 4.2.2.2.1). The delegate then takes one dependency
-node. A REVOKED response from such a delegate is accepted unless the CRL index
-shows the delegate revoked. A member whose response is missing, malformed,
-unauthorized, stale, UNKNOWN or unavailable, or whose delegate lacks that
-proof, falls back to CRLs. Exhausted limits and argument errors
-stop the call. Responses must stay unchanged during the call and must not
-overlap any workspace array. A build without `TINY_CRYPTO_ENABLE_X509_OCSP`
-uses CRLs for every member.
+the response. Each delegate is validated as the last certificate of the path
+above its issuer, under the selected anchor's path controls (RFC 5937 section
+3.1). That delegate path uses `search.path` as scratch, and a search capacity
+below the member's index plus one returns `TC_TLV_LIMIT`. The composed check
+verifies responses without a nonce. An accepted REVOKED response settles the
+member. After an accepted GOOD response the member's CRLs are also consulted,
+and a CRL that lists the member revoked takes precedence. A GOOD response
+signed by a delegate without `id-pkix-ocsp-nocheck` is accepted only when the
+CRL index proves the delegate unrevoked (RFC 6960 section 4.2.2.2.1). The
+delegate then takes one dependency node. A REVOKED response from such a
+delegate is accepted unless the CRL index shows the delegate revoked. A member
+whose response is missing, malformed, unauthorized, stale, UNKNOWN or
+unavailable, or whose delegate lacks that proof, falls back to CRLs. Exhausted
+limits and argument errors stop the call. Responses must stay unchanged during
+the call and must not overlap any workspace array. A build without
+`TINY_CRYPTO_ENABLE_X509_OCSP` uses CRLs for every member.
 
 ## Workspace and results
 

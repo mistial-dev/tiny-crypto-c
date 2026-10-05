@@ -136,6 +136,15 @@ RFC 6960 section 4.2.2.2 allows two signers:
   anyExtendedKeyUsage alone is rejected. Path validation also rejects unknown
   critical extensions.
 
+`TC_X509_ocsp_response_verify` holds only the issuer name and key, so it treats
+the issuer as a bare trust anchor. A delegate is checked without the trust anchor's
+CertPathControls and without the constraints of certificates above the issuer.
+`TC_X509_path_check_revocation` validates each delegate as the last certificate
+of the validated path to its issuer, under the selected store anchor. The anchor's
+names, policy set, policy flags and `x509_unusable` gate then apply, together with
+the constraints of every certificate above the delegate (RFC 5937 section 3.1,
+RFC 5914 section 2.5).
+
 For a delegate, `responder_certificate` borrows its DER certificate from the
 response or the store record, and `responder_nocheck` reports
 `id-pkix-ocsp-nocheck`. Without nocheck the caller must establish the
@@ -190,6 +199,9 @@ during the call and while `responder_certificate` is used.
 - The module has no transport, cache or response pre-fetching.
 - The low-level verify reports a delegate without nocheck and leaves its
   revocation check to the caller.
+- The low-level verify checks a delegate below the bare issuer. Use
+  `TC_X509_path_check_revocation` to apply the anchor's path controls and upstream
+  constraints.
 - `TC_X509_path_check_revocation` verifies responses without a nonce.
 
 ## Testing

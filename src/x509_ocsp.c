@@ -12,6 +12,7 @@
 #include "pki_status_internal.h"
 #include "pki_crl_reason_internal.h"
 #include "hash_dispatch_internal.h"
+#include "x509_ocsp_internal.h"
 #include "x509_path_internal.h"
 #include "x509_time_internal.h"
 #include "tlv_internal.h"
@@ -490,27 +491,42 @@ static TC_TLV_result verify_signature(const ocsp_response* response, const TC_X5
 }
 
 /* RFC 6960 4.2.2.2: the delegate is issued directly by the CA that issued
- * the certificate and carries id-kp-OCSPSigning. Validate it as a
- * one-certificate path below the issuer with that purpose, which also checks
- * its signature, validity with skew, digitalSignature in a present key usage
- * and critical extensions. anyExtendedKeyUsage does not authorize it. */
+ * the certificate and carries id-kp-OCSPSigning. Validate it with that
+ * purpose as the last certificate of the path above its issuer, under the
+ * anchor's path controls (RFC 5937 section 3.1). That also checks its
+ * signature, validity with skew, digitalSignature in a present key usage,
+ * critical extensions and the constraints of the anchor and every issuer.
+ * anyExtendedKeyUsage does not authorize it. */
 static TC_TLV_result delegate_path(TC_bytes encoded, const TC_X509_ocsp_verify_request* request,
+                                   const tc_x509_ocsp_issuer_path* above,
                                    const TC_X509_path_workspace* workspace, size_t* work,
                                    TC_X509_public_key* key)
 {
+  const size_t count = above->count + 1;
+  const TC_bytes* chain = &encoded;
+  if (above->count) {
+    if (above->path_capacity < count)
+      return TC_TLV_LIMIT;
+    memcpy(above->path, above->issuers, above->count * sizeof *above->issuers);
+    above->path[above->count] = encoded;
+    chain = above->path;
+  }
   TC_X509_path_options options;
   TC_X509_path_report validated;
   memset(&options, 0, sizeof options);
   options.at = request->time.at;
   options.clock_skew_seconds = request->time.clock_skew_seconds;
   options.parsing = *request->parsing;
-  options.max_certificates = 1;
-  options.max_input = request->parsing->max_input;
+  options.max_certificates = count;
+  /* Each certificate is bounded by parsing->max_input. */
+  options.max_input = request->parsing->max_input > SIZE_MAX / count
+                          ? SIZE_MAX
+                          : request->parsing->max_input * count;
   options.signatures = *request->signatures;
   options.purpose = (TC_bytes){ocsp_signing_oid, sizeof ocsp_signing_oid};
   options.key_usage = TC_KEY_USAGE_DIGITAL_SIGNATURE;
   options.flags = TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE | TC_X509_PATH_INHIBIT_ANY_PURPOSE;
-  TC_X509_path_status status = tc_x509_path_validate_budget(&encoded, 1, request->issuer, &options,
+  TC_X509_path_status status = tc_x509_path_validate_anchor(chain, count, above->anchor, &options,
                                                             workspace, work, &validated);
   if (status == TC_X509_PATH_VALID)
     *key = validated.public_key;
@@ -555,6 +571,7 @@ typedef struct {
  * LIMIT and ARGUMENT stop it. */
 static TC_TLV_result try_candidate(TC_bytes encoded, const ocsp_response* response,
                                    const TC_X509_ocsp_verify_request* request,
+                                   const tc_x509_ocsp_issuer_path* above,
                                    const TC_X509_path_workspace* workspace, size_t* work,
                                    delegate_search* search)
 {
@@ -571,7 +588,7 @@ static TC_TLV_result try_candidate(TC_bytes encoded, const ocsp_response* respon
   if (status == TC_TLV_OK && !matches)
     return TC_TLV_OK;
   if (status == TC_TLV_OK)
-    status = delegate_path(encoded, request, workspace, work, &key);
+    status = delegate_path(encoded, request, above, workspace, work, &key);
   if (status == TC_TLV_OK)
     status = delegate_nocheck(&signer, request->parsing, work, &nocheck);
   if (status == TC_TLV_OK)
@@ -585,6 +602,7 @@ static TC_TLV_result try_candidate(TC_bytes encoded, const ocsp_response* respon
 
 static TC_TLV_result authorize_response(ocsp_response* response,
                                         const TC_X509_ocsp_verify_request* request,
+                                        const tc_x509_ocsp_issuer_path* above,
                                         const TC_X509_path_workspace* workspace, size_t* work)
 {
   int matches;
@@ -610,7 +628,7 @@ static TC_TLV_result authorize_response(ocsp_response* response,
     while (!search.certificate.data && (status = TC_TLV_next(&embedded, &element)) == TC_TLV_OK) {
       if (!tc_pki_tag(&element, 0x30))
         return TC_TLV_INVALID;
-      status = try_candidate(element.encoded, response, request, workspace, work, &search);
+      status = try_candidate(element.encoded, response, request, above, workspace, work, &search);
       if (status != TC_TLV_OK)
         return status;
     }
@@ -623,7 +641,7 @@ static TC_TLV_result authorize_response(ocsp_response* response,
     status = tc_pki_source_candidate(store, i, work, &candidate);
     if (status != TC_TLV_OK)
       return status;
-    status = try_candidate(candidate, response, request, workspace, work, &search);
+    status = try_candidate(candidate, response, request, above, workspace, work, &search);
     if (status != TC_TLV_OK)
       return status;
   }
@@ -641,6 +659,7 @@ static int trust_anchor_present(const TC_X509_trust_anchor* issuer)
 
 /* Verify after the entry checks. out is written only on OK. */
 static TC_TLV_result verify_response(const TC_X509_ocsp_verify_request* request,
+                                     const tc_x509_ocsp_issuer_path* above,
                                      const TC_X509_path_workspace* workspace, size_t* work,
                                      TC_X509_ocsp_report* out)
 {
@@ -671,7 +690,7 @@ static TC_TLV_result verify_response(const TC_X509_ocsp_verify_request* request,
     return TC_TLV_INVALID;
   status = time_check(request, &parsed.result);
   if (status == TC_TLV_OK)
-    status = authorize_response(&parsed, request, workspace, work);
+    status = authorize_response(&parsed, request, above, workspace, work);
   if (status != TC_TLV_OK)
     return status;
   /* An authenticated unknown status gives no revocation decision. */
@@ -683,14 +702,16 @@ static TC_TLV_result verify_response(const TC_X509_ocsp_verify_request* request,
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_X509_ocsp_response_verify(const TC_X509_ocsp_verify_request* request,
-                                           const TC_X509_path_workspace* workspace, size_t* work,
-                                           TC_X509_ocsp_report* out)
+TC_TLV_result tc_x509_ocsp_response_verify_path(const TC_X509_ocsp_verify_request* request,
+                                                const tc_x509_ocsp_issuer_path* above,
+                                                const TC_X509_path_workspace* workspace,
+                                                size_t* work, TC_X509_ocsp_report* out)
 {
-  if (!request || !workspace || !work || !out || !request->response.data ||
-      !request->certificate.data || !trust_anchor_present(request->issuer) || !request->parsing ||
-      !request->signatures || !workspace->frames.data || !workspace->oids ||
-      !request->max_responses ||
+  if (!request || !above || !above->anchor || (above->count && !above->issuers) ||
+      (above->path_capacity && !above->path) || !workspace || !work || !out ||
+      !request->response.data || !request->certificate.data ||
+      !trust_anchor_present(request->issuer) || !request->parsing || !request->signatures ||
+      !workspace->frames.data || !workspace->oids || !request->max_responses ||
       (request->certificates && request->certificates->candidate_count &&
        !request->certificates->candidate) ||
       (request->expected_nonce.length &&
@@ -698,10 +719,23 @@ TC_TLV_result TC_X509_ocsp_response_verify(const TC_X509_ocsp_verify_request* re
         request->expected_nonce.length > 128)) ||
       TC_X509_time_check(&request->time.at) != TC_TLV_OK)
     return TC_TLV_ARGUMENT;
-  TC_TLV_result status = verify_response(request, workspace, work, out);
+  TC_TLV_result status = verify_response(request, above, workspace, work, out);
   if (status != TC_TLV_OK)
     memset(out, 0, sizeof *out);
   return status;
+}
+
+TC_TLV_result TC_X509_ocsp_response_verify(const TC_X509_ocsp_verify_request* request,
+                                           const TC_X509_path_workspace* workspace, size_t* work,
+                                           TC_X509_ocsp_report* out)
+{
+  /* The bare issuer is the anchor of a one-certificate delegate path. */
+  TC_X509_store_anchor issuer;
+  memset(&issuer, 0, sizeof issuer);
+  if (request && request->issuer)
+    issuer.trust = *request->issuer;
+  const tc_x509_ocsp_issuer_path above = {&issuer, NULL, 0, NULL, 0};
+  return tc_x509_ocsp_response_verify_path(request, &above, workspace, work, out);
 }
 
 /* Size of one element with a one-byte tag. Request contents stay far below

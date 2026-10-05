@@ -13,7 +13,7 @@
 #include "pki_extensions_internal.h"
 #include "pki_source_internal.h"
 #if TC_ENABLE_X509_OCSP
-#include <tiny_crypto/x509_ocsp.h>
+#include "x509_ocsp_internal.h"
 #endif
 
 TC_TLV_result tc_x509_crl_resolve_dependencies(TC_bytes target,
@@ -392,9 +392,10 @@ TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
   return result == TC_TLV_END ? TC_TLV_UNSUPPORTED : result;
 }
 
-/* OCSP evidence for the members of one path check. writes records the
- * validation workspace that OCSP verification modifies, so issuer anchors
- * and delegate candidates are checked against it. */
+/* OCSP evidence for the members of one path check. writes is the preflight
+ * plan of the validation workspace that OCSP verification modifies. The
+ * prepared CRL resolution's write set, which also covers the search path,
+ * guards the anchor and delegate candidates. */
 typedef struct {
   const TC_X509_revocation_options* options;
   const TC_bytes* chain;
@@ -407,32 +408,33 @@ typedef struct {
 } x509_crl_path_context;
 
 #if TC_ENABLE_X509_OCSP
-/* The issuer of chain[index]: the selected anchor for the first member,
- * otherwise the previous member. Both borrow stable input bytes. */
+/* The issuer of chain[index] and the validated path above a delegate: the
+ * selected anchor as issuer for the first member, otherwise the previous
+ * member. The path holds the anchor and chain[0..index-1], so delegates are
+ * validated under the anchor's path controls (RFC 5937 section 3.1). The
+ * search path is free between scope runs and holds the delegate path. Every
+ * span borrows stable input bytes. */
 static TC_TLV_result x509_ocsp_issuer(const x509_crl_path_context* path, size_t index,
-                                      TC_X509_trust_anchor* out)
+                                      TC_X509_trust_anchor* issuer, tc_x509_ocsp_issuer_path* above)
 {
   const x509_ocsp_members* ocsp = path->ocsp;
-  const TC_X509_path_workspace* validation = path->prepared->workspace->validation;
-  size_t* work = path->prepared->workspace->tree->work;
-  TC_TLV_result result;
+  const tc_x509_crl_resolution_workspace* workspace = path->prepared->workspace;
+  const TC_X509_path_workspace* validation = workspace->validation;
+  size_t* work = workspace->tree->work;
+  *above = (tc_x509_ocsp_issuer_path){&path->prepared->anchor, ocsp->chain, index,
+                                      workspace->search->path, workspace->search->capacity};
   if (!index) {
-    const tc_pki_source_guard guard = {ocsp->options->source, ocsp->writes,
-                                       TC_X509_PATH_STORAGE_COUNT};
-    TC_X509_store_anchor anchor;
-    result = tc_pki_source_guard_anchor((void*)&guard, ocsp->options->anchor_index, work, &anchor);
-    if (result == TC_TLV_OK)
-      *out = anchor.trust;
-    return result;
+    *issuer = path->prepared->anchor.trust;
+    return TC_TLV_OK;
   }
   TC_X509_workspace parser = {validation->frames, validation->oids, validation->oid_capacity};
-  TC_X509_certificate issuer = {0};
+  TC_X509_certificate certificate = {0};
   const TC_bytes encoded = ocsp->chain[index - 1];
-  result = tc_pki_work_charge(work, encoded.length);
+  TC_TLV_result result = tc_pki_work_charge(work, encoded.length);
   if (result == TC_TLV_OK)
-    result = TC_X509_read(encoded, &ocsp->options->signer_policy->parsing, &parser, &issuer);
+    result = TC_X509_read(encoded, &ocsp->options->signer_policy->parsing, &parser, &certificate);
   if (result == TC_TLV_OK)
-    *out = (TC_X509_trust_anchor){issuer.subject, issuer.public_key};
+    *issuer = (TC_X509_trust_anchor){certificate.subject, certificate.public_key};
   return result;
 }
 
@@ -463,10 +465,11 @@ static TC_TLV_result x509_ocsp_member(const x509_crl_path_context* path, size_t 
   const TC_X509_path_workspace* validation = path->prepared->workspace->validation;
   size_t* work = path->prepared->workspace->tree->work;
   TC_X509_trust_anchor issuer;
-  TC_TLV_result result = x509_ocsp_issuer(path, index, &issuer);
+  tc_x509_ocsp_issuer_path above;
+  TC_TLV_result result = x509_ocsp_issuer(path, index, &issuer, &above);
   if (result != TC_TLV_OK)
     return result;
-  tc_pki_source_guard guard = {options->source, path->ocsp->writes, TC_X509_PATH_STORAGE_COUNT};
+  tc_pki_source_guard guard = {options->source, path->prepared->writes, CRL_SCOPE_WRITES};
   const TC_X509_store_source delegates = tc_pki_source_guard_bind(&guard);
   const TC_X509_ocsp_verify_request request = {options->ocsp.responses[index],
                                                certificate,
@@ -479,7 +482,7 @@ static TC_TLV_result x509_ocsp_member(const x509_crl_path_context* path, size_t 
                                                &options->signer_policy->parsing,
                                                &options->signer_policy->signatures};
   TC_X509_ocsp_report verified;
-  result = TC_X509_ocsp_response_verify(&request, validation, work, &verified);
+  result = tc_x509_ocsp_response_verify_path(&request, &above, validation, work, &verified);
   if (result != TC_TLV_OK)
     return result;
   if (verified.responder_certificate.data && !verified.responder_nocheck) {

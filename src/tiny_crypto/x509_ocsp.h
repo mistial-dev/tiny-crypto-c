@@ -88,7 +88,10 @@ typedef struct {
  * signed it that matches the ResponderID and validates as a path below the
  * issuer at time.at with time.clock_skew_seconds, with id-kp-OCSPSigning in
  * its extended key usage and digitalSignature in a present key usage
- * (RFC 6960 4.2.2.2). The result names that delegate and reports
+ * (RFC 6960 4.2.2.2). The issuer acts as a bare trust anchor: the delegate
+ * check omits the anchor's CertPathControls and the constraints of
+ * certificates above the issuer. TC_X509_path_check_revocation applies them
+ * (RFC 5937 section 3.1). The result names that delegate and reports
  * id-pkix-ocsp-nocheck. Before trusting GOOD, the caller establishes the
  * delegate's own revocation status, using responder_nocheck for RFC 6960
  * 4.2.2.2.1. An authenticated REVOKED status remains revocation evidence.
