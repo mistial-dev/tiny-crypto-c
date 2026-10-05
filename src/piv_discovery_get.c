@@ -6,13 +6,13 @@
 #if TC_ENABLE_PIV_VCI
 #include "internal.h"
 #include "piv_link_internal.h"
+#include "piv_discovery_internal.h"
 
 TC_PIV_result TC_PIV_discovery_get(TC_PIV_link* link, TC_PIV_discovery_profile profile,
                                    TC_buffer response, TC_PIV_discovery* out)
 {
   static const uint8_t tag[] = {0x7e};
-  if (!tc_piv_link_ready(link) || !out ||
-      (profile != TC_PIV_DISCOVERY_PIV && profile != TC_PIV_DISCOVERY_TWIC) ||
+  if (!tc_piv_link_ready(link) || !out || !tc_piv_discovery_profile_known(profile) ||
       !tc_piv_response_valid(link, response, out, sizeof *out))
     return TC_PIV_ARGUMENT;
   /* GET DATA on a secured link always travels under secure messaging, so

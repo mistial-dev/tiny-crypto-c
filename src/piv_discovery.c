@@ -5,6 +5,7 @@
 #if TC_ENABLE_PIV_OBJECTS
 #include "internal.h"
 #include "piv_aid_internal.h"
+#include "piv_discovery_internal.h"
 #include "twic_card_objects_internal.h"
 
 enum {
@@ -34,7 +35,7 @@ static int piv_policy(uint8_t policy, uint8_t preference)
   return preference == 0;
 }
 
-static int profile_known(TC_PIV_discovery_profile profile)
+int tc_piv_discovery_profile_known(TC_PIV_discovery_profile profile)
 {
 #if TC_ENABLE_TWIC
   if (profile == TC_PIV_DISCOVERY_TWIC)
@@ -52,7 +53,8 @@ TC_TLV_result TC_PIV_discovery_read(TC_bytes encoded, TC_PIV_discovery_profile p
                                     TC_PIV_discovery* out)
 {
   static const TC_TLV_limits limits = {DISCOVERY_BYTES, DISCOVERY_VALUE_BYTES, 1, 1};
-  if (!out || !tc_internal_span_valid(encoded.data, encoded.length) || !profile_known(profile) ||
+  if (!out || !tc_internal_span_valid(encoded.data, encoded.length) ||
+      !tc_piv_discovery_profile_known(profile) ||
       !tc_internal_ranges_disjoint(encoded.data, encoded.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
   if (!encoded.length)
