@@ -100,7 +100,7 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
 /*
  * The ECB, CBC, CTR, CFB and OFB entry points share one argument contract.
  * They return TC_ERROR for a NULL or uninitialized context, a context without
- * an IV from TC_DES_set_iv(every mode except ECB, (TC_bytes){even for an empty buffer, TC_DES_BLOCKLEN}),
+ * an IV from TC_DES_set_iv (every mode except ECB, even for an empty buffer),
  * a NULL buffer with a nonzero length, or a buffer that overlaps the context,
  * and leave the context and buffer unchanged. Otherwise a NULL buffer with
  * length 0 returns TC_OK.

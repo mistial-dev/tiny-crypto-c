@@ -9,7 +9,9 @@
  * - BITWISE: constant-time byte loop with the smallest code and no table.
  * - WIDE: constant-time 64-bit shift loop when uint64_t is available.
  * - FAST_TABLE: 16-entry nibble table in the context (256 bytes of RAM),
- *   rebuilt for each key. Table lookups are indexed by message nibbles.
+ *   rebuilt for each key. Each lookup index is a nibble of the running
+ *   accumulator, which depends on H, so lookup timing depends on the key.
+ *   Use it only where cache timing is unobservable.
  * - HARDWARE: TC_AES_GCM_hardware_multiply supplied by the platform.
  * - AUTO: WIDE when TC_AES_WIDE_OPS is set, otherwise BITWISE. */
 #include "aes_internal.h"
