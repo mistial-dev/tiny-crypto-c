@@ -75,7 +75,7 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
     /* RFC 5914 section 2.6: these duplicate CertPathControls, must not
      * appear in TrustAnchorInfo exts and are ignored if they do. Their OIDs
      * still take part in the duplicate check. */
-    if (trust_anchor_info && tc_pki_extension_path_control(id))
+    if (trust_anchor_info && tc_x509_anchor_exts_ignored(id))
       continue;
     switch (id) {
     case TC_PKI_EXT_CERTIFICATE_POLICIES: {

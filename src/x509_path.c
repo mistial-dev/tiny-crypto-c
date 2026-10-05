@@ -3,6 +3,7 @@
 #include <tiny_crypto/x509.h>
 #if TC_ENABLE_X509_PATH
 #include "x509_path_internal.h"
+#include "x509_store_anchor_internal.h"
 #include "pki_status_internal.h"
 #include "pki_internal.h"
 #include "pki_storage_internal.h"
@@ -509,25 +510,6 @@ static TC_TLV_result path_storage(const TC_bytes* chain, size_t count,
   return result;
 }
 
-/* CertPathControls field that replaces one certificate path control
- * (RFC 5914 section 2.5), or 0 for other extensions. */
-static unsigned anchor_replacement(unsigned id)
-{
-  switch (id) {
-  case TC_PKI_EXT_CERTIFICATE_POLICIES:
-    return TC_X509_ANCHOR_REPLACED_POLICY_SET;
-  case TC_PKI_EXT_POLICY_CONSTRAINTS:
-  case TC_PKI_EXT_INHIBIT_ANY_POLICY:
-    return TC_X509_ANCHOR_REPLACED_POLICY_FLAGS;
-  case TC_PKI_EXT_NAME_CONSTRAINTS:
-    return TC_X509_ANCHOR_REPLACED_NAMES;
-  case TC_PKI_EXT_BASIC_CONSTRAINTS:
-    return TC_X509_ANCHOR_REPLACED_PATH_LEN;
-  default:
-    return 0;
-  }
-}
-
 /* Report whether the anchor record reflects one path-control extension.
  * RFC 5914 section 2.5 enforces an anchor certificate's path controls unless
  * CertPathControls replaces them. Validation reads only the record fields,
@@ -543,7 +525,7 @@ static TC_TLV_result anchor_control_applied(const TC_X509_store_anchor* anchor, 
   const TC_bytes value = extension->value;
   TC_TLV_result result;
   *applied = 1;
-  if (!trust_anchor_info && (anchor->replaced_controls & anchor_replacement(id)))
+  if (!trust_anchor_info && (anchor->replaced_controls & tc_x509_anchor_path_control(id)))
     return TC_TLV_OK;
   switch (id) {
   case TC_PKI_EXT_NAME_CONSTRAINTS:
@@ -602,7 +584,7 @@ static TC_TLV_result anchor_extensions_check(const TC_X509_store_anchor* anchor,
     return result;
   while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
     const unsigned id = tc_pki_extension_id(&extension);
-    const int path_control = tc_pki_extension_path_control(id);
+    const int path_control = tc_x509_anchor_exts_ignored(id);
     int applied;
     if (trust_anchor_info && path_control)
       continue;

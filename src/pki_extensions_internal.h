@@ -87,13 +87,6 @@ static inline unsigned tc_pki_extension_id(const TC_X509_extension* extension)
   return extension->oid.data[2];
 }
 
-/* RFC 5914 section 2.6: extensions duplicated by TrustAnchorInfo
- * CertPathControls. */
-static inline int tc_pki_extension_path_control(unsigned id)
-{
-  return id == TC_PKI_EXT_NAME_CONSTRAINTS || id == TC_PKI_EXT_CERTIFICATE_POLICIES ||
-         id == TC_PKI_EXT_POLICY_CONSTRAINTS || id == TC_PKI_EXT_INHIBIT_ANY_POLICY;
-}
 /* Borrow the certificate's SKI. A NULL span means absent. An empty OCTET
  * STRING remains distinguishable. Output changes only on OK. Work is
  * provisional. Parsed inputs and output/work are disjoint. */
