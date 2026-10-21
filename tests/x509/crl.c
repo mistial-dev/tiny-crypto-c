@@ -773,12 +773,10 @@ TC_TEST(source_entry_span)
   tc_x509_crl_entry entry, saved;
   memset(&entry, 0xa5, sizeof entry);
   memcpy(&saved, &entry, sizeof saved);
-  munit_assert_int(tc_x509_crl_source_entry_next(&reader, &entries,
-                                                 (TC_buffer){scratch, sizeof scratch},
-                                                 &(TC_TLV_limits){FIXTURE_CAPACITY,
-                                                                  FIXTURE_CAPACITY, 128,
-                                                                  FRAME_CAPACITY},
-                                                 &tree, &entry),
+  munit_assert_int(tc_x509_crl_source_entry_next(
+                       &reader, &entries, (TC_buffer){scratch, sizeof scratch},
+                       &(TC_TLV_limits){FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY},
+                       &tree, &entry),
                    ==, TC_TLV_INVALID);
   munit_assert_uint(changing.length_reads, ==, 2);
   munit_assert_true(entries.cursor == cursor && entries.remaining == remaining);

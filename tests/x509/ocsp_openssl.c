@@ -515,8 +515,7 @@ TC_TEST(delegates)
   X509_free(delegate);
   /* RFC 5280 permits critical EKU and multiple purposes. RFC 6960 requires
    * only that the delegate's list contain id-kp-OCSPSigning. */
-  const char* const accepted_eku[] = {"critical,OCSPSigning",
-                                      "serverAuth,OCSPSigning",
+  const char* const accepted_eku[] = {"critical,OCSPSigning", "serverAuth,OCSPSigning",
                                       "anyExtendedKeyUsage,OCSPSigning",
                                       "critical,serverAuth,OCSPSigning"};
   for (size_t i = 0; i < sizeof accepted_eku / sizeof *accepted_eku; ++i) {
@@ -1097,16 +1096,15 @@ TC_TEST(delegate_path_controls)
                                     "critical,anyExtendedKeyUsage"};
   const size_t search_capacity = revocation.search.capacity;
   for (size_t eku = 0; eku < sizeof issuer_eku / sizeof *issuer_eku; ++eku) {
-    const certificate_spec intermediate_fields = {
-        .key = intermediate_key,
-        .name = "tiny-crypto-c OCSP intermediate",
-        .issuer = pki.ca,
-        .signer = pki.ca_key,
-        .serial = 3,
-        .ca = 1,
-        .key_usage = "critical,keyCertSign,cRLSign",
-        .extended_key_usage = issuer_eku[eku],
-        .name_constraints = constraint};
+    const certificate_spec intermediate_fields = {.key = intermediate_key,
+                                                  .name = "tiny-crypto-c OCSP intermediate",
+                                                  .issuer = pki.ca,
+                                                  .signer = pki.ca_key,
+                                                  .serial = 3,
+                                                  .ca = 1,
+                                                  .key_usage = "critical,keyCertSign,cRLSign",
+                                                  .extended_key_usage = issuer_eku[eku],
+                                                  .name_constraints = constraint};
     X509* intermediate = issue(&intermediate_fields);
     const certificate_spec leaf_fields = {.key = leaf_key,
                                           .name = "tiny-crypto-c OCSP leaf",
