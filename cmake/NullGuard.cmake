@@ -11,6 +11,7 @@ option(TINY_CRYPTO_TEST_NULL_GUARD "Repeat C test calls with NULL arguments" OFF
 set(tc_null_guard_dir ${CMAKE_CURRENT_BINARY_DIR}/null-guard)
 set(tc_null_guard_wrappers ${tc_null_guard_dir}/null_guard_wrappers.h)
 set(tc_null_guard_inventory ${tc_null_guard_dir}/inventory.txt)
+set(tc_null_guard_probe ${tc_null_guard_dir}/probe.c)
 set(tc_null_guard_report ${tc_null_guard_dir}/report.txt)
 
 if(TINY_CRYPTO_TEST_NULL_GUARD)
@@ -26,16 +27,16 @@ if(TINY_CRYPTO_TEST_NULL_GUARD)
   file(GLOB tc_null_guard_headers CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tiny_crypto/*.h)
   add_custom_command(
-    OUTPUT ${tc_null_guard_wrappers} ${tc_null_guard_inventory}
+    OUTPUT ${tc_null_guard_wrappers} ${tc_null_guard_inventory} ${tc_null_guard_probe}
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/null_guard/generate.py
       --clang ${tc_null_guard_clang} --output ${tc_null_guard_wrappers}
-      --inventory ${tc_null_guard_inventory}
+      --inventory ${tc_null_guard_inventory} --probe ${tc_null_guard_probe}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/null_guard/generate.py
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/null_guard/nullable.txt
       ${CMAKE_CURRENT_SOURCE_DIR}/cmake/features.json ${tc_null_guard_headers}
     COMMENT "Generating null-guard wrappers"
     VERBATIM)
-  add_custom_target(tc_null_guard_wrappers DEPENDS ${tc_null_guard_wrappers})
+  add_custom_target(tc_null_guard_wrappers DEPENDS ${tc_null_guard_wrappers} ${tc_null_guard_probe})
   # Some test executables compile library sources directly. Those keep the
   # real calls between library functions.
   file(GLOB tc_null_guard_library_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c)
@@ -47,6 +48,16 @@ if(TINY_CRYPTO_TEST_NULL_GUARD)
     target_compile_options(tc_null_guard_runtime PRIVATE ${tc_sanitize_flags})
   endif()
 endif()
+
+# Generated smoke coverage for status-returning workflow entry points that may
+# not have a successful fixture in the quick suite. Functional tests still run
+# the same wrappers with real inputs where available.
+function(tc_add_null_guard_probe library)
+  if(NOT TINY_CRYPTO_TEST_NULL_GUARD)
+    return()
+  endif()
+  tc_add_linked_test(test_null_guard_probe ${library} ${tc_null_guard_probe})
+endfunction()
 
 # Force-include the wrappers into the C sources of one test executable.
 function(tc_use_null_guard target)

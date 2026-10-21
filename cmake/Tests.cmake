@@ -759,6 +759,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_X509_PATH=1 TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_CMS=1
     TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_TWIC=1 TC_ENABLE_CREDENTIAL=1
     TC_ENABLE_AES=0 TC_ENABLE_SHA256=0 TC_ENABLE_EAC_CVC=1)
+  tc_add_null_guard_probe(tiny-crypto-c-test-pki)
   tc_add_c_test(test_cms_external_collections tiny-crypto-c-test-pki
     tests/cms/external.c tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c)
   tc_add_test_executable(test_eac_reader tests/eac/reader.c)
