@@ -170,7 +170,10 @@ enum {
   TC_X509_PATH_REQUIRE_KEY_USAGE = 8u,
   TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE = 16u,
   /* Require an explicit purpose match when a certificate contains EKU. */
-  TC_X509_PATH_INHIBIT_ANY_PURPOSE = 32u
+  TC_X509_PATH_INHIBIT_ANY_PURPOSE = 32u,
+  /* Apply the purpose match only to the target certificate. Issuer EKUs are
+   * still parsed and validated. */
+  TC_X509_PATH_PURPOSE_TARGET_ONLY = 64u
 };
 typedef struct {
   /* Validation time. Certificate validity periods are widened by

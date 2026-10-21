@@ -47,6 +47,9 @@ Initialize `TC_X509_path_options` to zero, then set:
 - `TC_X509_PATH_INHIBIT_ANY_PURPOSE` disables the `anyExtendedKeyUsage` wildcard throughout the
   path, so a present EKU extension must list the requested OID. Add `REQUIRE_EXTENDED_KEY_USAGE`
   when the target must carry EKU.
+- `TC_X509_PATH_PURPOSE_TARGET_ONLY` applies the purpose match only to the target. Issuer EKUs are
+  still parsed and checked as extensions. Use this for protocols such as delegated OCSP, where the
+  required purpose belongs to the response signer's certificate.
 
 Profile rules such as EKU criticality or exclusive use of one EKU need separate checks.
 

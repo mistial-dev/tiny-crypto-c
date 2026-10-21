@@ -860,6 +860,7 @@ static TC_X509_path_status path_usage_phase(const path_validation* v)
   usage.require_extended_key_usage =
       (options->flags & TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE) != 0;
   usage.inhibit_any_purpose = (options->flags & TC_X509_PATH_INHIBIT_ANY_PURPOSE) != 0;
+  usage.purpose_target_only = (options->flags & TC_X509_PATH_PURPOSE_TARGET_ONLY) != 0;
   extension_workspace.oids = v->workspace->oids;
   extension_workspace.oid_capacity = v->workspace->oid_capacity;
   extension_workspace.names = v->names;

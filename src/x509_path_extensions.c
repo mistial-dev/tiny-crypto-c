@@ -167,7 +167,7 @@ TC_TLV_result tc_x509_path_extensions(const tc_x509_path_input* input,
                                           usage, workspace, input->limits, work, &permitted);
       if (result != TC_TLV_OK)
         return result;
-      if (!permitted) {
+      if (!permitted && (!usage->purpose_target_only || i + 1 == input->count)) {
         *accepted = 0;
         return TC_TLV_OK;
       }

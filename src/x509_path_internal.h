@@ -181,14 +181,15 @@ typedef struct {
   TC_bytes purpose;
   uint16_t key_usage;
   int require_key_usage, require_extended_key_usage;
-  int inhibit_any_purpose;
+  int inhibit_any_purpose, purpose_target_only;
 } tc_x509_path_usage;
 
 enum {
   TC_X509_PATH_SUPPORTED_FLAGS =
       TC_X509_PATH_REQUIRE_EXPLICIT_POLICY | TC_X509_PATH_INHIBIT_MAPPING |
       TC_X509_PATH_INHIBIT_ANY_POLICY | TC_X509_PATH_REQUIRE_KEY_USAGE |
-      TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE | TC_X509_PATH_INHIBIT_ANY_PURPOSE
+      TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE | TC_X509_PATH_INHIBIT_ANY_PURPOSE |
+      TC_X509_PATH_PURPOSE_TARGET_ONLY
 };
 typedef struct {
   TC_bytes* oids;

@@ -513,6 +513,26 @@ TC_TEST(delegates)
   response_spec spec = response_by(delegate, pki.responder_key);
   munit_assert_int(verify(&spec, NULL, &result), ==, TC_TLV_OK);
   X509_free(delegate);
+  /* RFC 5280 permits critical EKU and multiple purposes. RFC 6960 requires
+   * only that the delegate's list contain id-kp-OCSPSigning. */
+  const char* const accepted_eku[] = {"critical,OCSPSigning",
+                                      "serverAuth,OCSPSigning",
+                                      "anyExtendedKeyUsage,OCSPSigning",
+                                      "critical,serverAuth,OCSPSigning"};
+  for (size_t i = 0; i < sizeof accepted_eku / sizeof *accepted_eku; ++i) {
+    certificate_spec fields = delegate_spec();
+    fields.extended_key_usage = accepted_eku[i];
+    delegate = issue(&fields);
+    const TC_bytes delegate_der = certificate_der(delegate, delegate_bytes);
+    const TC_X509_store_array array = {&delegate_der, 1, NULL, 0};
+    TC_X509_store_source store;
+    munit_assert_int(TC_X509_store_array_source(&array, &store), ==, TC_TLV_OK);
+    spec = response_by(delegate, pki.responder_key);
+    munit_assert_int(verify(&spec, NULL, &result), ==, TC_TLV_OK);
+    spec.flags = OCSP_NOCERTS | OCSP_RESPID_KEY;
+    munit_assert_int(verify(&spec, &store, &result), ==, TC_TLV_OK);
+    X509_free(delegate);
+  }
   hierarchy_free();
   return MUNIT_OK;
 }
@@ -1062,66 +1082,82 @@ TC_TEST(delegate_path_controls)
   }
 
   /* An intermediate's nameConstraints bind a delegate for the member it
-   * issued. The CA's empty CRL settles the intermediate. */
+   * issued. Its serverAuth EKU does not constrain the delegate's authorized
+   * purpose. The CA's empty CRL settles the intermediate. */
   EVP_PKEY* intermediate_key = EVP_EC_gen("prime256v1");
   EVP_PKEY* leaf_key = EVP_EC_gen("prime256v1");
   munit_assert_not_null(intermediate_key);
   munit_assert_not_null(leaf_key);
-  const certificate_spec intermediate_fields = {.key = intermediate_key,
-                                                .name = "tiny-crypto-c OCSP intermediate",
-                                                .issuer = pki.ca,
-                                                .signer = pki.ca_key,
-                                                .serial = 3,
-                                                .ca = 1,
-                                                .key_usage = "critical,keyCertSign,cRLSign",
-                                                .name_constraints = constraint};
-  X509* intermediate = issue(&intermediate_fields);
-  const certificate_spec leaf_fields = {.key = leaf_key,
-                                        .name = "tiny-crypto-c OCSP leaf",
-                                        .issuer = intermediate,
-                                        .signer = intermediate_key,
-                                        .serial = 4,
-                                        .key_usage = "critical,digitalSignature",
-                                        .subject_alt_name = "DNS:good.example"};
-  X509* leaf = issue(&leaf_fields);
-  const TC_bytes chain[] = {certificate_der(intermediate, intermediate_der),
-                            certificate_der(leaf, leaf_der)};
-  for (size_t i = 0; i < 2; ++i) {
-    certificate_spec delegate_fields = delegate_spec();
-    delegate_fields.issuer = intermediate;
-    delegate_fields.signer = intermediate_key;
-    delegate_fields.nocheck = 1;
-    delegate_fields.subject_alt_name = names[i];
-    X509* delegate = issue(&delegate_fields);
-    const TC_bytes candidates[] = {pki.ca_bytes, certificate_der(delegate, delegate_bytes)};
-    response_spec spec = response_by(delegate, pki.responder_key);
-    spec.flags = OCSP_NOCERTS;
-    spec.cert_id_subject = leaf;
-    spec.cert_id_issuer = intermediate;
-    const TC_bytes responses[] = {{NULL, 0}, build_response(&spec, responses_der[i])};
-    const TC_X509_revocation_options options =
-        revocation_inputs(pki.ca_bytes, candidates, 2, EMPTY_CRL, responses, 2);
-    const TC_TLV_result status = check_revocation(chain, 2, &options, &result);
-    if (i) {
-      munit_assert_int(status, ==, TC_TLV_UNSUPPORTED);
-    } else {
-      munit_assert_int(status, ==, TC_TLV_OK);
-      munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
-      /* A chain stored in the search scratch is an argument error: the
-       * delegate path is assembled there. */
-      munit_assert_size(revocation.search.capacity, >=, 2);
-      revocation.search.path[0] = chain[0];
-      revocation.search.path[1] = chain[1];
-      munit_assert_int(check_revocation(revocation.search.path, 2, &options, &result), ==,
-                       TC_TLV_ARGUMENT);
-      /* The delegate path below the intermediate needs two search spans. */
-      revocation.search.capacity = 1;
-      munit_assert_int(check_revocation(chain, 2, &options, &result), ==, TC_TLV_LIMIT);
+  const char* const issuer_eku[] = {NULL,
+                                    "serverAuth",
+                                    "OCSPSigning",
+                                    "serverAuth,OCSPSigning",
+                                    "anyExtendedKeyUsage",
+                                    "critical,serverAuth",
+                                    "critical,anyExtendedKeyUsage"};
+  const size_t search_capacity = revocation.search.capacity;
+  for (size_t eku = 0; eku < sizeof issuer_eku / sizeof *issuer_eku; ++eku) {
+    const certificate_spec intermediate_fields = {
+        .key = intermediate_key,
+        .name = "tiny-crypto-c OCSP intermediate",
+        .issuer = pki.ca,
+        .signer = pki.ca_key,
+        .serial = 3,
+        .ca = 1,
+        .key_usage = "critical,keyCertSign,cRLSign",
+        .extended_key_usage = issuer_eku[eku],
+        .name_constraints = constraint};
+    X509* intermediate = issue(&intermediate_fields);
+    const certificate_spec leaf_fields = {.key = leaf_key,
+                                          .name = "tiny-crypto-c OCSP leaf",
+                                          .issuer = intermediate,
+                                          .signer = intermediate_key,
+                                          .serial = 4,
+                                          .key_usage = "critical,digitalSignature",
+                                          .subject_alt_name = "DNS:good.example"};
+    X509* leaf = issue(&leaf_fields);
+    const TC_bytes chain[] = {certificate_der(intermediate, intermediate_der),
+                              certificate_der(leaf, leaf_der)};
+    for (size_t i = 0; i < 2; ++i) {
+      certificate_spec delegate_fields = delegate_spec();
+      delegate_fields.issuer = intermediate;
+      delegate_fields.signer = intermediate_key;
+      delegate_fields.nocheck = 1;
+      delegate_fields.subject_alt_name = names[i];
+      X509* delegate = issue(&delegate_fields);
+      const TC_bytes candidates[] = {pki.ca_bytes, certificate_der(delegate, delegate_bytes)};
+      response_spec spec = response_by(delegate, pki.responder_key);
+      spec.flags = OCSP_NOCERTS;
+      spec.cert_id_subject = leaf;
+      spec.cert_id_issuer = intermediate;
+      const TC_bytes responses[] = {{NULL, 0}, build_response(&spec, responses_der[i])};
+      const TC_X509_revocation_options options =
+          revocation_inputs(pki.ca_bytes, candidates, 2, EMPTY_CRL, responses, 2);
+      const TC_TLV_result status = check_revocation(chain, 2, &options, &result);
+      if (i) {
+        munit_assert_int(status, ==, TC_TLV_UNSUPPORTED);
+      } else {
+        munit_assert_int(status, ==, TC_TLV_OK);
+        munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
+        if (!eku) {
+          /* A chain stored in the search scratch is an argument error: the
+           * delegate path is assembled there. */
+          munit_assert_size(revocation.search.capacity, >=, 2);
+          revocation.search.path[0] = chain[0];
+          revocation.search.path[1] = chain[1];
+          munit_assert_int(check_revocation(revocation.search.path, 2, &options, &result), ==,
+                           TC_TLV_ARGUMENT);
+          /* The delegate path below the intermediate needs two search spans. */
+          revocation.search.capacity = 1;
+          munit_assert_int(check_revocation(chain, 2, &options, &result), ==, TC_TLV_LIMIT);
+          revocation.search.capacity = search_capacity;
+        }
+      }
+      X509_free(delegate);
     }
-    X509_free(delegate);
+    X509_free(leaf);
+    X509_free(intermediate);
   }
-  X509_free(leaf);
-  X509_free(intermediate);
   X509_free(anchor);
   EVP_PKEY_free(leaf_key);
   EVP_PKEY_free(intermediate_key);

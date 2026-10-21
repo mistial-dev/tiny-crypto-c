@@ -945,7 +945,7 @@ TC_TEST(paths)
           munit_assert_size(count, ==, wanted ? 1 : 0);
           if (wanted) {
             static const uint8_t server_auth[] = {0x2b, 6, 1, 5, 5, 7, 3, 1};
-            tc_x509_path_usage usage = {{NULL, 0}, 0, 0, 0, 0};
+            tc_x509_path_usage usage = {{NULL, 0}, 0, 0, 0, 0, 0};
             tc_x509_extension_workspace extension_workspace = {policies, 8, {{frames, 16}, &names}};
             TC_TLV_result result;
             int usage_valid = scenario < USAGE_VALID || scenario == USAGE_VALID ||

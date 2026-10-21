@@ -728,7 +728,7 @@ TC_TEST(usage)
   TC_bytes oids[4];
   TC_X509_name_workspace names = {left, right, 32, used, 4};
   tc_x509_extension_workspace workspace = {oids, 4, {{frames, 8}, &names}};
-  tc_x509_path_usage purpose = {{oid, sizeof oid}, 1, 1, 1, 0};
+  tc_x509_path_usage purpose = {{oid, sizeof oid}, 1, 1, 1, 0, 0};
   size_t i, work = 100000, required;
   int accepted = 99;
   memset(certificates, 0, sizeof certificates);
@@ -854,6 +854,18 @@ TC_TEST(usage)
   munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
                    ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 0);
+  certificates[1].extensions = (TC_bytes){combined, sizeof combined};
+  purpose.purpose_target_only = 1;
+  work = 100000;
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
+  munit_assert_int(accepted, ==, 1);
+  /* Target-only matching still parses every issuer EKU. */
+  extensions[25]++;
+  work = 100000;
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_INVALID);
+  extensions[25]--;
   return MUNIT_OK;
 }
 

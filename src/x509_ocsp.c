@@ -519,7 +519,8 @@ static TC_TLV_result delegate_path(TC_bytes encoded, const TC_X509_ocsp_verify_r
   options.signatures = *request->signatures;
   options.purpose = (TC_bytes){ocsp_signing_oid, sizeof ocsp_signing_oid};
   options.key_usage = TC_KEY_USAGE_DIGITAL_SIGNATURE;
-  options.flags = TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE | TC_X509_PATH_INHIBIT_ANY_PURPOSE;
+  options.flags = TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE | TC_X509_PATH_INHIBIT_ANY_PURPOSE |
+                  TC_X509_PATH_PURPOSE_TARGET_ONLY;
   TC_X509_path_status status = tc_x509_path_validate_anchor(chain, count, above->anchor, &options,
                                                             workspace, work, &validated);
   if (status == TC_X509_PATH_VALID)
