@@ -344,6 +344,8 @@ TC_TLV_result tc_x509_crl_source_entry_next(tc_source_reader* reader,
   result = tc_x509_crl_entry_next(&bounded, entries->version, tree, &parsed);
   if (result != TC_TLV_OK)
     return result;
+  if (!tc_pki_end(&bounded))
+    return TC_TLV_INVALID;
   entries->cursor = element.end;
   entries->remaining--;
   *out = parsed;

@@ -723,6 +723,69 @@ TC_TEST(source_entry_failures)
   return MUNIT_OK;
 }
 
+typedef struct {
+  TC_bytes bytes;
+  uint64_t length_offset;
+  unsigned length_reads;
+  int shorten;
+} changing_entry_source;
+
+static TC_status changing_entry_read(void* context, uint64_t offset, uint8_t* destination,
+                                     size_t length)
+{
+  changing_entry_source* source = (changing_entry_source*)context;
+  if (offset > source->bytes.length || length > source->bytes.length - offset)
+    return TC_ERROR;
+  memcpy(destination, source->bytes.data + (size_t)offset, length);
+  if (source->length_offset >= offset && source->length_offset - offset < length) {
+    source->length_reads++;
+    if (source->shorten && source->length_reads == 2)
+      destination[(size_t)(source->length_offset - offset)] = 18;
+  }
+  return TC_OK;
+}
+
+/* A changing source must not let the parsed entry cover less data than the
+ * source-framed span that was authenticated. */
+TC_TEST(source_entry_span)
+{
+  fixture input = make_crl(2, NEXT_UPDATE | REVOKED | ENTRY_EXTENSIONS);
+  changing_entry_source changing = {{input.bytes, input.length}, input.revoked + 3, 0, 0};
+  TC_source source = {changing_entry_read, &changing, input.length};
+  uint8_t window[1], scratch[FIXTURE_CAPACITY];
+  tc_source_reader reader;
+  tc_x509_crl_layout layout;
+  tc_x509_crl_source_entries entries;
+  munit_assert_int(
+      tc_source_reader_init(&reader, &source, (TC_buffer){window, sizeof window}, 4096, 4096), ==,
+      TC_RESULT_OK);
+  munit_assert_int(tc_x509_crl_source_layout(&reader, &layout), ==, TC_TLV_OK);
+  munit_assert_int(tc_x509_crl_source_entries_init(&reader, layout.revoked, 2, 1, &entries), ==,
+                   TC_TLV_OK);
+
+  changing.length_reads = 0;
+  changing.shorten = 1;
+  const uint64_t cursor = entries.cursor;
+  const uint64_t remaining = entries.remaining;
+  size_t work = WORK_BUDGET;
+  TC_TLV_frame frames[FRAME_CAPACITY];
+  const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
+  tc_x509_crl_entry entry, saved;
+  memset(&entry, 0xa5, sizeof entry);
+  memcpy(&saved, &entry, sizeof saved);
+  munit_assert_int(tc_x509_crl_source_entry_next(&reader, &entries,
+                                                 (TC_buffer){scratch, sizeof scratch},
+                                                 &(TC_TLV_limits){FIXTURE_CAPACITY,
+                                                                  FIXTURE_CAPACITY, 128,
+                                                                  FRAME_CAPACITY},
+                                                 &tree, &entry),
+                   ==, TC_TLV_INVALID);
+  munit_assert_uint(changing.length_reads, ==, 2);
+  munit_assert_true(entries.cursor == cursor && entries.remaining == remaining);
+  munit_assert_memory_equal(sizeof entry, &entry, &saved);
+  return MUNIT_OK;
+}
+
 TC_TEST(source_batch)
 {
   const uint8_t issuer[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
@@ -3413,6 +3476,7 @@ int main(int argc, char** argv)
       {"/record-index-failures", record_index_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/source-layout", source_layout, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/source-entry-failures", source_entry_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/source-entry-span", source_entry_span, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/source-batch", source_batch, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/corpus", corpus_file, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
