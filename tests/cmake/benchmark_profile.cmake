@@ -21,6 +21,7 @@ else()
   set(executable "${BINARY_DIR}/benchmark_aes")
 endif()
 run("${executable}")
-if(NOT last_output MATCHES "key_bits=256 sbox=${SBOX_VALUE} ghash=2")
+if(NOT last_output MATCHES
+    "key_bits=256 aes_sbox=${SBOX_VALUE} ghash=2 wide=0 DES=0 des_sbox=1")
   message(FATAL_ERROR "Benchmark did not use the requested profile: ${last_output}")
 endif()
