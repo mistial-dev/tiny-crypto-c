@@ -1066,7 +1066,7 @@ static void check_des_mode_overlap(des_mode_fn mode, size_t length, size_t bytes
   struct TC_DES_ctx saved;
   uint8_t before[TC_DES_BLOCKLEN];
   /* The last span ends on the first context byte. */
-  uint8_t* const inside[] = {frame.ctx.iv, frame.ctx.schedule[0],
+  uint8_t* const inside[] = {frame.ctx.iv, (uint8_t*)frame.ctx.schedule[0],
                              frame.before + sizeof frame.before + 1 - bytes};
   size_t i;
 
@@ -1186,10 +1186,13 @@ TC_TEST(test_des_mode_overlap)
   memcpy(&saved, &ctx, sizeof saved);
   munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, (TC_bytes){ctx.iv, TC_DES_BLOCKLEN}));
   munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, (TC_bytes){ctx.iv + 1, TC_DES_BLOCKLEN}));
-  munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, (TC_bytes){ctx.schedule[0], TC_DES_BLOCKLEN}));
+  munit_assert_int(
+      TC_ERROR, ==,
+      TC_DES_set_iv(&ctx, (TC_bytes){(const uint8_t*)ctx.schedule[0], TC_DES_BLOCKLEN}));
 #if TC_DES_ENABLE_ECB
-  munit_assert_int(TC_ERROR, ==,
-                   TC_DES_ECB_encrypt(&ctx, (TC_buffer){ctx.schedule[1], TC_DES_BLOCKLEN}));
+  munit_assert_int(
+      TC_ERROR, ==,
+      TC_DES_ECB_encrypt(&ctx, (TC_buffer){(uint8_t*)ctx.schedule[1], TC_DES_BLOCKLEN}));
   munit_assert_int(TC_ERROR, ==, TC_DES_ECB_decrypt(&ctx, (TC_buffer){ctx.iv, TC_DES_BLOCKLEN}));
 #endif
   assert_des_ctx_equal(&ctx, &saved);
@@ -1252,7 +1255,9 @@ TC_TEST(test_des_iso9797_overlap)
   memcpy(saved_mac, ctx->mac, sizeof saved_mac);
   memcpy(saved_buf, ctx->buf, sizeof saved_buf);
   munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_update(ctx, (TC_bytes){ctx->buf, 1}));
-  munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_update(ctx, (TC_bytes){ctx->keys.schedule[0], 6}));
+  munit_assert_int(
+      TC_ERROR, ==,
+      TC_DES_ISO9797_update(ctx, (TC_bytes){(const uint8_t*)ctx->keys.schedule[0], 6}));
   munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_final(ctx, (TC_buffer){ctx->mac, TC_DES_BLOCKLEN}));
   munit_assert_int(TC_ERROR, ==,
                    TC_DES_ISO9797_final(
@@ -1272,6 +1277,12 @@ TC_TEST(test_des_secure_zero_and_clear)
   uint8_t buf[16];
   struct TC_DES_ctx ctx;
   size_t i;
+
+#if TC_DES_SBOX_MODE == TC_DES_SBOX_MODE_FAST
+  munit_assert_size(sizeof(TC_DES_round_key), ==, 8);
+#else
+  munit_assert_size(sizeof(TC_DES_round_key), ==, 6);
+#endif
 
   for (i = 0; i < sizeof(buf); ++i)
     buf[i] = (uint8_t)(0xA5U + (uint8_t)i);

@@ -506,8 +506,10 @@ single DES and TDEA, and the key length passed to `TC_DES_init` selects the ciph
 three-key TDEA when `TINY_CRYPTO_DES_ENABLE_TDES` is on. A failed init wipes the context, so an
 earlier key is unusable after a failed re-init.
 
-DES has a 56-bit effective key and exists for protocols that require it. Its table lookups have no
-cache-timing protection. Limit 3DES to compatibility code as well.
+DES has a 56-bit effective key and exists for protocols that require it. The default S-box mode is
+constant-time. `TINY_CRYPTO_DES_SBOX_MODE=fast` uses direct table lookups without cache-timing
+protection and lookup-ready round keys. The fast schedule adds 32 bytes for DES or 96 bytes for
+TDEA. Limit 3DES to compatibility code as well.
 `TINY_CRYPTO_DES_REJECT_WEAK_KEYS=ON` rejects weak or semi-weak DES component keys and TDEA bundles
 that collapse to single DES. It defaults off so published DES test vectors with such keys still run.
 
