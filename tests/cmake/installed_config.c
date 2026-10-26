@@ -3,6 +3,7 @@
  * installed build_config.h must supply the library's configuration: SHA-384
  * and PIV SM cipher suite 7, which the default header profile omits. */
 #include <tiny_crypto/hash.h>
+#include <tiny_crypto/des.h>
 #include <tiny_crypto/piv_sm.h>
 #include <string.h>
 
@@ -23,7 +24,17 @@ int main(void)
       0x1a, 0x8b, 0x60, 0x5a, 0x43, 0xff, 0x5b, 0xed, 0x80, 0x86, 0x07, 0x2b,
       0xa1, 0xe7, 0xcc, 0x23, 0x58, 0xba, 0xec, 0xa1, 0x34, 0xc8, 0x25, 0xa7};
   uint8_t digest[TC_SHA384_DIGESTLEN];
+  static const uint8_t des_key[TC_DES_KEYLEN] = {0x13, 0x34, 0x57, 0x79, 0x9b, 0xbc, 0xdf, 0xf1};
+  static const uint8_t des_expected[TC_DES_BLOCKLEN] = {0x85, 0xe8, 0x13, 0x54,
+                                                        0x0f, 0x0a, 0xb4, 0x05};
+  uint8_t des_block[TC_DES_BLOCKLEN] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
+  struct TC_DES_ctx des;
   if (TC_SHA384_digest((TC_bytes){(const uint8_t*)"abc", 3}, digest) != TC_OK)
     return 1;
-  return memcmp(digest, expected, sizeof digest) == 0 ? 0 : 1;
+  if (memcmp(digest, expected, sizeof digest) != 0 ||
+      TC_DES_init(&des, (TC_bytes){des_key, sizeof des_key}) != TC_OK ||
+      TC_DES_ECB_encrypt(&des, (TC_buffer){des_block, sizeof des_block}) != TC_OK)
+    return 1;
+  TC_DES_ctx_clear(&des);
+  return memcmp(des_block, des_expected, sizeof des_block) == 0 ? 0 : 1;
 }

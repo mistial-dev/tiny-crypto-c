@@ -45,6 +45,8 @@ run("${CMAKE_COMMAND}" -S "${SOURCE_DIR}" -B "${BINARY_DIR}/library"
   -DTINY_CRYPTO_PIV_SM_ENABLE_CS2=ON -DTINY_CRYPTO_PIV_SM_ENABLE_CS7=ON
   -DTINY_CRYPTO_ENABLE_SSKDF=ON -DTINY_CRYPTO_ENABLE_SHA384=ON
   -DTINY_CRYPTO_AES_ENABLE_DYNAMIC=ON -DTINY_CRYPTO_AES_ENABLE_ECB=ON
+  -DTINY_CRYPTO_ENABLE_DES=ON -DTINY_CRYPTO_DES_ENABLE_ECB=ON
+  -DTINY_CRYPTO_DES_ENABLE_TDES=ON -DTINY_CRYPTO_DES_SBOX_MODE=constant-time
   "-DCMAKE_INSTALL_PREFIX=${BINARY_DIR}/prefix"
   -DCMAKE_INSTALL_INCLUDEDIR=custom-include)
 run("${CMAKE_COMMAND}" --build "${BINARY_DIR}/library" --config Release)
@@ -88,11 +90,13 @@ if(NOT C_COMPILER MATCHES "(^|[/\\\\])cl(\\.exe)?$")
   run("${C_COMPILER}" -std=c99 -I "${BINARY_DIR}/prefix/custom-include"
     -DTC_ENABLE_SHA384=1 -DTC_RESOURCE_PROFILE=TC_RESOURCE_DEFAULT
     -DTC_AES_SBOX_MODE=TC_AES_SBOX_MODE_CONSTANT_TIME
+    -DTC_DES_SBOX_MODE=TC_DES_SBOX_MODE_CONSTANT_TIME
     -c "${SOURCE_DIR}/tests/cmake/installed_config.c"
     -o "${BINARY_DIR}/installed_config_match.o")
   # A definition that contradicts the installed build fails at compile time.
   foreach(conflict "TC_ENABLE_SHA384=0" "TC_RESOURCE_PROFILE=TC_RESOURCE_MICRO"
-      "TC_AES_GCM_GHASH_MODE=TC_AES_GCM_GHASH_MODE_WIDE")
+      "TC_AES_GCM_GHASH_MODE=TC_AES_GCM_GHASH_MODE_WIDE"
+      "TC_DES_SBOX_MODE=TC_DES_SBOX_MODE_FAST")
     string(REGEX REPLACE "=.*" "" macro "${conflict}")
     execute_process(COMMAND "${C_COMPILER}" -std=c99 -I "${BINARY_DIR}/prefix/custom-include"
         "-D${conflict}" -c "${SOURCE_DIR}/tests/cmake/installed_config.c"

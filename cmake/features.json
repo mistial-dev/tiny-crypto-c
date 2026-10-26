@@ -49,6 +49,9 @@
 
     {"macro": "TC_ENABLE_DES", "description": "Build DES and 3DES",
      "sources": ["src/des.c", "src/des_modes.c", "src/des_mac.c"]},
+    {"macro": "TC_DES_SBOX_MODE", "parent": "TC_ENABLE_DES", "description": "DES S-box implementation",
+     "values": [{"name": "constant-time", "value": 1}, {"name": "fast", "value": 2}],
+     "default": "constant-time"},
     {"macro": "TC_DES_ENABLE_ECB", "parent": "TC_ENABLE_DES", "description": "Build DES-ECB"},
     {"macro": "TC_DES_ENABLE_CBC", "parent": "TC_ENABLE_DES", "description": "Build DES-CBC"},
     {"macro": "TC_DES_ENABLE_CTR", "parent": "TC_ENABLE_DES", "description": "Build DES-CTR"},

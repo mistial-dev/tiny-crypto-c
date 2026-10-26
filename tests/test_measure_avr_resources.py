@@ -100,6 +100,24 @@ class ProfileBudgets(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "budget is for atmega2560, measured on atmega328p"):
             resources.check_budgets(report, budgets, io.StringIO())
 
+    def test_check_enforces_relative_flash_savings(self):
+        report = {"profiles": {
+            "small": {"mcu": "atmega328p", "flash": 2500},
+            "fast": {"mcu": "atmega328p", "flash": 4000},
+        }}
+        budgets = {
+            "profiles": {"small": {"flash": 3000}, "fast": {"flash": 4500}},
+            "comparisons": {"small_vs_fast": {
+                "smaller": "small", "larger": "fast", "metric": "flash",
+                "minimum_savings": 1536,
+            }},
+        }
+        with self.assertRaisesRegex(SystemExit, "1500 byte savings is below 1536"):
+            resources.check_budgets(report, budgets, io.StringIO())
+
+        report["profiles"]["small"]["flash"] = 2400
+        resources.check_budgets(report, budgets, io.StringIO())
+
 
 class ToolchainVersion(unittest.TestCase):
     def test_version_is_read_from_the_banner(self):

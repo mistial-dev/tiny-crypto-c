@@ -874,7 +874,8 @@ TC_EC_result TC_ECDSA_sign_digest_external_random(TC_EC_curve curve, TC_bytes pr
   if (!execution || !execution->random.fill ||
       !sign_storage_valid(private_key, public_key, digest, signature, workspace, execution))
     return TC_EC_ARGUMENT;
-  if (!bytes)
+  /* Reject unsupported sizes before using fixed-size temporary buffers. */
+  if (!bytes || bytes > TC_EC_MAX_BYTES)
     return TC_EC_UNSUPPORTED;
   if (private_key.length != bytes || public_key.length != 1 + 2 * bytes)
     return TC_EC_INVALID;

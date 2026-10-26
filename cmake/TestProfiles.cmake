@@ -17,7 +17,7 @@ set(tc_full_definitions
   TC_DES_ENABLE_ECB=1 TC_DES_ENABLE_CBC=1 TC_DES_ENABLE_CTR=1
   TC_DES_ENABLE_OFB=1 TC_DES_ENABLE_CFB1=1 TC_DES_ENABLE_CFB8=1
   TC_DES_ENABLE_CFB64=1 TC_DES_ENABLE_TDES=1 TC_DES_ENABLE_CMAC=1
-  TC_DES_ENABLE_ISO9797=1)
+  TC_DES_ENABLE_ISO9797=1 TC_DES_SBOX_MODE=TC_DES_SBOX_MODE_CONSTANT_TIME)
 # TC_AES_CAVP adds single-block AES entry points to the library. The DES, hash
 # and KDF switches are test-only and select the CAVP suites in tests/*/cavp.c.
 if(TINY_CRYPTO_TEST_FULL)
@@ -82,6 +82,18 @@ tc_add_test_library(tiny-crypto-c-test ${tc_test_sources})
 target_compile_definitions(tiny-crypto-c-test PUBLIC
   ${tc_full_definitions} TC_AES_KEY_BITS=128 TC_AES_ENABLE_EAX_PRIME=1
   TC_DES_REJECT_WEAK_KEYS=0)
+
+tc_add_test_library(tiny-crypto-c-test-des-fast
+  src/common.c ${tc_des_sources})
+target_compile_definitions(tiny-crypto-c-test-des-fast PUBLIC
+  TC_ENABLE_AES=0 TC_ENABLE_DES=1 TC_ENABLE_SHA1=0 TC_ENABLE_SHA224=0
+  TC_ENABLE_SHA256=0 TC_ENABLE_SHA384=0 TC_ENABLE_SHA512=0
+  TC_ENABLE_HMAC=0 TC_ENABLE_KDF=0 TC_AVR_PROGMEM=1
+  TC_DES_SBOX_MODE=TC_DES_SBOX_MODE_FAST TC_DES_ENABLE_ECB=1
+  TC_DES_ENABLE_CBC=1 TC_DES_ENABLE_CTR=1 TC_DES_ENABLE_OFB=1
+  TC_DES_ENABLE_CFB1=1 TC_DES_ENABLE_CFB8=1 TC_DES_ENABLE_CFB64=1
+  TC_DES_ENABLE_TDES=1 TC_DES_ENABLE_CMAC=1 TC_DES_ENABLE_ISO9797=1
+  TC_DES_REJECT_WEAK_KEYS=0 TC_DES_CAVP=$<BOOL:${TINY_CRYPTO_TEST_FULL}>)
 
 # AES-192/256 variants compile only AES and its CMAC-backed KDF, which keeps
 # SHA, HMAC and DES cores out of the per-key-size libraries.
