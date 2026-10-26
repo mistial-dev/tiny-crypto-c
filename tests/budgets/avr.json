@@ -1,6 +1,6 @@
 {
   "avr_gcc_version": "7.3.0",
-  "description": "ATmega328P unless a profile names its mcu, -Os without LTO. Rounded headroom over the recorded baseline. Stack covers project call chains, excluding application/libc/interrupt frames. Figures include the unconditional secret wiping and argument checks, which cost at most 50 bytes of flash and 4 bytes of stack in these profiles. aes_ctr runs on the CBC/CTR/OFB core shared with DES, so it includes the block cipher descriptor call and the buffer and context overlap check. aes_kw measures KW and KWP at AES-128 with fixed keys and the constant-time S-box. Its stack is the deepest entry, TC_AES_KWP_unwrap. The fast S-box adds a 256-byte inverse table in flash, and the runtime S-box adds 512 bytes of static RAM. ecdsa_p256, apdu_piv_read and piv_sm_cs2 measure on the ATmega2560 (256 KiB flash, 8 KiB RAM). The ECDSA profile exercises deterministic signing, including its mandatory self-check, then verifies the signature separately. The PIV profiles use the smallest common AVR part that holds a PIV reader. Their static RAM counts the link, the command scratch, a response buffer for a CHUID at its SP 800-73-5 Part 1 Table 8 capacity of 2881 bytes and, for piv_sm_cs2, the SM session, workspace and SM scratch. They exclude the transport callback. sm_framing_flash is the linked code of piv_sm_apdu.c and piv_sm_key_request.c.",
+  "description": "ATmega328P unless a profile names its mcu, -Os without LTO. Rounded headroom over the recorded baseline. Stack covers project call chains, excluding application/libc/interrupt frames. Figures include the unconditional secret wiping and argument checks, which cost at most 50 bytes of flash and 4 bytes of stack in these profiles. aes_ctr runs on the CBC/CTR/OFB core shared with DES, so it includes the block cipher descriptor call and the buffer and context overlap check. aes_kw measures KW and KWP at AES-128 with fixed keys and the constant-time S-box. Its stack is the deepest entry, TC_AES_KWP_unwrap. The fast AES S-box adds a 256-byte inverse table in flash, and the runtime S-box adds 512 bytes of static RAM. des_constant_time and des_fast link the same TDEA ECB operations; their comparison requires the constant-time algebraic S-boxes to save at least 1536 bytes of flash. ecdsa_p256, apdu_piv_read and piv_sm_cs2 measure on the ATmega2560 (256 KiB flash, 8 KiB RAM). The ECDSA profile exercises deterministic signing, including its mandatory self-check, then verifies the signature separately. The PIV profiles use the smallest common AVR part that holds a PIV reader. Their static RAM counts the link, the command scratch, a response buffer for a CHUID at its SP 800-73-5 Part 1 Table 8 capacity of 2881 bytes and, for piv_sm_cs2, the SM session, workspace and SM scratch. They exclude the transport callback. sm_framing_flash is the linked code of piv_sm_apdu.c and piv_sm_key_request.c.",
   "profiles": {
     "aes_ctr": {
       "flash": 2500,
@@ -36,6 +36,16 @@
       "static_ram": 150,
       "project_stack_estimate": 330
     },
+    "des_constant_time": {
+      "flash": 3900,
+      "static_ram": 80,
+      "project_stack_estimate": 110
+    },
+    "des_fast": {
+      "flash": 5650,
+      "static_ram": 80,
+      "project_stack_estimate": 85
+    },
     "apdu_piv_read": {
       "mcu": "atmega2560",
       "flash": 13700,
@@ -50,6 +60,14 @@
       "project_stack_estimate": 750,
       "sm_framing_flash": 3800,
       "sm_workspace_bytes": 1090
+    }
+  },
+  "comparisons": {
+    "des_constant_time_vs_fast": {
+      "smaller": "des_constant_time",
+      "larger": "des_fast",
+      "metric": "flash",
+      "minimum_savings": 1536
     }
   }
 }

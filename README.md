@@ -272,15 +272,18 @@ Under `AUTO`, the three `TINY_CRYPTO_TAF_ENABLE_*` choices follow
 | `TINY_CRYPTO_TARGET`             | empty, `full`, `piv`, `twic`, `desfire`                        | empty           |
 | `TINY_CRYPTO_AES_KEY_BITS`       | `128`, `192`, `256`                                            | `128`           |
 | `TINY_CRYPTO_AES_SBOX_MODE`      | `constant-time`, `runtime`, `fast`                             | `constant-time` |
+| `TINY_CRYPTO_DES_SBOX_MODE`      | `constant-time`, `fast`                                        | `constant-time` |
 | `TINY_CRYPTO_AES_GCM_GHASH_MODE` | `profile`, `auto`, `bitwise`, `wide`, `fast-table`, `hardware` | `profile`       |
 
 `TINY_CRYPTO_AES_KEY_BITS` fixes the key size of the `aes.h` API, including the AES-CMAC keys that
 KBKDF uses and the key wrap KEK. `TINY_CRYPTO_AES_ENABLE_DYNAMIC` adds per-context 128, 192 and
 256-bit keys and KEKs.
 
-The S-box modes trade timing protection for speed. `constant-time` computes the S-box
+The AES S-box modes trade timing protection for speed. `constant-time` computes the S-box
 algebraically. `runtime` builds it in RAM and reads it with a masked scan. `fast` uses direct
-table lookups and has no cache-timing protection.
+table lookups and has no cache-timing protection. DES follows the same convention: its
+`constant-time` mode computes all eight S-boxes algebraically and reduces flash use, while `fast`
+uses the eight combined S-box/permutation tables.
 
 `TINY_CRYPTO_AES_GCM_GHASH_MODE=profile` selects `auto` for the default and mini builds, `bitwise`
 for micro and `wide` for desktop. `fast-table` uses key-dependent table lookups and adds 256 bytes

@@ -637,6 +637,17 @@
 
 /* DES defaults enable CTR and Triple DES only. DES has a 56-bit effective
  * key; use it only where a protocol requires it. */
+/* DES S-box implementation:
+ *   TC_DES_SBOX_MODE_CONSTANT_TIME - algebraic normal form (default)
+ *   TC_DES_SBOX_MODE_FAST          - direct lookup, not constant-time */
+#define TC_DES_SBOX_MODE_CONSTANT_TIME 1
+#define TC_DES_SBOX_MODE_FAST 2
+#ifndef TC_DES_SBOX_MODE
+#define TC_DES_SBOX_MODE TC_DES_SBOX_MODE_CONSTANT_TIME
+#endif
+#if TC_DES_SBOX_MODE != TC_DES_SBOX_MODE_CONSTANT_TIME && TC_DES_SBOX_MODE != TC_DES_SBOX_MODE_FAST
+#error "TC_DES_SBOX_MODE must be TC_DES_SBOX_MODE_CONSTANT_TIME or TC_DES_SBOX_MODE_FAST"
+#endif
 #ifndef TC_DES_ENABLE_ECB
 #define TC_DES_ENABLE_ECB TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif

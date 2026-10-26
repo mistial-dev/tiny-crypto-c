@@ -4,6 +4,13 @@
 
 # Changelog
 
+## 2.1.0
+
+### Added
+
+- `TINY_CRYPTO_DES_SBOX_MODE` selects the constant-time algebraic DES S-box implementation or
+  the faster combined lookup tables. Constant-time is the default for every resource profile.
+
 ## 2.0.0
 
 2.0 changes public interfaces across the library. See [migrating to 2.0](docs/migration-2.0.md).

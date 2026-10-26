@@ -1556,6 +1556,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
   target_include_directories(test_des PRIVATE tests/des)
   target_compile_definitions(test_des PRIVATE
     CAVP_VECTOR_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/des/cavp")
+  tc_add_c_test(test_des_fast tiny-crypto-c-test-des-fast
+    tests/des/test.c tests/des/test_edge_vectors.c)
+  target_include_directories(test_des_fast PRIVATE tests/des)
+  target_compile_definitions(test_des_fast PRIVATE
+    CAVP_VECTOR_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/des/cavp")
 
   if(TINY_CRYPTO_TEST_FULL)
     tc_add_test_library(tiny-crypto-c-test-des-cmac-cavp
@@ -1566,6 +1571,10 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_c_test(test_des_cmac_cavp tiny-crypto-c-test-des-cmac-cavp
       tests/des/cmac_cavp.c)
     target_compile_definitions(test_des_cmac_cavp PRIVATE
+      CMAC_TDES_CAVP_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/des/cmac")
+    tc_add_c_test(test_des_cmac_cavp_fast tiny-crypto-c-test-des-fast
+      tests/des/cmac_cavp.c)
+    target_compile_definitions(test_des_cmac_cavp_fast PRIVATE
       CMAC_TDES_CAVP_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/des/cmac")
     add_executable(test_des_cavp
       tests/des/cavp_main.c tests/des/cavp.c
@@ -1579,6 +1588,19 @@ if(TINY_CRYPTO_BUILD_TESTS)
     foreach(group kat mmt mct-ecb mct-cbc mct-cfb1 mct-cfb8 mct-cfb64 mct-ofb)
       add_test(NAME test_des_cavp_${group}
         COMMAND test_des_cavp /tiny-des-cavp/${group})
+    endforeach()
+    add_executable(test_des_cavp_fast
+      tests/des/cavp_main.c tests/des/cavp.c
+      tests/support/cavp.c tests/support/munit.c)
+    target_link_libraries(test_des_cavp_fast PRIVATE tiny-crypto-c-test-des-fast)
+    target_include_directories(test_des_cavp_fast PRIVATE tests/support tests/des)
+    target_compile_definitions(test_des_cavp_fast PRIVATE
+      CAVP_VECTOR_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/des/cavp")
+    tc_warnings(test_des_cavp_fast)
+    tc_use_test_sanitizers(test_des_cavp_fast)
+    foreach(group kat mmt mct-ecb mct-cbc mct-cfb1 mct-cfb8 mct-cfb64 mct-ofb)
+      add_test(NAME test_des_cavp_fast_${group}
+        COMMAND test_des_cavp_fast /tiny-des-cavp/${group})
     endforeach()
   endif()
 
@@ -2128,6 +2150,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
       test_des_cavp_kat test_des_cavp_mmt test_des_cavp_mct-ecb
       test_des_cavp_mct-cbc test_des_cavp_mct-cfb1 test_des_cavp_mct-cfb8
       test_des_cavp_mct-cfb64 test_des_cavp_mct-ofb
+      test_des_cavp_fast_kat test_des_cavp_fast_mmt test_des_cavp_fast_mct-ecb
+      test_des_cavp_fast_mct-cbc test_des_cavp_fast_mct-cfb1 test_des_cavp_fast_mct-cfb8
+      test_des_cavp_fast_mct-cfb64 test_des_cavp_fast_mct-ofb
       PROPERTIES LABELS extended)
   endif()
 

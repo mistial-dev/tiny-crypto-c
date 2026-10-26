@@ -20,7 +20,8 @@
     TC_AES_GCM_GHASH_MODE != EXPECT_GHASH
 #error "Memory defaults disagree"
 #endif
-#if TC_AES_SBOX_MODE != 1
+#if TC_AES_SBOX_MODE != TC_AES_SBOX_MODE_CONSTANT_TIME ||                                          \
+    TC_DES_SBOX_MODE != TC_DES_SBOX_MODE_CONSTANT_TIME
 #error "Profiles must retain security defaults"
 #endif
 typedef int tc_profile_checked;

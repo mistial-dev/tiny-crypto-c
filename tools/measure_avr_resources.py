@@ -50,6 +50,24 @@ PROFILES = {
       if (TC_AES_KWP_wrap(kek, (TC_bytes){iv, 7}, (TC_buffer){out, 16}) != TC_OK) return 1;
       return TC_AES_KWP_unwrap(kek, (TC_bytes){out, 16}, (TC_buffer){iv, 8}, &length) != TC_OK;
     """, "TC_AES_KWP_unwrap"),
+    "des_constant_time": ([
+        "TC_ENABLE_AES=0", "TC_ENABLE_DES=1", "TC_DES_ENABLE_ECB=1",
+        "TC_DES_ENABLE_TDES=1", "TC_DES_SBOX_MODE=TC_DES_SBOX_MODE_CONSTANT_TIME",
+    ], """
+      struct TC_DES_ctx ctx;
+      if (TC_DES_init(&ctx, (TC_bytes){key, 24}) != TC_OK) return 1;
+      if (TC_DES_ECB_encrypt(&ctx, (TC_buffer){out, 8}) != TC_OK) return 1;
+      return TC_DES_ECB_decrypt(&ctx, (TC_buffer){out, 8}) != TC_OK;
+    """, ("TC_DES_ECB_encrypt", "TC_DES_ECB_decrypt")),
+    "des_fast": ([
+        "TC_ENABLE_AES=0", "TC_ENABLE_DES=1", "TC_DES_ENABLE_ECB=1",
+        "TC_DES_ENABLE_TDES=1", "TC_DES_SBOX_MODE=TC_DES_SBOX_MODE_FAST",
+    ], """
+      struct TC_DES_ctx ctx;
+      if (TC_DES_init(&ctx, (TC_bytes){key, 24}) != TC_OK) return 1;
+      if (TC_DES_ECB_encrypt(&ctx, (TC_buffer){out, 8}) != TC_OK) return 1;
+      return TC_DES_ECB_decrypt(&ctx, (TC_buffer){out, 8}) != TC_OK;
+    """, ("TC_DES_ECB_encrypt", "TC_DES_ECB_decrypt")),
     "kdf_sha256": (["TC_ENABLE_HMAC=1", "TC_ENABLE_KDF=1"], """
       struct TC_KBKDF_params p = {32, 1, 0};
       return TC_KBKDF_HMAC_SHA256_counter((TC_bytes){key, sizeof(key)}, &p, (TC_bytes){NULL, 0}, (TC_bytes){iv, sizeof(iv)}, (TC_buffer){out, sizeof(out)}) != TC_OK;
@@ -445,6 +463,14 @@ def check_budgets(report, budgets, stream=sys.stderr):
             actual = measured[metric]
             if actual is None or actual > limit:
                 raise SystemExit(f"{name} {metric}: {actual} exceeds {limit}")
+    for name, comparison in budgets.get("comparisons", {}).items():
+        metric = comparison["metric"]
+        smaller = report["profiles"][comparison["smaller"]][metric]
+        larger = report["profiles"][comparison["larger"]][metric]
+        savings = larger - smaller
+        if savings < comparison["minimum_savings"]:
+            raise SystemExit(f"{name}: {savings} byte savings is below "
+                             f"{comparison['minimum_savings']}")
 
 
 def main():
